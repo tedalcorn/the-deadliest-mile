@@ -51,8 +51,17 @@ const canvas=L.canvas({padding:.5});
 const segLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map);
 function rateColor(r,n){ if(!n||r==null) return '#d4d4d4';
   return r<1?'#1a9850':r<3?'#a6d96a':r<6?'#fee08b':r<12?'#fdae61':'#d73027'; }
-const harmPretty={Pedalcyclist:'bicyclist killed',Pedestrian:'pedestrian killed',
-  'Motor Vehicle In-Transport':'vehicle collision','Rollover/Overturn':'rollover'};
+const DOW=['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function crashPopup(c){
+  const ev=c.ev.charAt(0).toUpperCase()+c.ev.slice(1);
+  let date=[c.dw?DOW[c.dw]:'', `${MON[c.m]||''} ${c.dy||''}, ${c.y}`.trim()].filter(Boolean).join(', ');
+  if(c.hr!=null){ const h=c.hr%12||12; date+=` · ${h} ${c.hr<12?'AM':'PM'}`; }
+  let cas=`${c.k} killed`; if(c.p>c.k) cas+=` · ${c.p} people in the crash`;
+  let line3=[cas, c.d?'alcohol involved':''].filter(Boolean).join(' · ');
+  return `<div style="font:12px/1.5 -apple-system,Helvetica,Arial"><b>${ev}</b><br>`
+    +`<span style="color:#555">${date}</span>`+(c.rd?`<br>${c.rd}`:'')+`<br>${line3}</div>`;
+}
 let SEG=[], CR=[], y0=YMIN, y1=YMAX;
 
 function draw(){
@@ -67,10 +76,8 @@ function draw(){
   ptLayer.clearLayers();
   let nc=0,nk=0;
   CR.forEach(c=>{ if(c.y<y0||c.y>y1) return; nc++; nk+=c.k;
-    const lab=harmPretty[c.h]||c.h||'fatal crash';
-    const pop=`<b>${lab}</b><br>${c.y}`+(c.k>1?` · ${c.k} killed`:'')+(c.d?'<br>alcohol involved':'');
     L.circleMarker([c.la,c.lo],{renderer:canvas,radius:4+(c.k-1)*2,color:'#67000d',weight:1,
-      fillColor:'#cb181d',fillOpacity:.9}).bindPopup(pop).addTo(ptLayer);
+      fillColor:'#cb181d',fillOpacity:.9}).bindPopup(crashPopup(c)).addTo(ptLayer);
   });
   document.getElementById('yrlabel').textContent = y0===y1? y0 : `${y0}–${y1}`;
   document.getElementById('stat').innerHTML = `${nc.toLocaleString()} fatal crashes · ${nk.toLocaleString()} killed`;
