@@ -54,13 +54,15 @@ function rateColor(r,n){ if(!n||r==null) return '#d4d4d4';
 const DOW=['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MON=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function crashPopup(c){
-  const ev=c.ev.charAt(0).toUpperCase()+c.ev.slice(1);
+  let cas=`${c.k} killed`;
+  if(c.inj) cas+=` · ${c.inj} injured`+(c.si?` (${c.si} serious)`:'');
   let date=[c.dw?DOW[c.dw]:'', `${MON[c.m]||''} ${c.dy||''}, ${c.y}`.trim()].filter(Boolean).join(', ');
   if(c.hr!=null){ const h=c.hr%12||12; date+=` · ${h} ${c.hr<12?'AM':'PM'}`; }
-  let cas=`${c.k} killed`; if(c.p>c.k) cas+=` · ${c.p} people in the crash`;
-  let line3=[cas, c.d?'alcohol involved':''].filter(Boolean).join(' · ');
-  return `<div style="font:12px/1.5 -apple-system,Helvetica,Arial"><b>${ev}</b><br>`
-    +`<span style="color:#555">${date}</span>`+(c.rd?`<br>${c.rd}`:'')+`<br>${line3}</div>`;
+  const details=[c.ev, c.d?'alcohol involved':''].filter(Boolean).join(' · ');
+  let html=`<div style="font:12px/1.55 -apple-system,Helvetica,Arial"><b>${cas}</b>`
+    +`<br><span style="color:#555">${date}</span>`;
+  if(details) html+=`<br>${details}`;
+  return html+'</div>';
 }
 let SEG=[], CR=[], y0=YMIN, y1=YMAX;
 
