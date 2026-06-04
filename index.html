@@ -13,7 +13,9 @@
   #ctrl{bottom:18px;right:14px;padding:10px 13px;width:210px}
   #ctrl .yr{font-weight:600;margin-bottom:9px}
   #slider{margin:2px 7px 4px}
-  #stat{margin-top:9px;color:#444}
+  #pedrow{display:flex;align-items:center;gap:5px;margin-top:7px;font-size:11px;color:#555;cursor:pointer}
+  #pedrow input{margin:0}
+  #stat{margin-top:8px;color:#444}
   /* thin slider with small vertical-line handles */
   .noUi-target{height:3px;border:none;background:#dcdcdc;box-shadow:none}
   .noUi-connect{background:#2171b5}
@@ -28,7 +30,9 @@
 <body>
 <div id="map"></div>
 <div id="ctrl" class="panel"><div class="yr">Years: <span id="yrlabel"></span></div>
-  <div id="slider"></div><div id="stat"></div></div>
+  <div id="slider"></div>
+  <label id="pedrow"><input type="checkbox" id="fPed"> pedestrian / cyclist only</label>
+  <div id="stat"></div></div>
 <div id="legend" class="panel">
   <b>Fatal crashes per 100M vehicle-miles</b>
   <div><span class="sw" style="background:#1a9850"></span>&lt;1
@@ -65,29 +69,33 @@ function crashPopup(c){
   return html+'</div>';
 }
 let SEG=[], CR=[], y0=YMIN, y1=YMAX;
+const fPed=document.getElementById('fPed');
 
 function draw(){
-  const ny=y1-y0+1;
+  const ny=y1-y0+1, ped=fPed.checked;
   segLayer.clearLayers();
   SEG.forEach(s=>{
-    const n=s.y.filter(y=>y>=y0&&y<=y1).length, vmt=s.a*365*ny*s.l, rate=vmt? n/vmt*1e8:null;
-    const tip=`<b>${s.lab}</b><br>${n} fatal crash(es) ${y0}–${y1} on this ${s.l}-mi segment`
+    const n=s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&(!ped||a[1])).length;
+    const vmt=s.a*365*ny*s.l, rate=vmt? n/vmt*1e8:null;
+    const what=ped?'pedestrian/cyclist fatal crash(es)':'fatal crash(es)';
+    const tip=`<b>${s.lab}</b><br>${n} ${what} ${y0}–${y1} on this ${s.l}-mi segment`
       +`<br>AADT ${s.a.toLocaleString()}`+(rate!=null?`<br>rate ${rate.toFixed(1)} per 100M veh-mi`:'');
     L.polyline(s.c,{color:rateColor(rate,n),weight:n?7:2,opacity:.85}).bindPopup(tip).addTo(segLayer);
   });
   ptLayer.clearLayers();
   let nc=0,nk=0;
-  CR.forEach(c=>{ if(c.y<y0||c.y>y1) return; nc++; nk+=c.k;
+  CR.forEach(c=>{ if(c.y<y0||c.y>y1||(ped&&!c.pc)) return; nc++; nk+=c.k;
     L.circleMarker([c.la,c.lo],{renderer:canvas,radius:4+(c.k-1)*2,color:'#67000d',weight:1,
       fillColor:'#cb181d',fillOpacity:.9}).bindPopup(crashPopup(c)).addTo(ptLayer);
   });
   document.getElementById('yrlabel').textContent = y0===y1? y0 : `${y0}–${y1}`;
-  document.getElementById('stat').innerHTML = `${nc.toLocaleString()} fatal crashes · ${nk.toLocaleString()} killed`;
+  document.getElementById('stat').innerHTML = `${nc.toLocaleString()} ${ped?'crashes':'fatal crashes'} · ${nk.toLocaleString()} killed`;
 }
 const slider=document.getElementById('slider');
 noUiSlider.create(slider,{start:[YMIN,YMAX],connect:true,step:1,margin:0,
   range:{min:YMIN,max:YMAX},format:{to:v=>Math.round(v),from:v=>Number(v)}});
 slider.noUiSlider.on('update',v=>{ y0=+v[0]; y1=+v[1]; draw(); });
+fPed.addEventListener('change',draw);
 Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
   .then(([s,c])=>{ SEG=s; CR=c; draw(); });
 </script>
