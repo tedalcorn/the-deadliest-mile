@@ -45,8 +45,13 @@
   #rnx{display:none;position:absolute;top:3px;right:8px;border:none;background:none;font-size:21px;
     color:#999;cursor:pointer;line-height:1;padding:0}
   #rnx:hover{color:#444}
-  @media(max-width:620px){ #leftstack{right:14px;max-width:none}
-    #risknote{padding-right:28px} #rnx{display:block} }
+  @media(max-width:620px){
+    #leftstack{top:8px;bottom:auto;left:8px;right:8px;max-width:none}
+    #risknote{padding-right:28px} #rnx{display:block}
+    #ctrl{left:8px;right:8px;width:auto;bottom:10px;padding:11px 13px}
+    #legend .lgscale{white-space:normal}
+    .leaflet-control-zoom{display:none}
+  }
   .muted{color:#888;font-size:12px}
   #about{top:13%;left:26px;width:330px;padding:22px 24px;z-index:1200}
   #about .atitle{font-size:23px;font-weight:700;line-height:1.22;margin:0 14px 11px 0;color:#1a2433}
@@ -108,6 +113,16 @@
   table.seg th.sorted{color:#1559a3}
   table.seg tbody tr{cursor:pointer}
   table.seg tbody tr:hover{background:#eaf3fb}
+  /* mobile: keep only Road · Location · Crashes · Rate so the table fits */
+  @media(max-width:620px){
+    .wrap{padding:14px 10px 70px}
+    table.seg th,table.seg td{padding:7px 8px}
+    table.seg th:nth-child(3),table.seg td:nth-child(3),
+    table.seg th:nth-child(4),table.seg td:nth-child(4),
+    table.seg th:nth-child(6),table.seg td:nth-child(6),
+    table.seg th:nth-child(8),table.seg td:nth-child(8){display:none}
+    table.seg th:nth-child(2),table.seg td:nth-child(2){white-space:normal}
+  }
   .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
   .rec{display:inline-flex;height:9px;width:46px;border-radius:2px;overflow:hidden;
     vertical-align:-1px;margin-left:7px;border:1px solid #dcdcdc}
