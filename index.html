@@ -24,7 +24,9 @@
   /* floating panels on the map */
   .panel{position:absolute;z-index:1000;background:rgba(255,255,255,.96);border:1px solid #ccc;
     border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.2);font:12px/1.4 -apple-system,Helvetica,Arial}
-  #ctrl{bottom:18px;right:14px;padding:10px 13px;width:214px}
+  #ctrl{bottom:18px;right:14px;padding:10px 13px;width:248px}
+  #ctrl .mslab{font-weight:600;margin-bottom:4px}
+  #mapsearch{width:100%;font:12px inherit;padding:5px 8px;border:1px solid #c3c3c3;border-radius:5px}
   #ctrl .yr{font-weight:600;margin-bottom:9px}
   #slider,#slider2{margin:2px 7px 4px}
   #stat{margin-top:8px;color:#444}
@@ -71,6 +73,8 @@
   .hbar.sel .hl{font-weight:700;color:#111}
   .hbar.dim .bar{opacity:.28}
   .zeronote{color:#777;font-size:11.5px;margin-top:9px;text-align:center}
+  .zeronote #hclear{color:#1559a3;font-weight:600;text-decoration:none}
+  .zeronote #hclear:hover{text-decoration:underline}
   table.seg{width:100%;border-collapse:collapse;background:#fff;font-size:12.5px;
     border:1px solid #e2e6ea;border-radius:6px;overflow:hidden}
   table.seg th,table.seg td{padding:6px 10px;text-align:right;border-bottom:1px solid #eee;
@@ -117,7 +121,9 @@
   <div id="map-view" class="view active">
     <div id="map"></div>
     <div id="ctrl" class="panel">
-      <div class="yr">Years: <span id="yrlabel"></span></div>
+      <div class="mslab">Search roads or communities:</div>
+      <input id="mapsearch" placeholder="e.g. I-25, Gallup" autocomplete="off">
+      <div class="yr" style="margin-top:9px">Years: <span id="yrlabel"></span></div>
       <div id="slider"></div>
       <div class="catsel" data-which="map" style="margin-top:8px">
         <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button>
@@ -171,7 +177,7 @@
   </div>
 </div>
 <script>
-const YMIN=2001, YMAX=2024, STATS={"segTotal": 2287, "crTotal": 8426, "crAssigned": 4731, "crLocal": 2888, "crUnmatched": 807, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 1555, "road": "NM-53", "loc": "Zuni", "cty": "McKinley", "lat": 35.0518, "lon": -108.9441, "n": 10, "ped": 1, "aadt": 324, "len": 11.6, "rate": 30.3}, {"kind": "rate", "seg": 908, "road": "NM-244", "loc": "Mescalero", "cty": "Otero", "lat": 33.0601, "lon": -105.5695, "n": 9, "ped": 0, "aadt": 183, "len": 29.2, "rate": 19.3}, {"kind": "rate", "seg": 1206, "road": "NM-404", "loc": "Anthony", "cty": "Do\u00f1a Ana", "lat": 32.0114, "lon": -106.5446, "n": 11, "ped": 0, "aadt": 1069, "len": 8.9, "rate": 13.2}, {"kind": "rate", "seg": 1307, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0765, "lon": -106.7127, "n": 10, "ped": 8, "aadt": 21409, "len": 0.8, "rate": 6.8}, {"kind": "rate", "seg": 1304, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0208, "lon": -106.7149, "n": 12, "ped": 7, "aadt": 20133, "len": 1.1, "rate": 6.4}, {"kind": "rate", "seg": 551, "road": "NM-118", "loc": "Gallup", "cty": "McKinley", "lat": 35.5328, "lon": -108.6485, "n": 17, "ped": 7, "aadt": 9239, "len": 3.5, "rate": 6.0}, {"kind": "rate", "seg": 1321, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.092, "lon": -106.7103, "n": 9, "ped": 3, "aadt": 31122, "len": 0.6, "rate": 5.8}, {"kind": "rate", "seg": 2219, "road": "US-82", "loc": "E of Alamogordo", "cty": "Otero", "lat": 32.9412, "lon": -105.6164, "n": 9, "ped": 0, "aadt": 1111, "len": 17.1, "rate": 5.4}, {"kind": "rate", "seg": 1367, "road": "NM-47", "loc": "Belen", "cty": "Valencia", "lat": 34.5086, "lon": -106.598, "n": 9, "ped": 0, "aadt": 1273, "len": 17.4, "rate": 4.6}, {"kind": "rate", "seg": 2273, "road": "US 84/285", "loc": "Santa Fe", "cty": "Santa Fe", "lat": 35.6692, "lon": -105.9558, "n": 8, "ped": 2, "aadt": 32102, "len": 0.6, "rate": 4.6}, {"kind": "rate", "seg": 140, "road": "I-25", "loc": "S of Truth or Consequences", "cty": "Sierra", "lat": 32.9172, "lon": -107.3187, "n": 13, "ped": 1, "aadt": 8200, "len": 4.2, "rate": 4.3}, {"kind": "rate", "seg": 536, "road": "NM-116", "loc": "Bosque", "cty": "Valencia", "lat": 34.6151, "lon": -106.7774, "n": 9, "ped": 0, "aadt": 4366, "len": 5.6, "rate": 4.2}], "ped": [{"kind": "ped", "road": "Central Ave", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0756, "lon": -106.6029, "n": 58, "e": [[35.0785, -106.769], [35.0739, -106.5009]]}, {"kind": "ped", "road": "I-40", "loc": "Albuquerque", "cty": "", "lat": 35.0927, "lon": -106.6624, "n": 24, "e": [[35.046, -106.9779], [35.1104, -106.5423]]}, {"kind": "ped", "road": "Sr-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0909, "lon": -106.7032, "n": 22, "e": [[35.0055, -106.7255], [35.2079, -106.6727]]}, {"kind": "ped", "road": "I-25", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0759, "lon": -106.628, "n": 20, "e": [[34.9511, -106.6681], [35.1978, -106.5889]]}, {"kind": "ped", "road": "Sr-45 Coors Blvd", "loc": "Albuquerque", "cty": "", "lat": 35.0648, "lon": -106.7083, "n": 19, "e": [[34.9614, -106.7273], [35.1888, -106.6855]]}, {"kind": "ped", "road": "Louisiana Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0918, "lon": -106.5687, "n": 12, "e": [[35.1295, -106.5688], [35.0613, -106.5687]]}, {"kind": "ped", "road": "Montgomery Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.1309, "lon": -106.5747, "n": 10, "e": [[35.1311, -106.6077], [35.1305, -106.5093]]}, {"kind": "ped", "road": "Us-64", "loc": "W of Farmington", "cty": "", "lat": 36.7577, "lon": -108.5275, "n": 9, "e": [[36.7785, -108.7431], [36.7361, -108.3033]]}]};
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 2287, "crTotal": 8426, "crAssigned": 4731, "crLocal": 2888, "crUnmatched": 807, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 1555, "road": "NM-53", "loc": "Zuni", "cty": "McKinley", "lat": 35.0518, "lon": -108.9441, "n": 10, "ped": 1, "aadt": 324, "len": 11.6, "rate": 30.3}, {"kind": "rate", "seg": 908, "road": "NM-244", "loc": "Mescalero", "cty": "Otero", "lat": 33.0601, "lon": -105.5695, "n": 9, "ped": 0, "aadt": 183, "len": 29.2, "rate": 19.3}, {"kind": "rate", "seg": 1206, "road": "NM-404", "loc": "Anthony", "cty": "Do\u00f1a Ana", "lat": 32.0114, "lon": -106.5446, "n": 11, "ped": 0, "aadt": 1069, "len": 8.9, "rate": 13.2}, {"kind": "rate", "seg": 1307, "road": "NM-45", "loc": "Albuquerque (4 mi W)", "cty": "Bernalillo", "lat": 35.0765, "lon": -106.7127, "n": 10, "ped": 8, "aadt": 21409, "len": 0.8, "rate": 6.8}, {"kind": "rate", "seg": 1304, "road": "NM-45", "loc": "Albuquerque (6 mi SW)", "cty": "Bernalillo", "lat": 35.0208, "lon": -106.7149, "n": 12, "ped": 7, "aadt": 20133, "len": 1.1, "rate": 6.4}, {"kind": "rate", "seg": 551, "road": "NM-118", "loc": "Gallup (5 mi E)", "cty": "McKinley", "lat": 35.5328, "lon": -108.6485, "n": 17, "ped": 7, "aadt": 9239, "len": 3.5, "rate": 6.0}, {"kind": "rate", "seg": 1321, "road": "NM-45", "loc": "Albuquerque (3 mi W)", "cty": "Bernalillo", "lat": 35.092, "lon": -106.7103, "n": 9, "ped": 3, "aadt": 31122, "len": 0.6, "rate": 5.8}, {"kind": "rate", "seg": 2219, "road": "US-82", "loc": "20 mi E of Alamogordo", "cty": "Otero", "lat": 32.9412, "lon": -105.6164, "n": 9, "ped": 0, "aadt": 1111, "len": 17.1, "rate": 5.4}, {"kind": "rate", "seg": 1367, "road": "NM-47", "loc": "Belen (15 mi SE)", "cty": "Valencia", "lat": 34.5086, "lon": -106.598, "n": 9, "ped": 0, "aadt": 1273, "len": 17.4, "rate": 4.6}, {"kind": "rate", "seg": 2273, "road": "US 84/285", "loc": "Santa Fe", "cty": "Santa Fe", "lat": 35.6692, "lon": -105.9558, "n": 8, "ped": 2, "aadt": 32102, "len": 0.6, "rate": 4.6}, {"kind": "rate", "seg": 140, "road": "I-25", "loc": "15 mi S of Truth or Consequences", "cty": "Sierra", "lat": 32.9172, "lon": -107.3187, "n": 13, "ped": 1, "aadt": 8200, "len": 4.2, "rate": 4.3}, {"kind": "rate", "seg": 536, "road": "NM-116", "loc": "Bosque", "cty": "Valencia", "lat": 34.6151, "lon": -106.7774, "n": 9, "ped": 0, "aadt": 4366, "len": 5.6, "rate": 4.2}], "ped": [{"kind": "ped", "road": "Central Ave", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0756, "lon": -106.6029, "n": 58, "e": [[35.0712, -106.749], [35.0718, -106.7463], [35.0726, -106.7427], [35.0734, -106.7395], [35.074, -106.7367], [35.0745, -106.7342], [35.0757, -106.7303], [35.077, -106.7265], [35.079, -106.7201], [35.0801, -106.7122], [35.081, -106.7033], [35.0818, -106.6937], [35.0822, -106.683], [35.0824, -106.6732], [35.0825, -106.6632], [35.0825, -106.6534], [35.0825, -106.6434], [35.0823, -106.6344], [35.082, -106.6255], [35.0817, -106.6163], [35.0813, -106.607], [35.0803, -106.5994], [35.0789, -106.5921], [35.0776, -106.5848], [35.077, -106.579], [35.0766, -106.5744], [35.0762, -106.5709], [35.076, -106.5691], [35.0758, -106.5673], [35.0756, -106.5659], [35.0755, -106.5646], [35.0754, -106.5633], [35.0752, -106.562], [35.0751, -106.5606], [35.0749, -106.5593], [35.0748, -106.5583], [35.0747, -106.5572], [35.0746, -106.5562], [35.0745, -106.5552], [35.0744, -106.554], [35.0742, -106.5526], [35.074, -106.5511], [35.0739, -106.5497], [35.0737, -106.5481], [35.0735, -106.5465], [35.0733, -106.5447], [35.0731, -106.5422], [35.0727, -106.539], [35.0723, -106.5357], [35.072, -106.5326], [35.0716, -106.5294], [35.0715, -106.528], [35.0713, -106.5264], [35.0711, -106.5247], [35.0709, -106.5229], [35.0707, -106.5212], [35.0705, -106.5193], [35.0703, -106.517]]}, {"kind": "ped", "road": "I-40", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.092, "lon": -106.6607, "n": 23, "e": [[35.0428, -106.892], [35.0492, -106.8643], [35.0582, -106.8375], [35.074, -106.7847], [35.0864, -106.7464], [35.0957, -106.7269], [35.1033, -106.7116], [35.106, -106.6891], [35.1064, -106.6695], [35.1065, -106.6488], [35.1062, -106.6286], [35.1057, -106.6075], [35.105, -106.6034], [35.1045, -106.6004], [35.1043, -106.5978], [35.1041, -106.5946], [35.1035, -106.5903], [35.1028, -106.5861], [35.0993, -106.5748], [35.0956, -106.5642], [35.0917, -106.5539], [35.0894, -106.548], [35.0856, -106.5386]]}, {"kind": "ped", "road": "Sr-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0909, "lon": -106.7032, "n": 22, "e": [[35.0147, -106.7158], [35.0179, -106.7153], [35.0233, -106.7142], [35.0335, -106.7119], [35.0437, -106.7112], [35.0541, -106.7108], [35.0648, -106.7102], [35.0724, -106.7104], [35.0803, -106.7111], [35.0864, -106.7085], [35.0924, -106.707], [35.0971, -106.706], [35.1027, -106.7044], [35.107, -106.7028], [35.1102, -106.7035], [35.113, -106.7026], [35.1159, -106.7019], [35.1193, -106.7016], [35.1373, -106.6932], [35.1551, -106.6846], [35.1646, -106.6804], [35.1798, -106.6733]]}, {"kind": "ped", "road": "I-25", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0759, "lon": -106.628, "n": 20, "e": [[34.9617, -106.6635], [34.9669, -106.6604], [34.9714, -106.6582], [34.9815, -106.6529], [35.0008, -106.6469], [35.016, -106.6442], [35.0377, -106.6409], [35.0588, -106.6377], [35.0801, -106.6345], [35.0936, -106.6319], [35.1054, -106.6293], [35.1124, -106.6264], [35.1199, -106.6217], [35.1252, -106.6173], [35.1294, -106.6127], [35.134, -106.6073], [35.141, -106.6006], [35.1536, -106.5946], [35.1582, -106.5917], [35.1652, -106.5882]]}, {"kind": "ped", "road": "Sr-45 Coors Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0638, "lon": -106.7081, "n": 18, "e": [[34.9867, -106.7173], [34.9934, -106.717], [34.9979, -106.7167], [35.0091, -106.7165], [35.0206, -106.7146], [35.0301, -106.7131], [35.0425, -106.7125], [35.0554, -106.7115], [35.068, -106.7104], [35.0758, -106.7106], [35.0805, -106.7111], [35.086, -106.7096], [35.0924, -106.708], [35.0997, -106.7062], [35.1067, -106.7044], [35.1272, -106.6948], [35.1331, -106.6921], [35.1403, -106.6887]]}, {"kind": "ped", "road": "Louisiana Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0918, "lon": -106.5687, "n": 12, "e": [[35.1292, -106.5687], [35.126, -106.5687], [35.1168, -106.5687], [35.1069, -106.5687], [35.0987, -106.5688], [35.0925, -106.5688], [35.087, -106.5687], [35.0785, -106.5686], [35.0736, -106.5686], [35.0667, -106.5687], [35.0641, -106.5687], [35.0616, -106.5687]]}, {"kind": "ped", "road": "Montgomery Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.1309, "lon": -106.5747, "n": 10, "e": [[35.1312, -106.6055], [35.1311, -106.6038], [35.1309, -106.5975], [35.1309, -106.592], [35.1309, -106.5814], [35.1308, -106.5729], [35.1308, -106.5639], [35.1308, -106.5606], [35.1307, -106.5426], [35.1307, -106.5339]]}, {"kind": "ped", "road": "Menaul Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.1091, "lon": -106.589, "n": 9, "e": [[35.1091, -106.6264], [35.1092, -106.6212], [35.1092, -106.6124], [35.1092, -106.6049], [35.1091, -106.5944], [35.1091, -106.5812], [35.109, -106.5683], [35.109, -106.5514], [35.1089, -106.5456]]}]}, CITIES=[["Albuquerque", 35.0844, -106.6504], ["Las Cruces", 32.3199, -106.7637], ["Rio Rancho", 35.2328, -106.663], ["Santa Fe", 35.687, -105.9378], ["Roswell", 33.3943, -104.523], ["Farmington", 36.7281, -108.2187], ["Clovis", 34.4048, -103.2052], ["Hobbs", 32.7026, -103.136], ["Carlsbad", 32.4207, -104.2288], ["Alamogordo", 32.8995, -105.9603], ["Las Vegas", 35.5939, -105.2239], ["Gallup", 35.5281, -108.7426], ["Deming", 32.2687, -107.7586], ["Los Lunas", 34.8062, -106.7331], ["Artesia", 32.8423, -104.4035], ["Lovington", 32.944, -103.3486], ["Silver City", 32.7701, -108.2803], ["Espanola", 35.9911, -106.0806], ["Grants", 35.1473, -107.8514], ["Socorro", 34.0584, -106.8914], ["Taos", 36.4072, -105.5731], ["Raton", 36.9034, -104.4391], ["Truth or Consequences", 33.1284, -107.2528], ["Ruidoso", 33.3317, -105.673], ["Portales", 34.1862, -103.3344], ["Belen", 34.6626, -106.7764], ["Aztec", 36.8222, -107.9928], ["Bloomfield", 36.7111, -107.9845], ["Tucumcari", 35.1717, -103.725], ["Los Alamos", 35.8881, -106.307], ["Bernalillo", 35.3001, -106.5514], ["Edgewood", 35.0617, -106.1911], ["Chama", 36.9039, -106.5792], ["Mora", 35.9697, -105.3289], ["Cuba", 36.0233, -106.9586], ["Springer", 36.365, -104.595], ["Reserve", 33.71, -108.757], ["Clayton", 36.4511, -103.1841], ["Lordsburg", 32.3501, -108.707], ["Mountainair", 34.5206, -106.2436]];
 const NM_BOUNDS=[[31.33,-109.05],[37.0,-103.0]];
 const map=L.map('map',{attributionControl:true});
 map.fitBounds(NM_BOUNDS);   // open on the whole state
@@ -179,7 +185,26 @@ map.attributionControl.setPrefix(false);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
   {attribution:'© OSM, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
 const canvas=L.canvas({padding:.5});
-const segLayer=L.layerGroup().addTo(map), hlLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map);
+const segLayer=L.layerGroup().addTo(map), rhlLayer=L.layerGroup().addTo(map),
+      hlLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map);
+function mapSearch(q){
+  q=(q||'').trim().toLowerCase(); if(!q) return;
+  // exact municipality -> center on it (even though its name also tags nearby segments)
+  const exact=CITIES.find(c=>c[0].toLowerCase()===q);
+  if(exact){ rhlLayer.clearLayers(); map.setView([exact[1],exact[2]],11); return; }
+  // otherwise treat as a road/place: highlight the matching segments' real geometry
+  const segs=SEG.filter(s=>((s.lab||'')+' '+(s.loc||'')).toLowerCase().includes(q));
+  if(segs.length){
+    rhlLayer.clearLayers();
+    const bnds=L.latLngBounds([]);
+    segs.forEach(s=>{ L.polyline(s.c,{color:'#1d6fd8',weight:hlWeight(),opacity:.55,interactive:false}).addTo(rhlLayer);
+      s.c.forEach(p=>bnds.extend(p)); });
+    map.fitBounds(bnds,{padding:[45,45]});
+    return;
+  }
+  const city=CITIES.find(c=>c[0].toLowerCase().includes(q));
+  if(city){ rhlLayer.clearLayers(); map.setView([city[1],city[2]],11); }
+}
 function hlWeight(){ return segWeight().hit*2.0 + 5; }   // translucent highlight, fatter than the route
 function highlightSeg(i){ hlLayer.clearLayers();
   if(SEG[i]) L.polyline(SEG[i].c,{color:'#1d6fd8',weight:hlWeight(),opacity:.45,
@@ -260,7 +285,8 @@ function drawMap(){
 // zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
 map.on('zoomend',()=>{ const zw=segWeight();
   segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:sel(SEG[i]).length?zw.hit:zw.miss}); });
-  hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
+  hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); });
+  rhlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
 map.on('popupclose',()=>hlLayer.clearLayers());
 // Explicit view state so the toggle direction never depends on a zoom guess.
 let detail=null, atState=false;
@@ -289,9 +315,9 @@ function gotoSpot(h){
   setTab('map');
   if(h.seg!=null && SEG[h.seg]){ gotoSeg(h.seg); return; }   // rate hotspot is a real segment
   detail={t:'spot',h}; atState=false;
-  highlightLine(h.e);                                        // blue line along the cluster's axis
+  highlightLine(h.e);                                        // smoothed line tracing the corridor
   map.fitBounds(h.e,{padding:[80,80],maxZoom:14});
-  const mid=[(h.e[0][0]+h.e[1][0])/2,(h.e[0][1]+h.e[1][1])/2];
+  const mid=h.e[Math.floor(h.e.length/2)];
   setTimeout(()=>L.popup({maxWidth:260}).setLatLng(mid).setContent(spotTip(h)).openOn(map),360);
 }
 function renderHotspots(){
@@ -344,9 +370,13 @@ function renderHist(counts, BK){
     return `<div class="${cls}" data-b="${i}"><div class="hn">${counts[i]}</div>`
       +`<div class="bar" style="height:${Math.round(100*counts[i]/max)}%;background:${b.c}"></div>`
       +`<div class="hl">${lab}</div></div>`; }).join('');
-  document.getElementById('zeronote').textContent = histMode==='rate'
+  const cap = histMode==='rate'
     ? 'Each bar = number of road segments whose fatal-crash rate falls in that range.'
     : 'Each bar = number of road segments with that many fatal crashes in the selected years.';
+  const zn=document.getElementById('zeronote');
+  zn.innerHTML = cap + (bucketFilter!=null ? ` &nbsp;·&nbsp; <a href="#" id="hclear">show all segments</a>` : '');
+  const hc=document.getElementById('hclear');
+  if(hc) hc.onclick=(ev)=>{ ev.preventDefault(); bucketFilter=null; buildAnalysis(); };
   h.querySelectorAll('.hbar').forEach(el=>el.onclick=()=>{
     const b=+el.dataset.b; bucketFilter = (bucketFilter===b? null : b); buildAnalysis(); });
 }
@@ -413,6 +443,7 @@ const sMap=document.getElementById('slider'), sAna=document.getElementById('slid
 });
 document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>setCat(b.dataset.cat)));
 document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
+document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key==='Enter') mapSearch(e.target.value); });
 document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('click',()=>{
   histMode=b.dataset.m; bucketFilter=null;
   document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
