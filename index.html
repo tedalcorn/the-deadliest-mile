@@ -68,7 +68,7 @@
   .hbar .hl{font-size:11px;color:#666;margin-top:5px}
   .hbar.sel .hl{font-weight:700;color:#111}
   .hbar.dim .bar{opacity:.28}
-  .zeronote{color:#777;font-size:11.5px;margin-top:9px}
+  .zeronote{color:#777;font-size:11.5px;margin-top:9px;text-align:center}
   table.seg{width:100%;border-collapse:collapse;background:#fff;font-size:12.5px;
     border:1px solid #e2e6ea;border-radius:6px;overflow:hidden}
   table.seg th,table.seg td{padding:6px 10px;text-align:right;border-bottom:1px solid #eee;
@@ -91,8 +91,12 @@
   .segpop{font:12px/1.5 -apple-system,Helvetica,Arial}
   .hsgrp{margin:0 0 22px}
   .hsgrp h3{font-size:13.5px;margin:0 0 10px;border-bottom:2px solid #e2e6ea;padding-bottom:5px}
+  .hsred{color:#c0392b}
+  .hsred .muted{color:#888;font-weight:400}
+  .hscards{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  @media(max-width:680px){ .hscards{grid-template-columns:1fr} }
   .hscard{display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid #e2e6ea;
-    border-radius:6px;padding:9px 12px;margin:0 0 7px;cursor:pointer}
+    border-radius:6px;padding:9px 12px;cursor:pointer}
   .hscard:hover{background:#eaf3fb;border-color:#bcd6ef}
   .hsrank{flex:0 0 24px;height:24px;border-radius:50%;background:#1f2d3d;color:#fff;font-weight:700;
     font-size:12px;display:flex;align-items:center;justify-content:center}
@@ -134,23 +138,19 @@
   <div id="analysis" class="view">
     <div class="wrap">
       <h2>Risk by road segment</h2>
-      <p class="sub">How fatal-crash <b>rate</b> (deaths per mile driven) is distributed across New Mexico's
-        state highways, and which segments carry the most. Click any segment to see it on the map.</p>
       <div id="coverage" class="coverage"></div>
       <div class="actl">
         <div><div class="yr">Years: <span id="yrlabel2"></span></div><div id="slider2"></div></div>
         <div class="catsel" data-which="ana">
           <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button>
         </div>
-        <label class="zc"><input type="checkbox" id="showZero"> include segments with no fatal crashes</label>
         <input id="search" placeholder="search road or place…" autocomplete="off">
       </div>
       <div class="card">
         <div class="ttl">Distribution of segments by
           <span class="histsel">
             <button data-m="rate" class="on">rate /100M</button><button data-m="count">crash count</button>
-          </span>
-          <span class="muted">— rated segments with ≥1 fatal crash in range. Click a bar to filter the table.</span></div>
+          </span></div>
         <div id="hist" class="hist"></div>
         <div id="zeronote" class="zeronote"></div>
       </div>
@@ -169,7 +169,7 @@
   </div>
 </div>
 <script>
-const YMIN=2001, YMAX=2024, STATS={"segTotal": 2287, "crTotal": 8426, "crAssigned": 4731, "crLocal": 2888, "crUnmatched": 807, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "road": "NM-53", "loc": "Zuni", "cty": "McKinley", "lat": 35.0518, "lon": -108.9441, "n": 10, "ped": 1, "aadt": 324, "len": 11.6, "rate": 30.3}, {"kind": "rate", "road": "NM-244", "loc": "Mescalero", "cty": "Otero", "lat": 33.0601, "lon": -105.5695, "n": 9, "ped": 0, "aadt": 183, "len": 29.2, "rate": 19.3}, {"kind": "rate", "road": "NM-404", "loc": "Anthony", "cty": "Do\u00f1a Ana", "lat": 32.0114, "lon": -106.5446, "n": 11, "ped": 0, "aadt": 1069, "len": 8.9, "rate": 13.2}, {"kind": "rate", "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0765, "lon": -106.7127, "n": 10, "ped": 8, "aadt": 21409, "len": 0.8, "rate": 6.8}, {"kind": "rate", "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0208, "lon": -106.7149, "n": 12, "ped": 7, "aadt": 20133, "len": 1.1, "rate": 6.4}, {"kind": "rate", "road": "NM-118", "loc": "Gallup", "cty": "McKinley", "lat": 35.5328, "lon": -108.6485, "n": 17, "ped": 7, "aadt": 9239, "len": 3.5, "rate": 6.0}, {"kind": "rate", "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.092, "lon": -106.7103, "n": 9, "ped": 3, "aadt": 31122, "len": 0.6, "rate": 5.8}, {"kind": "rate", "road": "US-82", "loc": "E of Alamogordo", "cty": "Otero", "lat": 32.9412, "lon": -105.6164, "n": 9, "ped": 0, "aadt": 1111, "len": 17.1, "rate": 5.4}, {"kind": "rate", "road": "NM-47", "loc": "Belen", "cty": "Valencia", "lat": 34.5086, "lon": -106.598, "n": 9, "ped": 0, "aadt": 1273, "len": 17.4, "rate": 4.6}, {"kind": "rate", "road": "US 84/285", "loc": "Santa Fe", "cty": "Santa Fe", "lat": 35.6692, "lon": -105.9558, "n": 8, "ped": 2, "aadt": 32102, "len": 0.6, "rate": 4.6}, {"kind": "rate", "road": "I-25", "loc": "S of Truth or Consequences", "cty": "Sierra", "lat": 32.9172, "lon": -107.3187, "n": 13, "ped": 1, "aadt": 8200, "len": 4.2, "rate": 4.3}, {"kind": "rate", "road": "NM-116", "loc": "Bosque", "cty": "Valencia", "lat": 34.6151, "lon": -106.7774, "n": 9, "ped": 0, "aadt": 4366, "len": 5.6, "rate": 4.2}], "ped": [{"kind": "ped", "road": "Central Ave", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0756, "lon": -106.6029, "n": 58}, {"kind": "ped", "road": "I-40", "loc": "Albuquerque", "cty": "", "lat": 35.0927, "lon": -106.6624, "n": 24}, {"kind": "ped", "road": "Sr-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0909, "lon": -106.7032, "n": 22}, {"kind": "ped", "road": "I-25", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0759, "lon": -106.628, "n": 20}, {"kind": "ped", "road": "Sr-45 Coors Blvd", "loc": "Albuquerque", "cty": "", "lat": 35.0648, "lon": -106.7083, "n": 19}, {"kind": "ped", "road": "Louisiana Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0918, "lon": -106.5687, "n": 12}, {"kind": "ped", "road": "Montgomery Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.1309, "lon": -106.5747, "n": 10}, {"kind": "ped", "road": "Us-64", "loc": "W of Farmington", "cty": "", "lat": 36.7577, "lon": -108.5275, "n": 9}]};
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 2287, "crTotal": 8426, "crAssigned": 4731, "crLocal": 2888, "crUnmatched": 807, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 1555, "road": "NM-53", "loc": "Zuni", "cty": "McKinley", "lat": 35.0518, "lon": -108.9441, "n": 10, "ped": 1, "aadt": 324, "len": 11.6, "rate": 30.3}, {"kind": "rate", "seg": 908, "road": "NM-244", "loc": "Mescalero", "cty": "Otero", "lat": 33.0601, "lon": -105.5695, "n": 9, "ped": 0, "aadt": 183, "len": 29.2, "rate": 19.3}, {"kind": "rate", "seg": 1206, "road": "NM-404", "loc": "Anthony", "cty": "Do\u00f1a Ana", "lat": 32.0114, "lon": -106.5446, "n": 11, "ped": 0, "aadt": 1069, "len": 8.9, "rate": 13.2}, {"kind": "rate", "seg": 1307, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0765, "lon": -106.7127, "n": 10, "ped": 8, "aadt": 21409, "len": 0.8, "rate": 6.8}, {"kind": "rate", "seg": 1304, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0208, "lon": -106.7149, "n": 12, "ped": 7, "aadt": 20133, "len": 1.1, "rate": 6.4}, {"kind": "rate", "seg": 551, "road": "NM-118", "loc": "Gallup", "cty": "McKinley", "lat": 35.5328, "lon": -108.6485, "n": 17, "ped": 7, "aadt": 9239, "len": 3.5, "rate": 6.0}, {"kind": "rate", "seg": 1321, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.092, "lon": -106.7103, "n": 9, "ped": 3, "aadt": 31122, "len": 0.6, "rate": 5.8}, {"kind": "rate", "seg": 2219, "road": "US-82", "loc": "E of Alamogordo", "cty": "Otero", "lat": 32.9412, "lon": -105.6164, "n": 9, "ped": 0, "aadt": 1111, "len": 17.1, "rate": 5.4}, {"kind": "rate", "seg": 1367, "road": "NM-47", "loc": "Belen", "cty": "Valencia", "lat": 34.5086, "lon": -106.598, "n": 9, "ped": 0, "aadt": 1273, "len": 17.4, "rate": 4.6}, {"kind": "rate", "seg": 2273, "road": "US 84/285", "loc": "Santa Fe", "cty": "Santa Fe", "lat": 35.6692, "lon": -105.9558, "n": 8, "ped": 2, "aadt": 32102, "len": 0.6, "rate": 4.6}, {"kind": "rate", "seg": 140, "road": "I-25", "loc": "S of Truth or Consequences", "cty": "Sierra", "lat": 32.9172, "lon": -107.3187, "n": 13, "ped": 1, "aadt": 8200, "len": 4.2, "rate": 4.3}, {"kind": "rate", "seg": 536, "road": "NM-116", "loc": "Bosque", "cty": "Valencia", "lat": 34.6151, "lon": -106.7774, "n": 9, "ped": 0, "aadt": 4366, "len": 5.6, "rate": 4.2}], "ped": [{"kind": "ped", "road": "Central Ave", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0756, "lon": -106.6029, "n": 58}, {"kind": "ped", "road": "I-40", "loc": "Albuquerque", "cty": "", "lat": 35.0927, "lon": -106.6624, "n": 24}, {"kind": "ped", "road": "Sr-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0909, "lon": -106.7032, "n": 22}, {"kind": "ped", "road": "I-25", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0759, "lon": -106.628, "n": 20}, {"kind": "ped", "road": "Sr-45 Coors Blvd", "loc": "Albuquerque", "cty": "", "lat": 35.0648, "lon": -106.7083, "n": 19}, {"kind": "ped", "road": "Louisiana Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0918, "lon": -106.5687, "n": 12}, {"kind": "ped", "road": "Montgomery Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.1309, "lon": -106.5747, "n": 10}, {"kind": "ped", "road": "Us-64", "loc": "W of Farmington", "cty": "", "lat": 36.7577, "lon": -108.5275, "n": 9}]};
 const NM_BOUNDS=[[31.33,-109.05],[37.0,-103.0]];
 const map=L.map('map',{attributionControl:true});
 map.fitBounds(NM_BOUNDS);   // open on the whole state
@@ -177,7 +177,14 @@ map.attributionControl.setPrefix(false);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
   {attribution:'© OSM, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
 const canvas=L.canvas({padding:.5});
-const segLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map);
+const segLayer=L.layerGroup().addTo(map), hlLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map);
+function hlWeight(){ return segWeight().hit*2.0 + 5; }   // translucent highlight, fatter than the route
+function highlightSeg(i){ hlLayer.clearLayers();
+  if(SEG[i]) L.polyline(SEG[i].c,{color:'#1d6fd8',weight:hlWeight(),opacity:.45,
+    lineCap:'round',interactive:false}).addTo(hlLayer); }
+function highlightPt(lat,lon){ hlLayer.clearLayers();
+  L.circleMarker([lat,lon],{radius:16,color:'#1d6fd8',weight:2,fillColor:'#1d6fd8',
+    fillOpacity:.3,interactive:false}).addTo(hlLayer); }
 function rateColor(r,n){ if(!n||r==null) return '#d4d4d4';
   return r<1?'#1a9850':r<3?'#a6d96a':r<6?'#fee08b':r<12?'#fdae61':'#d73027'; }
 const DOW=['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -196,7 +203,7 @@ function crashPopup(c){
 
 let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all';
 let segPolys=[], curTab='map', syncing=false;
-let sort={key:'rate',dir:-1}, bucketFilter=null, showZero=false, histMode='rate', search='';
+let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='';
 
 const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
 const RATE_BUCKETS=[{lab:'<1',c:RAMP[0]},{lab:'1–3',c:RAMP[1]},{lab:'3–6',c:RAMP[2]},{lab:'6–12',c:RAMP[3]},{lab:'12+',c:RAMP[4]}];
@@ -235,7 +242,7 @@ function drawMap(){
   SEG.forEach((s,i)=>{
     const n=sel(s).length, rate=rateOf(s,n,ny);
     const pl=L.polyline(s.c,{color:rateColor(rate,n),weight:n?zw.hit:zw.miss,opacity:.85})
-      .bindPopup(segTip(i));
+      .bindPopup(segTip(i)).on('popupopen',()=>highlightSeg(i));
     pl.addTo(segLayer); segPolys[i]=pl;
   });
   ptLayer.clearLayers();
@@ -247,40 +254,61 @@ function drawMap(){
   document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
   document.getElementById('stat').innerHTML=`${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
 }
-// zoom-only restyle keeps any open popup alive (don't rebuild the layer)
+// zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
 map.on('zoomend',()=>{ const zw=segWeight();
-  segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:sel(SEG[i]).length?zw.hit:zw.miss}); }); });
+  segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:sel(SEG[i]).length?zw.hit:zw.miss}); });
+  hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
+map.on('popupclose',()=>hlLayer.clearLayers());
 function zbtnText(){ const b=document.querySelector('.leaflet-popup-content .zbtn');
-  if(b) b.textContent=map.getZoom()>=10?'▾ Statewide view':'▴ Zoom to segment'; }
+  if(b) b.textContent=map.getZoom()>=10?'▾ Statewide view':'▴ Segment view'; }
 map.on('popupopen',zbtnText);
 function toggleZoom(i){
   const toState = map.getZoom()>=10;   // currently zoomed in -> go statewide
   if(toState) map.fitBounds(NM_BOUNDS,{padding:[16,16]});
   else map.fitBounds(SEG[i].c,{padding:[70,70],maxZoom:14});
   const b=document.querySelector('.leaflet-popup-content .zbtn');   // label = destination
-  if(b) b.textContent = toState ? '▴ Zoom to segment' : '▾ Statewide view';
+  if(b) b.textContent = toState ? '▴ Segment view' : '▾ Statewide view';
 }
 function gotoSeg(i){
   setTab('map');
   map.fitBounds(SEG[i].c,{padding:[70,70],maxZoom:14});
-  setTimeout(()=>{ if(segPolys[i]) segPolys[i].openPopup(); }, 320);
+  setTimeout(()=>{ if(segPolys[i]) segPolys[i].openPopup(); }, 320);   // popupopen -> highlight + label
 }
-function gotoSpot(lat,lon){ setTab('map'); map.setView([lat,lon],13); }
+function spotTip(h){
+  const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
+  return `<div class="segpop"><b>${h.road}</b> · <span style="color:#555">${place}</span>`
+    +`<br><b>${h.n}</b> pedestrian / cyclist deaths (2001–2024)`
+    +`<br><button class="zbtn" onclick="spotToggle(${h.lat},${h.lon})">▾ Statewide view</button></div>`;
+}
+function spotToggle(lat,lon){
+  const toState = map.getZoom()>=10;
+  if(toState) map.fitBounds(NM_BOUNDS,{padding:[16,16]});
+  else { highlightPt(lat,lon); map.setView([lat,lon],13); }
+  const b=document.querySelector('.leaflet-popup-content .zbtn');
+  if(b) b.textContent = toState ? '▴ Segment view' : '▾ Statewide view';
+}
+function gotoSpot(h){
+  setTab('map');
+  if(h.seg!=null && SEG[h.seg]){ gotoSeg(h.seg); return; }   // rate hotspot is a real segment
+  highlightPt(h.lat,h.lon);
+  map.setView([h.lat,h.lon],13);
+  setTimeout(()=>L.popup({maxWidth:260}).setLatLng([h.lat,h.lon]).setContent(spotTip(h)).openOn(map),320);
+}
 function renderHotspots(){
-  const card=(h,r)=>{
+  const card=(h,k,i)=>{
     const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
     const stat = h.kind==='rate'
       ? `<b>${h.rate}</b> per 100M veh-mi · ${h.n} fatal crashes`+(h.ped?` (${h.ped} ped/bike)`:'')
         +` · AADT ${h.aadt.toLocaleString()} · ${h.len} mi`
       : `<b>${h.n}</b> pedestrian / cyclist deaths`;
-    return `<div class="hscard" data-la="${h.lat}" data-lo="${h.lon}"><div class="hsrank">${r}</div>`
+    return `<div class="hscard" data-k="${k}" data-i="${i}"><div class="hsrank">${i+1}</div>`
       +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${stat}</div></div></div>`; };
   document.getElementById('hslists').innerHTML=
-     `<div class="hsgrp"><h3>Highest death rate <span class="muted">— per 100M vehicle-miles, among segments with ≥8 fatal crashes (so one crash on an empty road can't top the list)</span></h3>`
-    +HOTSPOTS.rate.map((h,i)=>card(h,i+1)).join('')+`</div>`
-    +`<div class="hsgrp"><h3>Pedestrian &amp; cyclist death clusters <span class="muted">— most deaths on one road, regardless of traffic volume</span></h3>`
-    +HOTSPOTS.ped.map((h,i)=>card(h,i+1)).join('')+`</div>`;
-  document.querySelectorAll('.hscard').forEach(el=>el.onclick=()=>gotoSpot(+el.dataset.la,+el.dataset.lo));
+     `<div class="hsgrp"><h3 class="hsred">Highest death rate <span class="muted">— per 100M vehicle-miles, among segments with ≥8 fatal crashes (so one crash on an empty road can't top the list)</span></h3>`
+    +`<div class="hscards">`+HOTSPOTS.rate.map((h,i)=>card(h,'rate',i)).join('')+`</div></div>`
+    +`<div class="hsgrp"><h3 class="hsred">Pedestrian &amp; cyclist death clusters <span class="muted">— most deaths on one road, regardless of traffic volume</span></h3>`
+    +`<div class="hscards">`+HOTSPOTS.ped.map((h,i)=>card(h,'ped',i)).join('')+`</div></div>`;
+  document.querySelectorAll('.hscard').forEach(el=>el.onclick=()=>gotoSpot(HOTSPOTS[el.dataset.k][+el.dataset.i]));
 }
 
 // ---------- analysis ----------
@@ -291,7 +319,7 @@ function buildAnalysis(){
   const rows=[]; let zero=0;
   SEG.forEach((s,i)=>{
     const c=sel(s), n=c.length;
-    if(n===0){ zero++; if(!showZero) return;
+    if(n===0){ zero++;   // zero-crash segments are always listed (just sort to the bottom)
       rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n:0,rate:rateOf(s,0,ny),ped:pedN(s),bkt:-1,trend:trendOf(s)}); return; }
     const rate=rateOf(s,n,ny);
     const bkt = histMode==='rate' ? rateBucket(rate) : countBucket(n);
@@ -309,27 +337,32 @@ function buildAnalysis(){
 }
 function renderHist(counts, BK){
   const max=Math.max(1,...counts), h=document.getElementById('hist');
+  const unit = histMode==='rate' ? ' crash per 100M VMT' : ' fatal crash';
   h.innerHTML=BK.map((b,i)=>{
     const cls='hbar'+(bucketFilter===i?' sel':'')+(bucketFilter!=null&&bucketFilter!==i?' dim':'');
+    const lab = b.lab + (histMode==='rate' ? (i?'':' crash')+'/100M VMT' : (i?' crashes':' crash'));
     return `<div class="${cls}" data-b="${i}"><div class="hn">${counts[i]}</div>`
       +`<div class="bar" style="height:${Math.round(100*counts[i]/max)}%;background:${b.c}"></div>`
-      +`<div class="hl">${b.lab}</div></div>`; }).join('');
+      +`<div class="hl">${lab}</div></div>`; }).join('');
+  document.getElementById('zeronote').textContent = histMode==='rate'
+    ? 'Each bar = number of road segments whose fatal-crash rate falls in that range.'
+    : 'Each bar = number of road segments with that many fatal crashes in the selected years.';
   h.querySelectorAll('.hbar').forEach(el=>el.onclick=()=>{
     const b=+el.dataset.b; bucketFilter = (bucketFilter===b? null : b); buildAnalysis(); });
 }
 function renderCoverage(zero){
   const off=STATS.crLocal+STATS.crUnmatched, pon=Math.round(100*STATS.crAssigned/STATS.crTotal);
   document.getElementById('coverage').innerHTML=
-    `<b>What you're seeing — and what you're not.</b> Risk is ranked only on New Mexico's `
-    +`<b>state-highway network</b> (${STATS.segTotal.toLocaleString()} segments, each with an NMDOT traffic count). `
-    +`County and local roads carry no published traffic volume, so they can't be rated and aren't shown here. `
-    +`Of ${STATS.crTotal.toLocaleString()} geocoded fatal crashes (${STATS.yMin}–${STATS.yMax}), `
-    +`<b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> fall on a rated segment and drive these numbers; `
-    +`<b>${off.toLocaleString()} (${100-pon}%)</b> happened on local/county roads or couldn't be matched to a segment — `
-    +`they appear as points on the map but sit outside every rate. This is the state-highway picture, not every road.`;
-  document.getElementById('zeronote').textContent=
-    `${zero.toLocaleString()} rated segments had no ${catWord()}fatal crashes in ${y0}–${y1}`
-    +(showZero?' (shown in the table).':' (hidden — tick “include” to list them).');
+    `<b>What you're seeing — and what you're not:</b><br>`
+    +`Busy roads have more crashes on them in part because they have more traffic, so to assess `
+    +`<i>risk</i>, vehicle safety experts compare segments of road by the number of crashes per annual `
+    +`average daily traffic (AADT). NMDOT makes public AADT for the state highway network `
+    +`(${STATS.segTotal.toLocaleString()} segments) but not county and local roads.<br><br>`
+    +`Of ${STATS.crTotal.toLocaleString()} geocoded fatal crashes in New Mexico ${STATS.yMin}–${STATS.yMax}, `
+    +`<b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> occurred on a rated segment, and can be compared below `
+    +`according to their crashes per 100 million vehicle miles traveled (VMT). `
+    +`<b>${off.toLocaleString()} (${100-pon}%)</b> occurred on local/county roads or could not be matched to a `
+    +`segment — they appear as points on the map but can not be compared according to risk.`;
 }
 const COLS=[['lab','Road'],['loc','Location'],['l','Len mi'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
 const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['—','#bbb']};
@@ -384,7 +417,6 @@ document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('clic
   histMode=b.dataset.m; bucketFilter=null;
   document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
   buildAnalysis(); }));
-document.getElementById('showZero').addEventListener('change',e=>{ showZero=e.target.checked; buildAnalysis(); });
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 
 Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
