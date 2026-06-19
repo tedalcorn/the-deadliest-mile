@@ -12,10 +12,10 @@
   body{display:flex;flex-direction:column;font:13px/1.45 -apple-system,Helvetica,Arial;color:#222}
   /* tab bar */
   #tabbar{flex:0 0 auto;display:flex;gap:2px;background:#1f2d3d;padding:0 10px}
-  #tabbar .tab{appearance:none;border:none;background:transparent;color:#9fb3c8;
-    font:600 13px/1 -apple-system,Helvetica,Arial;padding:13px 17px;cursor:pointer;border-bottom:3px solid transparent}
-  #tabbar .tab:hover{color:#cfe0f0}
-  #tabbar .tab.active{color:#fff;border-bottom-color:#4a90d9}
+  #tabbar .tab{appearance:none;border:none;background:transparent;color:#5fc9bb;
+    font:600 14.5px/1 -apple-system,Helvetica,Arial;padding:13px 18px;cursor:pointer;border-bottom:3px solid transparent}
+  #tabbar .tab:hover{color:#9fe5da}
+  #tabbar .tab.active{color:#fff;border-bottom-color:#2ec4b6}
   #content{flex:1 1 auto;position:relative;min-height:0}
   .view{display:none;position:absolute;inset:0}
   .view.active{display:block}
@@ -36,6 +36,12 @@
   #legend .lgscale{white-space:nowrap}
   #legend .lgfoot{margin-top:6px;white-space:normal;max-width:330px}
   #legend .sw{display:inline-block;width:13px;height:8px;margin:0 2px 0 8px;vertical-align:1px}
+  #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
+    flex-direction:column;gap:10px;max-width:475px}
+  #leftstack .panel{position:static;max-width:none}
+  #risknote{padding:10px 13px;font:11.5px/1.45 -apple-system,Helvetica,Arial;color:#333}
+  #risknote b{color:#1a2433}
+  @media(max-width:620px){ #leftstack{right:14px;max-width:none} }
   .muted{color:#888;font-size:10.5px}
   #about{top:13%;left:26px;width:330px;padding:22px 24px;z-index:1200}
   #about .atitle{font-size:23px;font-weight:700;line-height:1.22;margin:0 14px 11px 0;color:#1a2433}
@@ -139,10 +145,11 @@
       <div class="yr" style="margin-top:9px">Years: <span id="yrlabel"></span></div>
       <div id="slider"></div>
       <div class="catsel" data-which="map" style="margin-top:8px">
-        <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button>
+        <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button><button data-pts="off">None</button>
       </div>
       <div id="stat"></div>
     </div>
+    <div id="leftstack">
     <div id="legend" class="panel">
       <b class="lgttl">Fatal crashes per 100M vehicle-miles</b>
       <div class="lgscale"><span class="sw" style="background:#1a9850;margin-left:0"></span>&lt;1
@@ -153,6 +160,8 @@
         <span class="sw" style="background:#d4d4d4"></span>insufficient data</div>
       <div class="muted lgfoot">Crash rate is calculated using 2024 AADT.
         Sources: Crash data from NHTSA FARS. AADT from NMDOT.</div>
+    </div>
+    <div id="risknote" class="panel"></div>
     </div>
     <div id="about" class="panel">
       <button id="aboutx" aria-label="Close">×</button>
@@ -167,7 +176,6 @@
   <div id="analysis" class="view">
     <div class="wrap">
       <h2>Risk by road segment</h2>
-      <div id="coverage" class="coverage"></div>
       <div class="actl">
         <div><div class="yr">Years: <span id="yrlabel2"></span></div><div id="slider2"></div></div>
         <div class="catsel" data-which="ana">
@@ -236,11 +244,11 @@ function mapSearch(q){
 }
 function hlWeight(){ return segWeight().hit*2.0 + 5; }   // translucent highlight, fatter than the route
 function highlightSeg(i){ hlLayer.clearLayers();
-  if(SEG[i]) L.polyline(SEG[i].c,{color:'#1d6fd8',weight:hlWeight(),opacity:.2,
+  if(SEG[i]) L.polyline(SEG[i].c,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
     lineCap:'round',interactive:false}).addTo(hlLayer); }
 function highlightSpot(h){ hlLayer.clearLayers();
   const lines = (h.geom && h.geom.length) ? h.geom : [h.e];   // real road geometry, else smoothed line
-  lines.forEach(ln=>L.polyline(ln,{color:'#1d6fd8',weight:hlWeight(),opacity:.2,
+  lines.forEach(ln=>L.polyline(ln,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
     lineCap:'round',interactive:false}).addTo(hlLayer)); }
 function rateColor(r,n){ if(!n||r==null) return '#d4d4d4';
   return r<1?'#1a9850':r<3?'#a6d96a':r<6?'#fee08b':r<12?'#fdae61':'#d73027'; }
@@ -258,7 +266,7 @@ function crashPopup(c){
   return html+'</div>';
 }
 
-let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all';
+let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all', ptsOff=false;
 let segPolys=[], curTab='map', syncing=false;
 let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
 
@@ -306,12 +314,14 @@ function drawMap(){
   });
   ptLayer.clearLayers();
   let nc=0,nk=0;
-  CR.forEach(c=>{ if(c.y<y0||c.y>y1||!inCat(c.pc)) return; nc++; nk+=c.k;
+  CR.forEach(c=>{ if(ptsOff||c.y<y0||c.y>y1||!inCat(c.pc)) return; nc++; nk+=c.k;
     L.circleMarker([c.la,c.lo],{renderer:canvas,radius:4+(c.k-1)*2,color:'#67000d',weight:1,
       fillColor:'#cb181d',fillOpacity:.9}).bindPopup(crashPopup(c)).addTo(ptLayer);
   });
   document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
-  document.getElementById('stat').innerHTML=`${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
+  document.getElementById('stat').innerHTML = ptsOff
+    ? `Crash points hidden — roads still shaded by risk`
+    : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
 }
 // zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
 map.on('zoomend',()=>{ const zw=segWeight();
@@ -401,7 +411,6 @@ function buildAnalysis(){
     rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n,rate,ped:pedN(s),bkt,trend:trendOf(s)});
   });
   renderHist(counts, BK);
-  renderCoverage(zero);
   let r = bucketFilter!=null ? rows.filter(x=>x.bkt===bucketFilter) : rows;
   if(min3) r=r.filter(x=>x.n>=3);
   if(search) r=r.filter(x=>((x.lab||'')+' '+(x.loc||'')).toLowerCase().includes(search));
@@ -429,9 +438,10 @@ function renderHist(counts, BK){
   h.querySelectorAll('.hbar').forEach(el=>el.onclick=()=>{
     const b=+el.dataset.b; bucketFilter = (bucketFilter===b? null : b); buildAnalysis(); });
 }
-function renderCoverage(zero){
+function renderCoverage(){
   const off=STATS.crLocal+STATS.crUnmatched, pon=Math.round(100*STATS.crAssigned/STATS.crTotal);
-  document.getElementById('coverage').innerHTML=
+  const el=document.getElementById('risknote'); if(!el) return;
+  el.innerHTML=
     `<b>What you're seeing — and what you're not:</b><br>`
     +`Busy roads have more crashes on them in part because they have more traffic, so to assess `
     +`<i>risk</i>, vehicle safety experts compare segments of road by the number of crashes per annual `
@@ -475,9 +485,15 @@ function setYears(a,b,from){ y0=a; y1=b; syncing=true;
   if(from!=='map'&&sMap&&sMap.noUiSlider) sMap.noUiSlider.set([a,b]);
   if(from!=='ana'&&sAna&&sAna.noUiSlider) sAna.noUiSlider.set([a,b]);
   syncing=false; apply(); }
-function setCat(c){ cat=c;
+function setCat(c){ cat=c; ptsOff=false;
   document.querySelectorAll('.catsel button').forEach(b=>b.classList.toggle('on',b.dataset.cat===c));
   apply(); }
+// map-only: hide all crash points but keep the risk-shaded roads
+function setPts(off){ ptsOff=off;
+  const row=document.querySelector('.catsel[data-which="map"]');
+  if(row) row.querySelectorAll('button').forEach(b=>
+    b.classList.toggle('on', off ? b.dataset.pts==='off' : b.dataset.cat===cat));
+  drawMap(); }
 function setTab(t){ curTab=t;
   const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');   // dismiss intro on first navigation
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
@@ -496,7 +512,8 @@ const sMap=document.getElementById('slider'), sAna=document.getElementById('slid
     range:{min:YMIN,max:YMAX},format:{to:v=>Math.round(v),from:v=>Number(v)}});
   el.noUiSlider.on('update',v=>{ if(syncing) return; setYears(+v[0],+v[1],which); });
 });
-document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>setCat(b.dataset.cat)));
+document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>{
+  if(b.dataset.pts==='off') setPts(true); else setCat(b.dataset.cat); }));
 document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
 document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
 document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key==='Enter') mapSearch(e.target.value); });
@@ -507,6 +524,7 @@ document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('clic
   document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
   buildAnalysis(); }));
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+renderCoverage();   // risk note lives on the map page now; render once on load
 
 Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
   .then(([s,c])=>{ SEG=s; CR=c; drawMap();
