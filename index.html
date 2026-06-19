@@ -51,7 +51,7 @@
     #risknote{padding-right:28px} #rnx{display:block}
     /* one compact panel at the bottom: search + toggles + stat + legend */
     #ctrl{left:8px;right:8px;width:auto;bottom:10px;padding:11px 13px;max-height:52vh;overflow:auto}
-    #ctrl .yr,#slider{display:none}                 /* drop the year slider on phones */
+    #ctrl .yr,#slider,#stat{display:none}           /* drop the year slider and the crash/killed count */
     #ctrl #legend{position:static;background:none;border:none;box-shadow:none;
       padding:9px 0 0;margin-top:9px;border-top:1px solid #e6e9ec;color:#333}
     #legend .lgttl{font-size:12.5px;margin-bottom:3px}
@@ -72,7 +72,11 @@
     border-radius:5px;padding:8px 14px;cursor:pointer}
   #about #aboutgo:hover{background:#1559a3}
   #about.hidden{display:none}
-  @media(max-width:620px){ #about{left:12px;right:12px;width:auto;top:64px} }
+  @media(max-width:620px){ #about{left:12px;right:12px;width:auto;top:54px;max-height:84vh;overflow:auto}
+    #about .atitle{font-size:21px}
+    #about .aboutnote{font-size:13px;line-height:1.5;color:#444;margin-top:14px;padding-top:13px;
+      border-top:1px solid #e6e9ec}
+    #about .aboutnote b{color:#1a2433} }
   /* category segmented control */
   .catsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden}
   .catsel button{appearance:none;border:none;background:#fff;color:#444;font:12.5px/1 inherit;padding:7px 11px;cursor:pointer}
@@ -558,11 +562,20 @@ document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('clic
   document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
   buildAnalysis(); }));
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
-renderCoverage();   // risk note lives on the map page now; render once on load
-// phones: fold the legend into the bottom control panel so the map gets more room
+renderCoverage();   // fills #risknote (desktop: the note under the legend)
+// phones: one intro card + one bottom panel, so the first view is clean (no overlap)
 if(window.matchMedia('(max-width:620px)').matches){
   const ctrl=document.getElementById('ctrl'), lg=document.getElementById('legend');
-  if(ctrl&&lg) ctrl.appendChild(lg);
+  if(ctrl&&lg) ctrl.appendChild(lg);                 // fold legend into the control panel
+  const rn=document.getElementById('risknote'), about=document.getElementById('about'),
+        go=document.getElementById('aboutgo');
+  if(rn&&about&&go){                                  // fold the methodology note into the intro card
+    const note=document.createElement('div'); note.className='aboutnote';
+    note.innerHTML=rn.innerHTML;
+    const x=note.querySelector('#rnx'); if(x) x.remove();
+    about.insertBefore(note, go);
+    rn.remove();                                      // no separate floating note on mobile
+  }
 }
 
 Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
