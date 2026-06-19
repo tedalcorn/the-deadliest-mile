@@ -173,6 +173,7 @@
         <div class="catsel" data-which="ana">
           <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button>
         </div>
+        <label class="zc"><input type="checkbox" id="min3" checked> show only segments with 3+ crashes</label>
         <input id="search" placeholder="search road or place…" autocomplete="off">
       </div>
       <div class="card">
@@ -258,7 +259,7 @@ function crashPopup(c){
 
 let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all';
 let segPolys=[], curTab='map', syncing=false;
-let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='';
+let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
 
 const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
 const RATE_BUCKETS=[{lab:'<1',c:RAMP[0]},{lab:'1–3',c:RAMP[1]},{lab:'3–6',c:RAMP[2]},{lab:'6–12',c:RAMP[3]},{lab:'12+',c:RAMP[4]}];
@@ -401,6 +402,7 @@ function buildAnalysis(){
   renderHist(counts, BK);
   renderCoverage(zero);
   let r = bucketFilter!=null ? rows.filter(x=>x.bkt===bucketFilter) : rows;
+  if(min3) r=r.filter(x=>x.n>=3);
   if(search) r=r.filter(x=>((x.lab||'')+' '+(x.loc||'')).toLowerCase().includes(search));
   const k=sort.key;
   r.sort((A,B)=>{ if(k==='lab'||k==='loc') return sort.dir*String(A[k]||'').localeCompare(String(B[k]||''));
@@ -491,6 +493,7 @@ const sMap=document.getElementById('slider'), sAna=document.getElementById('slid
 });
 document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>setCat(b.dataset.cat)));
 document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
+document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
 document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key==='Enter') mapSearch(e.target.value); });
 ['aboutx','aboutgo'].forEach(id=>document.getElementById(id).addEventListener('click',
   ()=>document.getElementById('about').classList.add('hidden')));
