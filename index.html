@@ -39,9 +39,14 @@
   #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
     flex-direction:column;gap:10px;max-width:520px}
   #leftstack .panel{position:static;max-width:none}
-  #risknote{padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
+  #risknote{position:relative;padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
   #risknote b{color:#1a2433}
-  @media(max-width:620px){ #leftstack{right:14px;max-width:none} }
+  #risknote.hidden{display:none}
+  #rnx{display:none;position:absolute;top:3px;right:8px;border:none;background:none;font-size:21px;
+    color:#999;cursor:pointer;line-height:1;padding:0}
+  #rnx:hover{color:#444}
+  @media(max-width:620px){ #leftstack{right:14px;max-width:none}
+    #risknote{padding-right:28px} #rnx{display:block} }
   .muted{color:#888;font-size:12px}
   #about{top:13%;left:26px;width:330px;padding:22px 24px;z-index:1200}
   #about .atitle{font-size:23px;font-weight:700;line-height:1.22;margin:0 14px 11px 0;color:#1a2433}
@@ -329,6 +334,9 @@ map.on('zoomend',()=>{ const zw=segWeight();
   hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); });
   rhlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
 map.on('popupclose',()=>{ hlLayer.clearLayers(); markLayer.clearLayers(); });
+// mobile: once the reader starts using the map, get the risk note out of the way
+map.on('dragstart click',()=>{ if(window.innerWidth<=620){
+  const rn=document.getElementById('risknote'); if(rn) rn.classList.add('hidden'); } });
 // Explicit view state so the toggle direction never depends on a zoom guess.
 let detail=null, atState=false, ready=false, hashLock=false;
 // Shareable URL: encodes the current tab and (on the map) center+zoom in the hash.
@@ -442,7 +450,8 @@ function renderCoverage(){
   const off=STATS.crLocal+STATS.crUnmatched, pon=Math.round(100*STATS.crAssigned/STATS.crTotal);
   const el=document.getElementById('risknote'); if(!el) return;
   el.innerHTML=
-    `<b>What you're seeing — and what you're not:</b><br>`
+    `<button id="rnx" aria-label="Dismiss">×</button>`
+    +`<b>What you're seeing — and what you're not:</b><br>`
     +`Busy roads have more crashes on them in part because they have more traffic, so to assess `
     +`<i>risk</i>, vehicle safety experts compare segments of road by the number of crashes per annual `
     +`average daily traffic (AADT). NMDOT makes public AADT for the state highway network `
@@ -452,6 +461,7 @@ function renderCoverage(){
     +`according to their crashes per 100 million vehicle miles traveled (VMT). `
     +`<b>${off.toLocaleString()} (${100-pon}%)</b> occurred on local/county roads or could not be matched to a `
     +`segment — they appear as points on the map but can not be compared according to risk.`;
+  const x=document.getElementById('rnx'); if(x) x.onclick=()=>el.classList.add('hidden');
 }
 const COLS=[['lab','Road'],['loc','Location'],['l','Length (miles)'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
 const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['Insufficient data','#aaa']};
