@@ -318,7 +318,7 @@ function crashPopup(c){
 }
 
 let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all', ptsOff=false;
-let segPolys=[], curTab='map', syncing=false;
+let segPolys=[], ptMarkers=[], curTab='map', syncing=false;
 let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
 
 const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
@@ -348,6 +348,10 @@ function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehic
 function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
   const b=ptsOff?1.9:1;   // bolder roads when crash dots are hidden ("just the map")
   return {hit:(1.8+5.0*f)*b, miss:(0.6+1.0*f)*b}; }   // higher floor so roads read at low (mobile) zoom
+// crash dots: tiny at statewide zoom (so they don't blob together), bigger as you zoom in
+function crashZ(){ return Math.max(0,Math.min(1,(map.getZoom()-6)/8)); }
+function crashR(k){ return 0.8+2.6*crashZ()+(k-1)*0.9; }
+function crashW(){ return 0.35+0.65*crashZ(); }
 function segTip(i){ const s=SEG[i], ny=y1-y0+1, n=sel(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
   const place=[s.loc, s.cty?`${s.cty} County`:''].filter(Boolean).join(' · ');
   return `<div class="segpop"><b>${s.lab}</b>${place?` <span style="color:#555">— ${place}</span>`:''}`
@@ -364,11 +368,12 @@ function drawMap(){
       .bindPopup(segTip(i)).on('popupopen',()=>{ detail={t:'seg',i}; atState=(map.getZoom()<=8); highlightSeg(i); zbtnText(); });
     pl.addTo(segLayer); segPolys[i]=pl;
   });
-  ptLayer.clearLayers();
+  ptLayer.clearLayers(); ptMarkers=[];
   let nc=0,nk=0;
   CR.forEach(c=>{ if(ptsOff||c.y<y0||c.y>y1||!inCat(c.pc)) return; nc++; nk+=c.k;
-    L.circleMarker([c.la,c.lo],{renderer:canvas,radius:4+(c.k-1)*2,color:'#67000d',weight:1,
-      fillColor:'#cb181d',fillOpacity:.9}).bindPopup(crashPopup(c)).addTo(ptLayer);
+    const m=L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k),color:'#67000d',
+      weight:crashW(),fillColor:'#cb181d',fillOpacity:.85}).bindPopup(crashPopup(c)).addTo(ptLayer);
+    ptMarkers.push([m,c.k]);
   });
   document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
   document.getElementById('stat').innerHTML = ptsOff
@@ -376,8 +381,9 @@ function drawMap(){
     : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
 }
 // zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
-map.on('zoomend',()=>{ const zw=segWeight();
+map.on('zoomend',()=>{ const zw=segWeight(), cw=crashW();
   segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:sel(SEG[i]).length?zw.hit:zw.miss}); });
+  ptMarkers.forEach(([m,k])=>{ m.setRadius(crashR(k)); m.setStyle({weight:cw}); });
   hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); });
   rhlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
 map.on('popupclose',()=>{ hlLayer.clearLayers(); markLayer.clearLayers(); });
