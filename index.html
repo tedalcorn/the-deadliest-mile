@@ -23,26 +23,26 @@
   #analysis{overflow:auto;background:#f4f6f8}
   /* floating panels on the map */
   .panel{position:absolute;z-index:1000;background:rgba(255,255,255,.96);border:1px solid #ccc;
-    border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.2);font:12px/1.4 -apple-system,Helvetica,Arial}
-  #ctrl{bottom:18px;right:14px;padding:10px 13px;width:248px}
+    border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.2);font:13.5px/1.5 -apple-system,Helvetica,Arial}
+  #ctrl{bottom:18px;right:14px;padding:12px 15px;width:270px}
   #ctrl .mslab{font-weight:600;margin-bottom:4px}
-  #mapsearch{width:100%;font:12px inherit;padding:5px 8px;border:1px solid #c3c3c3;border-radius:5px}
-  #msmsg{color:#b00;font-size:11px;line-height:1.35;margin-top:3px;min-height:0}
+  #mapsearch{width:100%;font:13.5px inherit;padding:6px 9px;border:1px solid #c3c3c3;border-radius:5px}
+  #msmsg{color:#b00;font-size:12.5px;line-height:1.35;margin-top:3px;min-height:0}
   #ctrl .yr{font-weight:600;margin-bottom:9px}
   #slider,#slider2{margin:2px 7px 4px}
   #stat{margin-top:8px;color:#444}
   #legend{bottom:18px;left:14px;padding:8px 11px;color:#333}
   #legend .lgttl{display:block;margin-bottom:4px;font-weight:700;white-space:nowrap}
   #legend .lgscale{white-space:nowrap}
-  #legend .lgfoot{margin-top:6px;white-space:normal;max-width:330px}
-  #legend .sw{display:inline-block;width:13px;height:8px;margin:0 2px 0 8px;vertical-align:1px}
+  #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
+  #legend .sw{display:inline-block;width:14px;height:9px;margin:0 2px 0 8px;vertical-align:1px}
   #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
-    flex-direction:column;gap:10px;max-width:475px}
+    flex-direction:column;gap:10px;max-width:520px}
   #leftstack .panel{position:static;max-width:none}
-  #risknote{padding:10px 13px;font:11.5px/1.45 -apple-system,Helvetica,Arial;color:#333}
+  #risknote{padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
   #risknote b{color:#1a2433}
   @media(max-width:620px){ #leftstack{right:14px;max-width:none} }
-  .muted{color:#888;font-size:10.5px}
+  .muted{color:#888;font-size:12px}
   #about{top:13%;left:26px;width:330px;padding:22px 24px;z-index:1200}
   #about .atitle{font-size:23px;font-weight:700;line-height:1.22;margin:0 14px 11px 0;color:#1a2433}
   #about .adesc{font-size:14px;line-height:1.52;color:#333}
@@ -56,9 +56,9 @@
   @media(max-width:620px){ #about{left:12px;right:12px;width:auto;top:64px} }
   /* category segmented control */
   .catsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden}
-  .catsel button{appearance:none;border:none;background:#fff;color:#444;font:11px/1 inherit;padding:6px 9px;cursor:pointer}
+  .catsel button{appearance:none;border:none;background:#fff;color:#444;font:12.5px/1 inherit;padding:7px 11px;cursor:pointer}
   .histsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden;vertical-align:middle;margin:0 3px}
-  .histsel button{appearance:none;border:none;background:#fff;color:#444;font:11px/1 inherit;padding:4px 8px;cursor:pointer}
+  .histsel button{appearance:none;border:none;background:#fff;color:#444;font:12px/1 inherit;padding:5px 9px;cursor:pointer}
   .histsel button+button{border-left:1px solid #d5d5d5}
   .histsel button.on{background:#2171b5;color:#fff}
   .catsel button+button{border-left:1px solid #d5d5d5}
@@ -112,7 +112,7 @@
   .zbtn{margin-top:6px;font:11px/1 inherit;color:#1559a3;background:#eef4fb;border:1px solid #cfe0f2;
     border-radius:4px;padding:4px 8px;cursor:pointer}
   .zbtn:hover{background:#dceaf8}
-  .segpop{font:12px/1.5 -apple-system,Helvetica,Arial}
+  .segpop{font:13.5px/1.55 -apple-system,Helvetica,Arial}
   #hslists{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
   @media(max-width:760px){ #hslists{grid-template-columns:1fr} }
   .hsgrp{margin:0}
@@ -260,7 +260,7 @@ function crashPopup(c){
   let date=[c.dw?DOW[c.dw]:'', `${MON[c.m]||''} ${c.dy||''}, ${c.y}`.trim()].filter(Boolean).join(', ');
   if(c.hr!=null){ const h=c.hr%12||12; date+=` · ${h} ${c.hr<12?'AM':'PM'}`; }
   const details=[c.ev, c.d?'alcohol involved':''].filter(Boolean).join(' · ');
-  let html=`<div style="font:12px/1.55 -apple-system,Helvetica,Arial"><b>${cas}</b>`
+  let html=`<div style="font:13.5px/1.6 -apple-system,Helvetica,Arial"><b>${cas}</b>`
     +`<br><span style="color:#555">${date}</span>`;
   if(details) html+=`<br>${details}`;
   return html+'</div>';
