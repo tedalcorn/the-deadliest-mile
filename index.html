@@ -348,7 +348,8 @@ function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehic
 
 // ---------- map ----------
 function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
-  return {hit:1.2+5.3*f, miss:0.5+1.0*f}; }   // routes get finer as you zoom out
+  const b=ptsOff?1.9:1;   // bolder roads when crash dots are hidden ("just the map")
+  return {hit:(1.8+5.0*f)*b, miss:(0.6+1.0*f)*b}; }   // higher floor so roads read at low (mobile) zoom
 function segTip(i){ const s=SEG[i], ny=y1-y0+1, n=sel(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
   const place=[s.loc, s.cty?`${s.cty} County`:''].filter(Boolean).join(' · ');
   return `<div class="segpop"><b>${s.lab}</b>${place?` <span style="color:#555">— ${place}</span>`:''}`
@@ -361,7 +362,7 @@ function drawMap(){
   segLayer.clearLayers(); segPolys=[];
   SEG.forEach((s,i)=>{
     const n=sel(s).length, rate=rateOf(s,n,ny);
-    const pl=L.polyline(s.c,{color:rateColor(rate,n),weight:n?zw.hit:zw.miss,opacity:.85})
+    const pl=L.polyline(s.c,{color:rateColor(rate,n),weight:n?zw.hit:zw.miss,opacity:ptsOff?1:.85})
       .bindPopup(segTip(i)).on('popupopen',()=>{ detail={t:'seg',i}; atState=(map.getZoom()<=8); highlightSeg(i); zbtnText(); });
     pl.addTo(segLayer); segPolys[i]=pl;
   });
