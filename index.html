@@ -89,12 +89,13 @@
     border-radius:4px;padding:4px 8px;cursor:pointer}
   .zbtn:hover{background:#dceaf8}
   .segpop{font:12px/1.5 -apple-system,Helvetica,Arial}
-  .hsgrp{margin:0 0 22px}
+  #hslists{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  @media(max-width:760px){ #hslists{grid-template-columns:1fr} }
+  .hsgrp{margin:0}
   .hsgrp h3{font-size:13.5px;margin:0 0 10px;border-bottom:2px solid #e2e6ea;padding-bottom:5px}
   .hsred{color:#c0392b}
   .hsred .muted{color:#888;font-weight:400}
-  .hscards{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-  @media(max-width:680px){ .hscards{grid-template-columns:1fr} }
+  .hscards{display:flex;flex-direction:column;gap:7px}
   .hscard{display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid #e2e6ea;
     border-radius:6px;padding:9px 12px;cursor:pointer}
   .hscard:hover{background:#eaf3fb;border-color:#bcd6ef}
@@ -169,7 +170,7 @@
   </div>
 </div>
 <script>
-const YMIN=2001, YMAX=2024, STATS={"segTotal": 2287, "crTotal": 8426, "crAssigned": 4731, "crLocal": 2888, "crUnmatched": 807, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 1555, "road": "NM-53", "loc": "Zuni", "cty": "McKinley", "lat": 35.0518, "lon": -108.9441, "n": 10, "ped": 1, "aadt": 324, "len": 11.6, "rate": 30.3}, {"kind": "rate", "seg": 908, "road": "NM-244", "loc": "Mescalero", "cty": "Otero", "lat": 33.0601, "lon": -105.5695, "n": 9, "ped": 0, "aadt": 183, "len": 29.2, "rate": 19.3}, {"kind": "rate", "seg": 1206, "road": "NM-404", "loc": "Anthony", "cty": "Do\u00f1a Ana", "lat": 32.0114, "lon": -106.5446, "n": 11, "ped": 0, "aadt": 1069, "len": 8.9, "rate": 13.2}, {"kind": "rate", "seg": 1307, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0765, "lon": -106.7127, "n": 10, "ped": 8, "aadt": 21409, "len": 0.8, "rate": 6.8}, {"kind": "rate", "seg": 1304, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0208, "lon": -106.7149, "n": 12, "ped": 7, "aadt": 20133, "len": 1.1, "rate": 6.4}, {"kind": "rate", "seg": 551, "road": "NM-118", "loc": "Gallup", "cty": "McKinley", "lat": 35.5328, "lon": -108.6485, "n": 17, "ped": 7, "aadt": 9239, "len": 3.5, "rate": 6.0}, {"kind": "rate", "seg": 1321, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.092, "lon": -106.7103, "n": 9, "ped": 3, "aadt": 31122, "len": 0.6, "rate": 5.8}, {"kind": "rate", "seg": 2219, "road": "US-82", "loc": "E of Alamogordo", "cty": "Otero", "lat": 32.9412, "lon": -105.6164, "n": 9, "ped": 0, "aadt": 1111, "len": 17.1, "rate": 5.4}, {"kind": "rate", "seg": 1367, "road": "NM-47", "loc": "Belen", "cty": "Valencia", "lat": 34.5086, "lon": -106.598, "n": 9, "ped": 0, "aadt": 1273, "len": 17.4, "rate": 4.6}, {"kind": "rate", "seg": 2273, "road": "US 84/285", "loc": "Santa Fe", "cty": "Santa Fe", "lat": 35.6692, "lon": -105.9558, "n": 8, "ped": 2, "aadt": 32102, "len": 0.6, "rate": 4.6}, {"kind": "rate", "seg": 140, "road": "I-25", "loc": "S of Truth or Consequences", "cty": "Sierra", "lat": 32.9172, "lon": -107.3187, "n": 13, "ped": 1, "aadt": 8200, "len": 4.2, "rate": 4.3}, {"kind": "rate", "seg": 536, "road": "NM-116", "loc": "Bosque", "cty": "Valencia", "lat": 34.6151, "lon": -106.7774, "n": 9, "ped": 0, "aadt": 4366, "len": 5.6, "rate": 4.2}], "ped": [{"kind": "ped", "road": "Central Ave", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0756, "lon": -106.6029, "n": 58}, {"kind": "ped", "road": "I-40", "loc": "Albuquerque", "cty": "", "lat": 35.0927, "lon": -106.6624, "n": 24}, {"kind": "ped", "road": "Sr-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0909, "lon": -106.7032, "n": 22}, {"kind": "ped", "road": "I-25", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0759, "lon": -106.628, "n": 20}, {"kind": "ped", "road": "Sr-45 Coors Blvd", "loc": "Albuquerque", "cty": "", "lat": 35.0648, "lon": -106.7083, "n": 19}, {"kind": "ped", "road": "Louisiana Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0918, "lon": -106.5687, "n": 12}, {"kind": "ped", "road": "Montgomery Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.1309, "lon": -106.5747, "n": 10}, {"kind": "ped", "road": "Us-64", "loc": "W of Farmington", "cty": "", "lat": 36.7577, "lon": -108.5275, "n": 9}]};
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 2287, "crTotal": 8426, "crAssigned": 4731, "crLocal": 2888, "crUnmatched": 807, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 1555, "road": "NM-53", "loc": "Zuni", "cty": "McKinley", "lat": 35.0518, "lon": -108.9441, "n": 10, "ped": 1, "aadt": 324, "len": 11.6, "rate": 30.3}, {"kind": "rate", "seg": 908, "road": "NM-244", "loc": "Mescalero", "cty": "Otero", "lat": 33.0601, "lon": -105.5695, "n": 9, "ped": 0, "aadt": 183, "len": 29.2, "rate": 19.3}, {"kind": "rate", "seg": 1206, "road": "NM-404", "loc": "Anthony", "cty": "Do\u00f1a Ana", "lat": 32.0114, "lon": -106.5446, "n": 11, "ped": 0, "aadt": 1069, "len": 8.9, "rate": 13.2}, {"kind": "rate", "seg": 1307, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0765, "lon": -106.7127, "n": 10, "ped": 8, "aadt": 21409, "len": 0.8, "rate": 6.8}, {"kind": "rate", "seg": 1304, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0208, "lon": -106.7149, "n": 12, "ped": 7, "aadt": 20133, "len": 1.1, "rate": 6.4}, {"kind": "rate", "seg": 551, "road": "NM-118", "loc": "Gallup", "cty": "McKinley", "lat": 35.5328, "lon": -108.6485, "n": 17, "ped": 7, "aadt": 9239, "len": 3.5, "rate": 6.0}, {"kind": "rate", "seg": 1321, "road": "NM-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.092, "lon": -106.7103, "n": 9, "ped": 3, "aadt": 31122, "len": 0.6, "rate": 5.8}, {"kind": "rate", "seg": 2219, "road": "US-82", "loc": "E of Alamogordo", "cty": "Otero", "lat": 32.9412, "lon": -105.6164, "n": 9, "ped": 0, "aadt": 1111, "len": 17.1, "rate": 5.4}, {"kind": "rate", "seg": 1367, "road": "NM-47", "loc": "Belen", "cty": "Valencia", "lat": 34.5086, "lon": -106.598, "n": 9, "ped": 0, "aadt": 1273, "len": 17.4, "rate": 4.6}, {"kind": "rate", "seg": 2273, "road": "US 84/285", "loc": "Santa Fe", "cty": "Santa Fe", "lat": 35.6692, "lon": -105.9558, "n": 8, "ped": 2, "aadt": 32102, "len": 0.6, "rate": 4.6}, {"kind": "rate", "seg": 140, "road": "I-25", "loc": "S of Truth or Consequences", "cty": "Sierra", "lat": 32.9172, "lon": -107.3187, "n": 13, "ped": 1, "aadt": 8200, "len": 4.2, "rate": 4.3}, {"kind": "rate", "seg": 536, "road": "NM-116", "loc": "Bosque", "cty": "Valencia", "lat": 34.6151, "lon": -106.7774, "n": 9, "ped": 0, "aadt": 4366, "len": 5.6, "rate": 4.2}], "ped": [{"kind": "ped", "road": "Central Ave", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0756, "lon": -106.6029, "n": 58, "e": [[35.0686, -106.501], [35.0666, -106.7693]]}, {"kind": "ped", "road": "I-40", "loc": "Albuquerque", "cty": "", "lat": 35.0927, "lon": -106.6624, "n": 24, "e": [[35.0257, -106.9734], [35.0849, -106.5366]]}, {"kind": "ped", "road": "Sr-45", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0909, "lon": -106.7032, "n": 22, "e": [[35.004, -106.7172], [35.2055, -106.6591]]}, {"kind": "ped", "road": "I-25", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0759, "lon": -106.628, "n": 20, "e": [[35.1957, -106.5791], [34.9516, -106.6707]]}, {"kind": "ped", "road": "Sr-45 Coors Blvd", "loc": "Albuquerque", "cty": "", "lat": 35.0648, "lon": -106.7083, "n": 19, "e": [[35.186, -106.6626], [34.9601, -106.7167]]}, {"kind": "ped", "road": "Louisiana Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.0918, "lon": -106.5687, "n": 12, "e": [[35.0613, -106.5687], [35.1295, -106.5687]]}, {"kind": "ped", "road": "Montgomery Blvd", "loc": "Albuquerque", "cty": "Bernalillo", "lat": 35.1309, "lon": -106.5747, "n": 10, "e": [[35.1306, -106.5093], [35.1314, -106.6077]]}, {"kind": "ped", "road": "Us-64", "loc": "W of Farmington", "cty": "", "lat": 36.7577, "lon": -108.5275, "n": 9, "e": [[36.7734, -108.7439], [36.7339, -108.3037]]}]};
 const NM_BOUNDS=[[31.33,-109.05],[37.0,-103.0]];
 const map=L.map('map',{attributionControl:true});
 map.fitBounds(NM_BOUNDS);   // open on the whole state
@@ -182,9 +183,8 @@ function hlWeight(){ return segWeight().hit*2.0 + 5; }   // translucent highligh
 function highlightSeg(i){ hlLayer.clearLayers();
   if(SEG[i]) L.polyline(SEG[i].c,{color:'#1d6fd8',weight:hlWeight(),opacity:.45,
     lineCap:'round',interactive:false}).addTo(hlLayer); }
-function highlightPt(lat,lon){ hlLayer.clearLayers();
-  L.circleMarker([lat,lon],{radius:16,color:'#1d6fd8',weight:2,fillColor:'#1d6fd8',
-    fillOpacity:.3,interactive:false}).addTo(hlLayer); }
+function highlightLine(e){ hlLayer.clearLayers();
+  L.polyline(e,{color:'#1d6fd8',weight:hlWeight(),opacity:.45,lineCap:'round',interactive:false}).addTo(hlLayer); }
 function rateColor(r,n){ if(!n||r==null) return '#d4d4d4';
   return r<1?'#1a9850':r<3?'#a6d96a':r<6?'#fee08b':r<12?'#fdae61':'#d73027'; }
 const DOW=['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -231,10 +231,12 @@ function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehic
 // ---------- map ----------
 function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
   return {hit:1.2+5.3*f, miss:0.5+1.0*f}; }   // routes get finer as you zoom out
-function segTip(i){ const s=SEG[i], ny=y1-y0+1, n=sel(s).length, rate=rateOf(s,n,ny);
-  return `<div class="segpop"><b>${s.lab}</b>${s.loc?` · <span style="color:#555">${s.loc}</span>`:''}`
-    +`<br>${n} ${catWord()}fatal crash(es) ${y0}–${y1} · ${s.l}-mi segment`
-    +`<br>AADT ${s.a.toLocaleString()}`+(rate!=null?` · rate ${rate.toFixed(1)}/100M`:'')
+function segTip(i){ const s=SEG[i], ny=y1-y0+1, n=sel(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
+  const place=[s.loc, s.cty?`${s.cty} County`:''].filter(Boolean).join(' · ');
+  return `<div class="segpop"><b>${s.lab}</b>${place?` <span style="color:#555">— ${place}</span>`:''}`
+    +`<br>${s.l.toFixed(1)} miles with AADT ${s.a.toLocaleString()} · ${n} fatal crash${n===1?'':'es'}`
+    +(pc?` (${pc} ped/bike)`:'')
+    +(rate!=null?` · ${rate.toFixed(1)} crashes per 100 million vehicle miles`:'')
     +`<br><button class="zbtn" onclick="toggleZoom(${i})"></button></div>`; }
 function drawMap(){
   const ny=y1-y0+1, zw=segWeight();
@@ -274,32 +276,35 @@ function gotoSeg(i){
   map.fitBounds(SEG[i].c,{padding:[70,70],maxZoom:14});
   setTimeout(()=>{ if(segPolys[i]) segPolys[i].openPopup(); }, 320);   // popupopen -> highlight + label
 }
+let activeSpot=null;
 function spotTip(h){
   const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
-  return `<div class="segpop"><b>${h.road}</b> · <span style="color:#555">${place}</span>`
+  return `<div class="segpop"><b>${h.road}</b> <span style="color:#555">— ${place}</span>`
     +`<br><b>${h.n}</b> pedestrian / cyclist deaths (2001–2024)`
-    +`<br><button class="zbtn" onclick="spotToggle(${h.lat},${h.lon})">▾ Statewide view</button></div>`;
+    +`<br><button class="zbtn" onclick="spotToggle()">▾ Statewide view</button></div>`;
 }
-function spotToggle(lat,lon){
+function spotToggle(){
   const toState = map.getZoom()>=10;
   if(toState) map.fitBounds(NM_BOUNDS,{padding:[16,16]});
-  else { highlightPt(lat,lon); map.setView([lat,lon],13); }
+  else if(activeSpot) map.fitBounds(activeSpot.e,{padding:[80,80],maxZoom:14});
   const b=document.querySelector('.leaflet-popup-content .zbtn');
   if(b) b.textContent = toState ? '▴ Segment view' : '▾ Statewide view';
 }
 function gotoSpot(h){
   setTab('map');
   if(h.seg!=null && SEG[h.seg]){ gotoSeg(h.seg); return; }   // rate hotspot is a real segment
-  highlightPt(h.lat,h.lon);
-  map.setView([h.lat,h.lon],13);
-  setTimeout(()=>L.popup({maxWidth:260}).setLatLng([h.lat,h.lon]).setContent(spotTip(h)).openOn(map),320);
+  activeSpot=h;
+  highlightLine(h.e);                                        // blue line across the cluster's span
+  map.fitBounds(h.e,{padding:[80,80],maxZoom:14});
+  const mid=[(h.e[0][0]+h.e[1][0])/2,(h.e[0][1]+h.e[1][1])/2];
+  setTimeout(()=>L.popup({maxWidth:260}).setLatLng(mid).setContent(spotTip(h)).openOn(map),360);
 }
 function renderHotspots(){
   const card=(h,k,i)=>{
     const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
     const stat = h.kind==='rate'
-      ? `<b>${h.rate}</b> per 100M veh-mi · ${h.n} fatal crashes`+(h.ped?` (${h.ped} ped/bike)`:'')
-        +` · AADT ${h.aadt.toLocaleString()} · ${h.len} mi`
+      ? `${h.len} miles with AADT ${h.aadt.toLocaleString()} · ${h.n} fatal crashes (${h.ped} ped/bike)`
+        +` · <b>${h.rate}</b> crashes per 100 million vehicle miles`
       : `<b>${h.n}</b> pedestrian / cyclist deaths`;
     return `<div class="hscard" data-k="${k}" data-i="${i}"><div class="hsrank">${i+1}</div>`
       +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${stat}</div></div></div>`; };
@@ -365,7 +370,7 @@ function renderCoverage(zero){
     +`segment — they appear as points on the map but can not be compared according to risk.`;
 }
 const COLS=[['lab','Road'],['loc','Location'],['l','Len mi'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
-const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['—','#bbb']};
+const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['Insufficient data','#aaa']};
 function renderTable(rows){
   const head='<thead><tr>'+COLS.map(([k,t])=>
       `<th data-k="${k}" class="${sort.key===k?'sorted':''}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
