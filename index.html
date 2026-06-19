@@ -35,6 +35,10 @@
   /* category segmented control */
   .catsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden}
   .catsel button{appearance:none;border:none;background:#fff;color:#444;font:11px/1 inherit;padding:6px 9px;cursor:pointer}
+  .histsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden;vertical-align:middle;margin:0 3px}
+  .histsel button{appearance:none;border:none;background:#fff;color:#444;font:11px/1 inherit;padding:4px 8px;cursor:pointer}
+  .histsel button+button{border-left:1px solid #d5d5d5}
+  .histsel button.on{background:#2171b5;color:#fff}
   .catsel button+button{border-left:1px solid #d5d5d5}
   .catsel button.on{background:#2171b5;color:#fff}
   /* thin slider with small vertical-line handles */
@@ -126,7 +130,11 @@
         <label class="zc"><input type="checkbox" id="showZero"> include segments with no fatal crashes</label>
       </div>
       <div class="card">
-        <div class="ttl">Distribution of segments by risk <span class="muted">— rated segments with ≥1 fatal crash in range. Click a bar to filter the table.</span></div>
+        <div class="ttl">Distribution of segments by
+          <span class="histsel">
+            <button data-m="rate" class="on">rate /100M</button><button data-m="count">crash count</button>
+          </span>
+          <span class="muted">— rated segments with ≥1 fatal crash in range. Click a bar to filter the table.</span></div>
         <div id="hist" class="hist"></div>
         <div id="zeronote" class="zeronote"></div>
       </div>
@@ -161,12 +169,25 @@ function crashPopup(c){
 
 let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all';
 let segPolys=[], curTab='map', syncing=false;
-let sort={key:'rate',dir:-1}, bucketFilter=null, showZero=false;
+let sort={key:'rate',dir:-1}, bucketFilter=null, showZero=false, histMode='rate';
 
-const BUCKETS=[{lab:'<1',c:'#1a9850',t:r=>r<1},{lab:'1–3',c:'#a6d96a',t:r=>r>=1&&r<3},
-  {lab:'3–6',c:'#fee08b',t:r=>r>=3&&r<6},{lab:'6–12',c:'#fdae61',t:r=>r>=6&&r<12},
-  {lab:'12+',c:'#d73027',t:r=>r>=12}];
-function bucketOf(r){ for(let i=0;i<BUCKETS.length;i++) if(BUCKETS[i].t(r)) return i; return -1; }
+const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
+const RATE_BUCKETS=[{lab:'<1',c:RAMP[0]},{lab:'1–3',c:RAMP[1]},{lab:'3–6',c:RAMP[2]},{lab:'6–12',c:RAMP[3]},{lab:'12+',c:RAMP[4]}];
+const COUNT_BUCKETS=[{lab:'1',c:RAMP[0]},{lab:'2–3',c:RAMP[1]},{lab:'4–6',c:RAMP[2]},{lab:'7–10',c:RAMP[3]},{lab:'11+',c:RAMP[4]}];
+function rateBucket(r){ return r<1?0:r<3?1:r<6?2:r<12?3:4; }
+function countBucket(n){ return n<=1?0:n<=3?1:n<=6?2:n<=10?3:4; }
+function curBuckets(){ return histMode==='rate'?RATE_BUCKETS:COUNT_BUCKETS; }
+// Trend of risk over the FULL period (2001–2024) in 5-year bands, category-filtered.
+// AADT is constant per segment, so rate-trend == crash-count-trend. Slope sign of
+// counts vs band index; needs >=4 crashes to call, else 'na'.
+function trendOf(s){
+  const b=[0,0,0,0,0];
+  s.cr.forEach(a=>{ if(!inCat(a[1])) return; const y=a[0];
+    b[y<=2005?0:y<=2010?1:y<=2015?2:y<=2020?3:4]++; });
+  if(b[0]+b[1]+b[2]+b[3]+b[4]<4) return 'na';
+  let slope=0; for(let x=0;x<5;x++) slope+=(x-2)*b[x]; slope/=10;
+  return slope>=0.25?'up':slope<=-0.25?'down':'flat';
+}
 function inCat(pc){ return cat==='all' ? true : (cat==='ped'? pc===1 : pc===0); }
 function sel(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&inCat(a[1])); }
 function pedN(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&a[1]===1).length; }
@@ -202,30 +223,30 @@ function gotoSeg(i){
 
 // ---------- analysis ----------
 function buildAnalysis(){
-  const ny=y1-y0+1, mid=Math.floor((y0+y1)/2);
+  const ny=y1-y0+1;
   document.getElementById('yrlabel2').textContent=y0===y1?y0:`${y0}–${y1}`;
-  const counts=BUCKETS.map(()=>0);
+  const BK=curBuckets(), counts=BK.map(()=>0);
   const rows=[]; let zero=0;
   SEG.forEach((s,i)=>{
     const c=sel(s), n=c.length;
     if(n===0){ zero++; if(!showZero) return;
-      rows.push({i,lab:s.lab,l:s.l,a:s.a,n:0,rate:rateOf(s,0,ny),ped:pedN(s),older:0,recent:0,bkt:-1}); return; }
-    const rate=rateOf(s,n,ny), b=bucketOf(rate);
-    if(b>=0) counts[b]++;
-    const older=c.filter(a=>a[0]<=mid).length;
-    rows.push({i,lab:s.lab,l:s.l,a:s.a,n,rate,ped:pedN(s),older,recent:n-older,bkt:b});
+      rows.push({i,lab:s.lab,l:s.l,a:s.a,n:0,rate:rateOf(s,0,ny),ped:pedN(s),bkt:-1,trend:trendOf(s)}); return; }
+    const rate=rateOf(s,n,ny);
+    const bkt = histMode==='rate' ? rateBucket(rate) : countBucket(n);
+    counts[bkt]++;
+    rows.push({i,lab:s.lab,l:s.l,a:s.a,n,rate,ped:pedN(s),bkt,trend:trendOf(s)});
   });
-  renderHist(counts, mid);
+  renderHist(counts, BK);
   renderCoverage(zero);
   let r = bucketFilter!=null ? rows.filter(x=>x.bkt===bucketFilter) : rows;
   const k=sort.key;
   r.sort((A,B)=>{ if(k==='lab') return sort.dir*String(A.lab).localeCompare(String(B.lab));
     let va=A[k], vb=B[k]; va=(va==null?-1:va); vb=(vb==null?-1:vb); return sort.dir*(va-vb); });
-  renderTable(r, mid);
+  renderTable(r);
 }
-function renderHist(counts, mid){
+function renderHist(counts, BK){
   const max=Math.max(1,...counts), h=document.getElementById('hist');
-  h.innerHTML=BUCKETS.map((b,i)=>{
+  h.innerHTML=BK.map((b,i)=>{
     const cls='hbar'+(bucketFilter===i?' sel':'')+(bucketFilter!=null&&bucketFilter!==i?' dim':'');
     return `<div class="${cls}" data-b="${i}"><div class="hn">${counts[i]}</div>`
       +`<div class="bar" style="height:${Math.round(100*counts[i]/max)}%;background:${b.c}"></div>`
@@ -248,17 +269,17 @@ function renderCoverage(zero){
     +(showZero?' (shown in the table).':' (hidden — tick “include” to list them).');
 }
 const COLS=[['lab','Segment'],['l','Len mi'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
-function renderTable(rows, mid){
+const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['—','#bbb']};
+function renderTable(rows){
   const head='<thead><tr>'+COLS.map(([k,t])=>
       `<th data-k="${k}" class="${sort.key===k?'sorted':''}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
-    +`<th title="older ${y0}–${mid} vs recent ${mid+1}–${y1} fatal crashes">Older / Recent</th></tr></thead>`;
+    +`<th title="Direction of risk over 2001–2024, in 5-year bands (independent of the year slider). ↑ rising · ↓ falling · → little change · — too few crashes to tell.">Trend</th></tr></thead>`;
   const body='<tbody>'+rows.map(r=>{
-    const col=rateColor(r.rate,r.n), ow=r.n?Math.round(100*r.older/r.n):0;
+    const col=rateColor(r.rate,r.n), tr=TREND[r.trend];
     return `<tr data-i="${r.i}"><td>${r.lab}</td><td>${r.l.toFixed(2)}</td><td>${r.a.toLocaleString()}</td>`
       +`<td>${r.n}</td><td>${r.ped||''}</td>`
       +`<td><span class="dot" style="background:${col}"></span>${r.rate!=null?r.rate.toFixed(1):'—'}</td>`
-      +`<td>${r.older} / ${r.recent}<span class="rec"><i style="width:${ow}%;background:#9ecae1"></i>`
-      +`<i style="width:${100-ow}%;background:#3182bd"></i></span></td></tr>`; }).join('')+'</tbody>';
+      +`<td style="color:${tr[1]};font-weight:600">${tr[0]}</td></tr>`; }).join('')+'</tbody>';
   const t=document.getElementById('segtable');
   t.innerHTML=head+body;
   t.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
@@ -266,7 +287,7 @@ function renderTable(rows, mid){
     buildAnalysis(); });
   t.querySelectorAll('tr[data-i]').forEach(tr=>tr.onclick=()=>gotoSeg(+tr.dataset.i));
   document.getElementById('rowhint').textContent=
-    `${rows.length.toLocaleString()} segments listed${bucketFilter!=null?` · filtered to ${BUCKETS[bucketFilter].lab} · click that bar again to clear`:''} · click a row to locate it on the map · lighter bar = older half, darker = recent half`;
+    `${rows.length.toLocaleString()} segments listed${bucketFilter!=null?` · filtered to “${curBuckets()[bucketFilter].lab}” · click that bar again to clear`:''} · click a row to locate it on the map · Trend uses 5-year bands across 2001–2024`;
 }
 
 // ---------- shared filter state ----------
@@ -292,6 +313,10 @@ const sMap=document.getElementById('slider'), sAna=document.getElementById('slid
   el.noUiSlider.on('update',v=>{ if(syncing) return; setYears(+v[0],+v[1],which); });
 });
 document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>setCat(b.dataset.cat)));
+document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('click',()=>{
+  histMode=b.dataset.m; bucketFilter=null;
+  document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
+  buildAnalysis(); }));
 document.getElementById('showZero').addEventListener('change',e=>{ showZero=e.target.checked; buildAnalysis(); });
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 
