@@ -37,9 +37,17 @@
   #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
   #legend .sw{display:inline-block;width:14px;height:9px;margin:0 2px 0 8px;vertical-align:1px}
   #legend .lgshort{display:none}
-  /* intro card shows alone in front of the map: hide the map's own panels while it's up */
-  #map-view.introup #ctrl,#map-view.introup #legend{display:none}
+  /* desktop: the methodology note sits in a stack beneath the legend */
+  #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
+    flex-direction:column;gap:10px;max-width:520px}
+  #leftstack .panel{position:static;max-width:none}
+  #risknote{padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
+  #risknote b{color:#1a2433}
+  /* the 'About' tab is mobile-only; desktop keeps the note under the legend */
+  @media(min-width:621px){ .tab[data-tab="info"]{display:none} }
   @media(max-width:620px){
+    #leftstack{display:none}                       /* the note lives in the About tab on mobile */
+    #map-view.introup #ctrl{display:none}          /* intro card shows alone on phones */
     /* one compact panel at the bottom: search + toggles + legend */
     #ctrl{left:8px;right:8px;width:auto;bottom:10px;padding:11px 13px;max-height:52vh;overflow:auto}
     #ctrl .yr,#slider,#stat{display:none}           /* drop the year slider and the crash/killed count */
@@ -188,6 +196,7 @@
       </div>
       <div id="stat"></div>
     </div>
+    <div id="leftstack">
     <div id="legend" class="panel">
       <b class="lgttl">Fatal crashes per 100M vehicle-miles</b>
       <div class="lgscale"><span class="sw" style="background:#1a9850;margin-left:0"></span>&lt;1
@@ -198,6 +207,8 @@
         <span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>
       <div class="muted lgfoot">Crash rate is calculated using 2024 AADT.
         Sources: Crash data from NHTSA FARS. AADT from NMDOT.</div>
+    </div>
+    <div id="risknote" class="panel"></div>
     </div>
     <div id="about" class="panel">
       <button id="aboutx" aria-label="Close">×</button>
@@ -497,8 +508,7 @@ function renderHist(counts, BK){
 }
 function renderCoverage(){
   const off=STATS.crLocal+STATS.crUnmatched, pon=Math.round(100*STATS.crAssigned/STATS.crTotal);
-  const el=document.getElementById('aboutbody'); if(!el) return;
-  el.innerHTML=
+  const html=
     `<b>What you're seeing — and what you're not:</b><br>`
     +`Busy roads have more crashes on them in part because they have more traffic, so to assess `
     +`<i>risk</i>, vehicle safety experts compare segments of road by the number of crashes per annual `
@@ -509,6 +519,7 @@ function renderCoverage(){
     +`according to their crashes per 100 million vehicle miles traveled (VMT). `
     +`<b>${off.toLocaleString()} (${100-pon}%)</b> occurred on local/county roads or could not be matched to a `
     +`segment — they appear as points on the map but can not be compared according to risk.`;
+  ['risknote','aboutbody'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
 }
 const COLS=[['lab','Road'],['loc','Location'],['l','Length (miles)'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
 const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['Insufficient data','#aaa']};
