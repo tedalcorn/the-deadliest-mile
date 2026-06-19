@@ -68,7 +68,6 @@
   #aboutbody{background:#fff;border:1px solid #e2e6ea;border-radius:8px;padding:16px 18px;
     font-size:14.5px;line-height:1.6;color:#333;max-width:680px}
   #aboutbody b{color:#1a2433}
-  .amethod{color:#777;font-size:12.5px;line-height:1.5;margin:12px 2px 0;max-width:680px}
   /* category segmented control */
   .catsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden}
   .catsel button{appearance:none;border:none;background:#fff;color:#444;font:12.5px/1 inherit;padding:7px 11px;cursor:pointer}
@@ -106,6 +105,7 @@
   .hbar.sel .hl{font-weight:700;color:#111}
   .hbar.dim .bar{opacity:.28}
   .zeronote{color:#777;font-size:11.5px;margin-top:9px;text-align:center}
+  .zeronote .haxis{font-weight:600;color:#555;font-size:12.5px}
   .zeronote #hclear{color:#1559a3;font-weight:600;text-decoration:none}
   .zeronote #hclear:hover{text-decoration:underline}
   table.seg{width:100%;border-collapse:collapse;background:#fff;font-size:12.5px;
@@ -247,8 +247,6 @@
     <div class="wrap">
       <h2>About this map</h2>
       <div id="aboutbody"></div>
-      <p class="amethod">Crash rate uses 2024 AADT. Sources: fatal crash data from
-        NHTSA FARS; traffic volumes (AADT) from NMDOT.</p>
     </div>
   </div>
 </div>
@@ -475,18 +473,17 @@ function buildAnalysis(){
 }
 function renderHist(counts, BK){
   const max=Math.max(1,...counts), h=document.getElementById('hist');
-  const unit = histMode==='rate' ? ' crash per 100M VMT' : ' fatal crash';
   h.innerHTML=BK.map((b,i)=>{
     const cls='hbar'+(bucketFilter===i?' sel':'')+(bucketFilter!=null&&bucketFilter!==i?' dim':'');
-    const lab = b.lab + (histMode==='rate' ? (i?'':' crash')+'/100M VMT' : (i?' crashes':' crash'));
     return `<div class="${cls}" data-b="${i}"><div class="hn">${counts[i]}</div>`
       +`<div class="bar" style="height:${Math.round(100*counts[i]/max)}%;background:${b.c}"></div>`
-      +`<div class="hl">${lab}</div></div>`; }).join('');
-  const cap = histMode==='rate'
-    ? 'Each bar = number of road segments whose fatal-crash rate falls in that range.'
-    : 'Each bar = number of road segments with that many fatal crashes in the selected years.';
+      +`<div class="hl">${b.lab}</div></div>`; }).join('');
+  const axis = histMode==='rate'
+    ? 'crashes per 100 million vehicle miles traveled (VMT)'
+    : 'fatal crashes in the selected years';
   const zn=document.getElementById('zeronote');
-  zn.innerHTML = cap + (bucketFilter!=null ? ` &nbsp;·&nbsp; <a href="#" id="hclear">show all segments</a>` : '');
+  zn.innerHTML = `<span class="haxis">${axis}</span>`
+    + (bucketFilter!=null ? ` &nbsp;·&nbsp; <a href="#" id="hclear">show all segments</a>` : '');
   const hc=document.getElementById('hclear');
   if(hc) hc.onclick=(ev)=>{ ev.preventDefault(); bucketFilter=null; buildAnalysis(); };
   h.querySelectorAll('.hbar').forEach(el=>el.onclick=()=>{
