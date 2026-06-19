@@ -36,6 +36,7 @@
   #legend .lgscale{white-space:nowrap}
   #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
   #legend .sw{display:inline-block;width:14px;height:9px;margin:0 2px 0 8px;vertical-align:1px}
+  #legend .lgshort{display:none}
   #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
     flex-direction:column;gap:10px;max-width:520px}
   #leftstack .panel{position:static;max-width:none}
@@ -48,8 +49,16 @@
   @media(max-width:620px){
     #leftstack{top:8px;bottom:auto;left:8px;right:8px;max-width:none}
     #risknote{padding-right:28px} #rnx{display:block}
-    #ctrl{left:8px;right:8px;width:auto;bottom:10px;padding:11px 13px}
-    #legend .lgscale{white-space:normal}
+    /* one compact panel at the bottom: search + toggles + stat + legend */
+    #ctrl{left:8px;right:8px;width:auto;bottom:10px;padding:11px 13px;max-height:52vh;overflow:auto}
+    #ctrl .yr,#slider{display:none}                 /* drop the year slider on phones */
+    #ctrl #legend{position:static;background:none;border:none;box-shadow:none;
+      padding:9px 0 0;margin-top:9px;border-top:1px solid #e6e9ec;color:#333}
+    #legend .lgttl{font-size:12.5px;margin-bottom:3px}
+    #legend .lgscale{white-space:nowrap;font-size:11.5px}
+    #legend .sw{margin:0 2px 0 5px;width:13px;height:8px}
+    #legend .lgfoot{display:none}                    /* drop the note under the legend */
+    #legend .lgfull{display:none} #legend .lgshort{display:inline}
     .leaflet-control-zoom{display:none}
   }
   .muted{color:#888;font-size:12px}
@@ -177,7 +186,7 @@
         <span class="sw" style="background:#fee08b"></span>3–6
         <span class="sw" style="background:#fdae61"></span>6–12
         <span class="sw" style="background:#d73027"></span>12+
-        <span class="sw" style="background:#d4d4d4"></span>insufficient data</div>
+        <span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>
       <div class="muted lgfoot">Crash rate is calculated using 2024 AADT.
         Sources: Crash data from NHTSA FARS. AADT from NMDOT.</div>
     </div>
@@ -550,6 +559,11 @@ document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('clic
   buildAnalysis(); }));
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 renderCoverage();   // risk note lives on the map page now; render once on load
+// phones: fold the legend into the bottom control panel so the map gets more room
+if(window.matchMedia('(max-width:620px)').matches){
+  const ctrl=document.getElementById('ctrl'), lg=document.getElementById('legend');
+  if(ctrl&&lg) ctrl.appendChild(lg);
+}
 
 Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
   .then(([s,c])=>{ SEG=s; CR=c; drawMap();
