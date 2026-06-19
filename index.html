@@ -186,6 +186,7 @@
       </div>
       <table class="seg" id="segtable"></table>
       <div class="tablohint" id="rowhint"></div>
+      <div class="tablohint">Trend is computed on 5-year bands across 2001–2024, where sufficient data exists to show a pattern.</div>
     </div>
   </div>
   <!-- HOT SPOTS -->
@@ -460,8 +461,12 @@ function renderTable(rows){
     const k=th.dataset.k; if(sort.key===k) sort.dir*=-1; else { sort.key=k; sort.dir=(k==='lab'?1:-1); }
     buildAnalysis(); });
   t.querySelectorAll('tr[data-i]').forEach(tr=>tr.onclick=()=>gotoSeg(+tr.dataset.i));
+  const parts=[]; if(min3) parts.push('3+ crashes'); if(search) parts.push(`“${search}”`);
+  const filtered = bucketFilter!=null || parts.length>0;
   document.getElementById('rowhint').textContent=
-    `${rows.length.toLocaleString()} segments listed${bucketFilter!=null?` · filtered to “${curBuckets()[bucketFilter].lab}” · click that bar again to clear`:''} · click a row to locate it on the map · Trend uses 5-year bands across 2001–2024`;
+    `${filtered?'Filtered to':'Showing'} ${rows.length.toLocaleString()} segments`
+    +(bucketFilter!=null?` “${curBuckets()[bucketFilter].lab}${histMode==='rate'?' crashes/100M VMT':' crashes'}”`:'')
+    +(parts.length?' · '+parts.join(' · '):'');
 }
 
 // ---------- shared filter state ----------
