@@ -31,7 +31,8 @@
   #maptype{width:100%;font:13px inherit;padding:6px 8px;border:1px solid #c3c3c3;border-radius:5px;background:#fff;margin-top:3px}
   #legend .lgbar{height:11px;border-radius:2px;margin:4px 0 2px}
   #legend .lgbarlab{display:flex;justify-content:space-between;font-size:11px;color:#555}
-  #legend .lgna{margin-top:5px;font-size:11.5px;color:#555}
+  #legend .lgstat{margin-top:5px;font-size:12px;color:#333;white-space:nowrap}
+  #legend .lgna{margin-top:4px;font-size:11.5px;color:#555;white-space:nowrap}
   #legend .lgna .sw{width:13px;height:8px}
   #ctrl .yr{font-weight:600;margin-bottom:9px}
   #slider,#slider2{margin:2px 7px 4px}
@@ -212,19 +213,8 @@
       <div id="stat"></div>
     </div>
     <div id="leftstack">
-    <div id="legend" class="panel">
-      <b class="lgttl">Fatal crashes per 100M vehicle-miles</b>
-      <div class="lgscale"><span class="sw" style="background:#1a9850;margin-left:0"></span>&lt;1
-        <span class="sw" style="background:#a6d96a"></span>1–3
-        <span class="sw" style="background:#fee08b"></span>3–6
-        <span class="sw" style="background:#fdae61"></span>6–12
-        <span class="sw" style="background:#d73027"></span>12+
-        <span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>
-      <div class="muted lgfoot">Crash rate is calculated using 2024 AADT.
-        Sources: crash data from <a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>;
-        AADT from <a href="https://www.dot.nm.gov/planning-research-multimodal-and-safety/planning-division/data-management-bureau/" target="_blank" rel="noopener">NMDOT</a>.</div>
-    </div>
     <div id="risknote" class="panel"></div>
+    <div id="legend" class="panel"></div>
     </div>
     <div id="about" class="panel">
       <button id="aboutx" aria-label="Close">×</button>
@@ -345,7 +335,7 @@ function crashPopup(c){
 }
 
 let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all', ptsOff=false, maptype='risk';
-let segPolys=[], ptMarkers=[], curTab='map', syncing=false, RISK_LEGEND='';
+let segPolys=[], ptMarkers=[], curTab='map', syncing=false;
 let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
 
 const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
@@ -377,12 +367,12 @@ function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehic
 // cr per-crash array layout: [year, pc, alcohol, night, intersection, weather]
 const MAPTYPES={
   risk:{lab:'Fatal crash risk'},
-  alc :{lab:'Alcohol involvement', share:1, fi:2, crkey:'d',  metric:'alcohol-involved', dot:'alcohol-involved crashes',
-        note:'Driver alcohol is police-reported and under-counts in the most recent years.'},
-  nt  :{lab:'Nighttime crashes',   share:1, fi:3, crkey:'nt', metric:'at night (in the dark)', dot:'nighttime crashes'},
-  ix  :{lab:'Deadly intersections',share:1, fi:4, crkey:'ix', since:2010, metric:'at an intersection', dot:'intersection crashes',
-        note:'Intersection coding is available 2010–2024 only.'},
-  wx  :{lab:'Adverse weather',     share:1, fi:5, crkey:'wx', metric:'in adverse weather', dot:'adverse-weather crashes'},
+  alc :{lab:'Alcohol involvement', share:1, fi:2, crkey:'d',  metric:'alcohol-involved', avg:'involving alcohol', dot:'alcohol-involved crashes',
+        note:'Recent-year alcohol involvement is under-counted.'},
+  nt  :{lab:'Nighttime crashes',   share:1, fi:3, crkey:'nt', metric:'at night', avg:'at night', dot:'nighttime crashes'},
+  ix  :{lab:'Deadly intersections',share:1, fi:4, crkey:'ix', since:2010, metric:'at an intersection', avg:'at intersections', dot:'intersection crashes',
+        note:'Based on 2010–2024 data only.'},
+  wx  :{lab:'Adverse weather',     share:1, fi:5, crkey:'wx', metric:'in adverse weather', avg:'in adverse weather', dot:'adverse-weather crashes'},
 };
 const SHARE_RAMP=['#f7fcfd','#bfd3e6','#8c96c6','#8856a7','#810f7c'];   // sequential (distinct from the rate ramp)
 const MINSHARE=4;   // need >=this many crashes in the window for a stable share
@@ -400,8 +390,8 @@ function segColor(s,maxShare){
 
 // ---------- map ----------
 function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
-  const b=ptsOff?1.9:1;   // bolder roads when crash dots are hidden ("just the map")
-  return {hit:(1.8+5.0*f)*b, miss:(0.6+1.0*f)*b}; }   // higher floor so roads read at low (mobile) zoom
+  // Consistent regardless of the crash toggle — routes don't change when crashes hide.
+  return {hit:1.8+5.0*f, miss:0.6+1.0*f}; }   // higher floor so roads read at low (mobile) zoom
 // crash dots: tiny at statewide zoom (so they don't blob together), bigger as you zoom in
 function crashZ(){ return Math.max(0,Math.min(1,(map.getZoom()-6)/8)); }
 function crashR(k){ return 0.8+2.6*crashZ()+(k-1)*0.9; }
@@ -424,7 +414,7 @@ function drawMap(){
   segLayer.clearLayers(); segPolys=[];
   SEG.forEach((s,i)=>{
     const has=segHasData(s);
-    const pl=L.polyline(s.c,{color:segColor(s,maxShare),weight:has?zw.hit:zw.miss,opacity:ptsOff?1:.85})
+    const pl=L.polyline(s.c,{color:segColor(s,maxShare),weight:has?zw.hit:zw.miss,opacity:.85})
       .bindPopup(segTip(i)).on('popupopen',()=>{ detail={t:'seg',i}; atState=(map.getZoom()<=8); highlightSeg(i); zbtnText(); });
     pl.addTo(segLayer); segPolys[i]=pl;
   });
@@ -444,15 +434,36 @@ function drawMap(){
                 : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`);
   updateLegend(maxShare);
 }
+function riskLegendHtml(){
+  return `<b class="lgttl">Fatal crashes per 100M vehicle-miles</b>`
+    +`<div class="lgscale"><span class="sw" style="background:#1a9850;margin-left:0"></span>&lt;1`
+    +`<span class="sw" style="background:#a6d96a"></span>1–3`
+    +`<span class="sw" style="background:#fee08b"></span>3–6`
+    +`<span class="sw" style="background:#fdae61"></span>6–12`
+    +`<span class="sw" style="background:#d73027"></span>12+`
+    +`<span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>`
+    +`<div class="muted lgfoot">Crash rate is calculated using 2024 AADT. Sources: crash data from `
+    +`<a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>; `
+    +`AADT from <a href="https://www.dot.nm.gov/planning-research-multimodal-and-safety/planning-division/data-management-bureau/" target="_blank" rel="noopener">NMDOT</a>.</div>`;
+}
+// Statewide share for the current map type, over CR within the year window (and >=since).
+function statewideAvg(){ const mt=MAPTYPES[maptype]; if(!mt.share) return null;
+  const k=mt.crkey, since=mt.since||0; let num=0,den=0;
+  for(const c of CR){ if(c.y<y0||c.y>y1) continue; if(since&&c.y<since) continue; den++; if(c[k]) num++; }
+  return den? num/den : 0; }
 function updateLegend(maxShare){
   const el=document.getElementById('legend'); if(!el) return;
   const mt=MAPTYPES[maptype];
-  if(!mt.share){ el.innerHTML=RISK_LEGEND; return; }
-  const pct=Math.round(100*(maxShare||0))||100;
+  // The "what you're seeing" note (#risknote, above the legend) is relevant ONLY to
+  // Fatal crash risk — hidden in every other map type so the legend stays put.
+  const rn=document.getElementById('risknote'); if(rn) rn.style.display = (maptype==='risk') ? '' : 'none';
+  if(!mt.share){ el.innerHTML=riskLegendHtml(); return; }
+  const pct=Math.round(100*(maxShare||0))||100, avg=Math.round(100*statewideAvg());
   el.innerHTML=`<b class="lgttl">Share of crashes ${mt.metric}</b>`
     +`<div class="lgbar" style="background:linear-gradient(to right,${SHARE_RAMP.join(',')})"></div>`
     +`<div class="lgbarlab"><span>0%</span><span>${pct}%</span></div>`
-    +`<div class="lgna"><span class="sw" style="background:#dcdcdc;margin-left:0"></span>under ${MINSHARE} crashes</div>`
+    +`<div class="lgstat">Crashes ${mt.avg} statewide: <b>${avg}%</b></div>`
+    +`<div class="lgna"><span class="sw" style="background:#dcdcdc;margin-left:0"></span>Insufficient crashes to assess</div>`
     +(mt.note?`<div class="muted lgfoot">${mt.note}</div>`:'');
 }
 // zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
@@ -648,8 +659,12 @@ const sMap=document.getElementById('slider'), sAna=document.getElementById('slid
 });
 document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>{
   if(b.dataset.pts==='off') setPts(true); else setCat(b.dataset.cat); }));
-RISK_LEGEND=document.getElementById('legend').innerHTML;   // capture the rate legend before any map-type swap
-document.getElementById('maptype').addEventListener('change',e=>{ maptype=e.target.value; drawMap(); });
+updateLegend(0);   // populate the (risk) legend immediately, before data loads
+document.getElementById('maptype').addEventListener('change',e=>{
+  maptype=e.target.value;
+  hlLayer.clearLayers(); markLayer.clearLayers(); map.closePopup(); detail=null;   // clear any illuminated segment
+  drawMap();
+});
 document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
 document.getElementById('search').addEventListener('change',e=>logSearch(e.target.value,'analysis'));
 document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
