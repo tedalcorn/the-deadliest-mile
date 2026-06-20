@@ -803,8 +803,12 @@ if(window.matchMedia('(max-width:620px)').matches){
   if(ctrl&&lg) ctrl.appendChild(lg);
 }
 
+// crashes.json is positional arrays (smaller download) — rehydrate to objects so the
+// rest of the code keeps using c.la/c.lo/etc. Order must match the build's CR writer.
+const CR_FIELDS=['la','lo','y','m','dy','dw','hr','k','inj','si','ev','d','pc','nt','ix','wx','sg'];
+function rehydrate(rows){ return rows.map(r=>{ const o={}; for(let i=0;i<CR_FIELDS.length;i++) o[CR_FIELDS[i]]=r[i]; return o; }); }
 Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
-  .then(([s,c])=>{ SEG=s; CR=c;
+  .then(([s,c])=>{ SEG=s; CR=rehydrate(c);
     if(CR.length>BIG_STATE){            // big state: start on the last 5 years so it loads light; expandable
       y0=Math.max(YMIN,YMAX-4);
       if(sMap&&sMap.noUiSlider) sMap.noUiSlider.set([y0,y1]);
