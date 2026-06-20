@@ -38,6 +38,8 @@
   #slider,#slider2{margin:2px 7px 4px}
   #stat{margin-top:8px;color:#444}
   #legend{bottom:18px;left:14px;padding:8px 11px;color:#333}
+  /* fixed size so the legend never resizes/jumps when switching map types (desktop) */
+  @media(min-width:621px){ #legend{width:352px;min-height:152px} }
   #legend .lgttl{display:block;margin-bottom:4px;font-weight:700;white-space:nowrap}
   #legend .lgscale{white-space:nowrap}
   #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
@@ -430,7 +432,7 @@ function drawMap(){
   });
   document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
   document.getElementById('stat').innerHTML = ptsOff ? `Crash points hidden`
-    : (mt.share ? `${nc.toLocaleString()} ${mt.dot}`
+    : (mt.share ? `${nc.toLocaleString()} fatal crashes ${mt.avg}`
                 : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`);
   updateLegend(maxShare);
 }
@@ -462,7 +464,7 @@ function updateLegend(maxShare){
   el.innerHTML=`<b class="lgttl">Share of crashes ${mt.metric}</b>`
     +`<div class="lgbar" style="background:linear-gradient(to right,${SHARE_RAMP.join(',')})"></div>`
     +`<div class="lgbarlab"><span>0%</span><span>${pct}%</span></div>`
-    +`<div class="lgstat">Crashes ${mt.avg} statewide: <b>${avg}%</b></div>`
+    +`<div class="lgstat">Fatal crashes ${mt.avg} statewide: <b>${avg}%</b></div>`
     +`<div class="lgna"><span class="sw" style="background:#dcdcdc;margin-left:0"></span>Insufficient crashes to assess</div>`
     +(mt.note?`<div class="muted lgfoot">${mt.note}</div>`:'');
 }
