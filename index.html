@@ -28,6 +28,11 @@
   #ctrl .mslab{font-weight:600;margin-bottom:4px}
   #mapsearch{width:100%;font:13.5px inherit;padding:6px 9px;border:1px solid #c3c3c3;border-radius:5px}
   #msmsg{color:#b00;font-size:12.5px;line-height:1.35;margin-top:3px;min-height:0}
+  #maptype{width:100%;font:13px inherit;padding:6px 8px;border:1px solid #c3c3c3;border-radius:5px;background:#fff;margin-top:3px}
+  #legend .lgbar{height:11px;border-radius:2px;margin:4px 0 2px}
+  #legend .lgbarlab{display:flex;justify-content:space-between;font-size:11px;color:#555}
+  #legend .lgna{margin-top:5px;font-size:11.5px;color:#555}
+  #legend .lgna .sw{width:13px;height:8px}
   #ctrl .yr{font-weight:600;margin-bottom:9px}
   #slider,#slider2{margin:2px 7px 4px}
   #stat{margin-top:8px;color:#444}
@@ -192,7 +197,16 @@
       <div id="msmsg"></div>
       <div class="yr" style="margin-top:9px">Years: <span id="yrlabel"></span></div>
       <div id="slider"></div>
-      <div class="catsel" data-which="map" style="margin-top:8px">
+      <div class="mslab" style="margin-top:9px">Map type:</div>
+      <select id="maptype">
+        <option value="risk">Fatal crash risk</option>
+        <option value="alc">Alcohol involvement</option>
+        <option value="nt">Nighttime crashes</option>
+        <option value="ix">Deadly intersections</option>
+        <option value="wx">Adverse weather</option>
+      </select>
+      <div class="mslab" style="margin-top:9px">Crashes shown:</div>
+      <div class="catsel" data-which="map" style="margin-top:3px">
         <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button><button data-pts="off">None</button>
       </div>
       <div id="stat"></div>
@@ -330,8 +344,8 @@ function crashPopup(c){
   return html+'</div>';
 }
 
-let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all', ptsOff=false;
-let segPolys=[], ptMarkers=[], curTab='map', syncing=false;
+let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all', ptsOff=false, maptype='risk';
+let segPolys=[], ptMarkers=[], curTab='map', syncing=false, RISK_LEGEND='';
 let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
 
 const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
@@ -357,6 +371,33 @@ function pedN(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&a[1]===1).length; }
 function rateOf(s,n,ny){ const vmt=s.a*365*ny*s.l; return vmt? n/vmt*1e8 : null; }
 function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehicle ':''; }
 
+// ---------- map types ----------
+// 'risk' = the fatal-crash rate (needs AADT). The others color each segment by the
+// SHARE of its crashes with a given trait (composition, AADT-independent).
+// cr per-crash array layout: [year, pc, alcohol, night, intersection, weather]
+const MAPTYPES={
+  risk:{lab:'Fatal crash risk'},
+  alc :{lab:'Alcohol involvement', share:1, fi:2, crkey:'d',  metric:'alcohol-involved', dot:'alcohol-involved crashes',
+        note:'Driver alcohol is police-reported and under-counts in the most recent years.'},
+  nt  :{lab:'Nighttime crashes',   share:1, fi:3, crkey:'nt', metric:'at night (in the dark)', dot:'nighttime crashes'},
+  ix  :{lab:'Deadly intersections',share:1, fi:4, crkey:'ix', since:2010, metric:'at an intersection', dot:'intersection crashes',
+        note:'Intersection coding is available 2010–2024 only.'},
+  wx  :{lab:'Adverse weather',     share:1, fi:5, crkey:'wx', metric:'in adverse weather', dot:'adverse-weather crashes'},
+};
+const SHARE_RAMP=['#f7fcfd','#bfd3e6','#8c96c6','#8856a7','#810f7c'];   // sequential (distinct from the rate ramp)
+const MINSHARE=4;   // need >=this many crashes in the window for a stable share
+function _hx(c){ return [parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)]; }
+function ramp(stops,t){ t=Math.max(0,Math.min(1,t||0)); const x=t*(stops.length-1),
+  i=Math.min(stops.length-2,Math.floor(x)), f=x-i, a=_hx(stops[i]), b=_hx(stops[i+1]);
+  return '#'+[0,1,2].map(j=>Math.round(a[j]+(b[j]-a[j])*f).toString(16).padStart(2,'0')).join(''); }
+function shareOf(s){ const mt=MAPTYPES[maptype], fi=mt.fi, since=mt.since||0; let num=0,den=0;
+  for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; if(since&&a[0]<since) continue; den++; if(a[fi]) num++; }
+  return den>=MINSHARE ? {share:num/den, n:den, k:num} : null; }
+function segHasData(s){ return MAPTYPES[maptype].share ? !!shareOf(s) : sel(s).length>0; }
+function segColor(s,maxShare){
+  if(MAPTYPES[maptype].share){ const r=shareOf(s); return r? ramp(SHARE_RAMP, maxShare? r.share/maxShare:0) : '#dcdcdc'; }
+  const ny=y1-y0+1, n=sel(s).length; return rateColor(rateOf(s,n,ny), n); }
+
 // ---------- map ----------
 function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
   const b=ptsOff?1.9:1;   // bolder roads when crash dots are hidden ("just the map")
@@ -365,37 +406,58 @@ function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
 function crashZ(){ return Math.max(0,Math.min(1,(map.getZoom()-6)/8)); }
 function crashR(k){ return 0.8+2.6*crashZ()+(k-1)*0.9; }
 function crashW(){ return 0.35+0.65*crashZ(); }
-function segTip(i){ const s=SEG[i], ny=y1-y0+1, n=sel(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
+function segTip(i){ const s=SEG[i], mt=MAPTYPES[maptype];
   const place=[s.loc, s.cty?`${s.cty} County`:''].filter(Boolean).join(' · ');
+  let body;
+  if(mt.share){ const r=shareOf(s);
+    body = r ? `<b>${Math.round(100*r.share)}%</b> of its ${r.n} fatal crashes were ${mt.metric}`
+             : `too few crashes to compare (under ${MINSHARE})`;
+  } else { const ny=y1-y0+1, n=sel(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
+    body = `${s.l.toFixed(1)} miles with AADT ${s.a.toLocaleString()} · ${n} fatal crash${n===1?'':'es'}`
+      +(pc?` (${pc} ped/bike)`:'')+(rate!=null?` · ${rate.toFixed(1)} crashes per 100 million vehicle miles`:''); }
   return `<div class="segpop"><b>${s.lab}</b>${place?` <span style="color:#555">— ${place}</span>`:''}`
-    +`<br>${s.l.toFixed(1)} miles with AADT ${s.a.toLocaleString()} · ${n} fatal crash${n===1?'':'es'}`
-    +(pc?` (${pc} ped/bike)`:'')
-    +(rate!=null?` · ${rate.toFixed(1)} crashes per 100 million vehicle miles`:'')
-    +`<br><button class="zbtn" onclick="toggleView()"></button></div>`; }
+    +`<br>${body}<br><button class="zbtn" onclick="toggleView()"></button></div>`; }
 function drawMap(){
-  const ny=y1-y0+1, zw=segWeight();
+  const zw=segWeight(), mt=MAPTYPES[maptype];
+  let maxShare=0;
+  if(mt.share) SEG.forEach(s=>{ const r=shareOf(s); if(r&&r.share>maxShare) maxShare=r.share; });
   segLayer.clearLayers(); segPolys=[];
   SEG.forEach((s,i)=>{
-    const n=sel(s).length, rate=rateOf(s,n,ny);
-    const pl=L.polyline(s.c,{color:rateColor(rate,n),weight:n?zw.hit:zw.miss,opacity:ptsOff?1:.85})
+    const has=segHasData(s);
+    const pl=L.polyline(s.c,{color:segColor(s,maxShare),weight:has?zw.hit:zw.miss,opacity:ptsOff?1:.85})
       .bindPopup(segTip(i)).on('popupopen',()=>{ detail={t:'seg',i}; atState=(map.getZoom()<=8); highlightSeg(i); zbtnText(); });
     pl.addTo(segLayer); segPolys[i]=pl;
   });
   ptLayer.clearLayers(); ptMarkers=[];
   let nc=0,nk=0;
-  CR.forEach(c=>{ if(ptsOff||c.y<y0||c.y>y1||!inCat(c.pc)) return; nc++; nk+=c.k;
+  CR.forEach(c=>{ if(ptsOff||c.y<y0||c.y>y1) return;
+    if(mt.share){ if(mt.since&&c.y<mt.since) return; if(!c[mt.crkey]) return; }
+    else if(!inCat(c.pc)) return;
+    nc++; nk+=c.k;
     const m=L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k),color:'#67000d',
       weight:crashW(),fillColor:'#cb181d',fillOpacity:.85}).bindPopup(crashPopup(c)).addTo(ptLayer);
     ptMarkers.push([m,c.k]);
   });
   document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
-  document.getElementById('stat').innerHTML = ptsOff
-    ? `Crash points hidden — roads still shaded by risk`
-    : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
+  document.getElementById('stat').innerHTML = ptsOff ? `Crash points hidden`
+    : (mt.share ? `${nc.toLocaleString()} ${mt.dot}`
+                : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`);
+  updateLegend(maxShare);
+}
+function updateLegend(maxShare){
+  const el=document.getElementById('legend'); if(!el) return;
+  const mt=MAPTYPES[maptype];
+  if(!mt.share){ el.innerHTML=RISK_LEGEND; return; }
+  const pct=Math.round(100*(maxShare||0))||100;
+  el.innerHTML=`<b class="lgttl">Share of crashes ${mt.metric}</b>`
+    +`<div class="lgbar" style="background:linear-gradient(to right,${SHARE_RAMP.join(',')})"></div>`
+    +`<div class="lgbarlab"><span>0%</span><span>${pct}%</span></div>`
+    +`<div class="lgna"><span class="sw" style="background:#dcdcdc;margin-left:0"></span>under ${MINSHARE} crashes</div>`
+    +(mt.note?`<div class="muted lgfoot">${mt.note}</div>`:'');
 }
 // zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
 map.on('zoomend',()=>{ const zw=segWeight(), cw=crashW();
-  segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:sel(SEG[i]).length?zw.hit:zw.miss}); });
+  segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:segHasData(SEG[i])?zw.hit:zw.miss}); });
   ptMarkers.forEach(([m,k])=>{ m.setRadius(crashR(k)); m.setStyle({weight:cw}); });
   hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); });
   rhlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
@@ -586,6 +648,8 @@ const sMap=document.getElementById('slider'), sAna=document.getElementById('slid
 });
 document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>{
   if(b.dataset.pts==='off') setPts(true); else setCat(b.dataset.cat); }));
+RISK_LEGEND=document.getElementById('legend').innerHTML;   // capture the rate legend before any map-type swap
+document.getElementById('maptype').addEventListener('change',e=>{ maptype=e.target.value; drawMap(); });
 document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
 document.getElementById('search').addEventListener('change',e=>logSearch(e.target.value,'analysis'));
 document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
