@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Deadliest Mile — fatal crash risk on Montana roads</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{display:flex;flex-direction:column;font:13px/1.45 -apple-system,Helvetica,Arial;color:#222}
+  /* tab bar */
+  #tabbar{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:2px;background:#1f2d3d;padding:0 10px}
+  #brand{font:800 16px/1 -apple-system,Helvetica,Arial;letter-spacing:.5px;color:#fff;
+    white-space:nowrap;padding:12px 18px 12px 6px;margin-right:4px}
+  #brand{cursor:pointer}
+  #brand b{color:#e3120b}
+  #statesel{margin-left:auto;align-self:center;background:#2a3a4d;color:#fff;border:1px solid #3a4d63;
+    border-radius:5px;font:600 12.5px inherit;padding:6px 8px;cursor:pointer}
+  #tabbar .tab{appearance:none;border:none;background:transparent;color:#5fc9bb;
+    font:600 14.5px/1 -apple-system,Helvetica,Arial;padding:13px 18px;cursor:pointer;border-bottom:3px solid transparent}
+  #tabbar .tab:hover{color:#9fe5da}
+  #tabbar .tab.active{color:#fff;border-bottom-color:#2ec4b6}
+  #content{flex:1 1 auto;position:relative;min-height:0}
+  .view{display:none;position:absolute;inset:0}
+  .view.active{display:block}
+  #map{height:100%}
+  #analysis,#info{overflow:auto;background:#f4f6f8}
+  /* floating panels on the map */
+  .panel{position:absolute;z-index:1000;background:rgba(255,255,255,.96);border:1px solid #ccc;
+    border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.2);font:13.5px/1.5 -apple-system,Helvetica,Arial}
+  #ctrl{bottom:18px;right:14px;padding:12px 15px;width:270px}
+  #ctrl .mslab{font-weight:600;margin-bottom:4px}
+  #mapsearch{width:100%;font:13.5px inherit;padding:6px 9px;border:1px solid #c3c3c3;border-radius:5px}
+  #msmsg{color:#b00;font-size:12.5px;line-height:1.35;margin-top:3px;min-height:0}
+  #maptype{width:100%;font:13px inherit;padding:6px 8px;border:1px solid #c3c3c3;border-radius:5px;background:#fff;margin-top:3px}
+  #legend .lgbar{height:11px;border-radius:2px;margin:4px 0 2px}
+  #legend .lgbarlab{display:flex;justify-content:space-between;font-size:11px;color:#555}
+  #legend .lgstat{margin-top:5px;font-size:12px;color:#333;white-space:nowrap}
+  #legend .lgna{margin-top:4px;font-size:11.5px;color:#555;white-space:nowrap}
+  #legend .lgna .sw{width:13px;height:8px}
+  #ctrl .yr{font-weight:600;margin-bottom:9px}
+  #slider,#slider2{margin:2px 7px 4px}
+  #stat{margin-top:8px;color:#444}
+  #legend{bottom:18px;left:14px;padding:8px 11px;color:#333}
+  /* fixed min-height so the legend never resizes when switching map types; width
+     comes from #leftstack so it always matches the "what you're seeing" note (desktop) */
+  @media(min-width:621px){ #legend{min-height:152px} }
+  #legend .lgttl{display:block;margin-bottom:4px;font-weight:700;white-space:nowrap}
+  #legend .lgscale{white-space:nowrap;font-size:11.5px}
+  #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
+  #legend .lgfoot a{color:#1559a3;text-decoration:underline}
+  #legend .sw{display:inline-block;width:13px;height:9px;margin:0 2px 0 5px;vertical-align:1px}
+  #legend .lgshort{display:none}
+  /* desktop: the methodology note sits in a stack beneath the legend */
+  #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
+    flex-direction:column;gap:10px;width:506px}   /* fixed width → legend matches the note; wide enough for the rate scale on one line */
+  #leftstack .panel{position:static;max-width:none}
+  #risknote{padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
+  #risknote b{color:#1a2433}
+  /* the 'About' tab is mobile-only; desktop keeps the note under the legend */
+  @media(min-width:621px){ .tab[data-tab="info"]{display:none} }
+  @media(max-width:620px){
+    #leftstack{display:none}                       /* the note lives in the About tab on mobile */
+    #map-view.introup #ctrl{display:none}          /* intro card shows alone on phones */
+    /* one compact panel at the bottom: search + toggles + legend */
+    #ctrl{left:8px;right:8px;width:auto;bottom:10px;padding:11px 13px;max-height:52vh;overflow:auto}
+    #ctrl .yr,#slider,#stat{display:none}           /* drop the year slider and the crash/killed count */
+    #ctrl #legend{position:static;background:none;border:none;box-shadow:none;
+      padding:9px 0 0;margin-top:9px;border-top:1px solid #e6e9ec;color:#333}
+    #legend .lgttl{font-size:12.5px;margin-bottom:3px}
+    #legend .lgscale{white-space:nowrap;font-size:11.5px}
+    #legend .sw{margin:0 2px 0 5px;width:13px;height:8px}
+    #legend .lgfoot{display:none}                    /* drop the note under the legend */
+    #legend .lgfull{display:none} #legend .lgshort{display:inline}
+    .leaflet-control-zoom{display:none}
+  }
+  .muted{color:#888;font-size:12px}
+  #about{top:50%;left:50%;transform:translate(-50%,-50%);width:420px;max-width:calc(100vw - 32px);
+    padding:30px 32px;z-index:1200;text-align:center}
+  #about .atitle{font:800 34px/1.05 -apple-system,Helvetica,Arial;letter-spacing:.5px;margin:0 0 4px;color:#1a2433}
+  #about .atitle b{color:#e3120b}
+  #about .asub{font-size:16px;font-weight:600;color:#555;margin:0 0 14px}
+  #about .adesc{font-size:15.5px;line-height:1.55;color:#333}
+  #about #aboutx{position:absolute;top:7px;right:11px;border:none;background:none;font-size:21px;
+    color:#999;cursor:pointer;line-height:1;padding:0}
+  #about #aboutx:hover{color:#444}
+  #about #aboutgo{margin-top:15px;font:13px/1 inherit;background:#2171b5;color:#fff;border:none;
+    border-radius:5px;padding:8px 14px;cursor:pointer}
+  #about #aboutgo:hover{background:#1559a3}
+  #about.hidden{display:none}
+  @media(max-width:620px){ #about{left:12px;right:12px;width:auto;top:54px;transform:none;max-height:84vh;overflow:auto}
+    #about .atitle{font-size:27px} }
+  #aboutbody{background:#fff;border:1px solid #e2e6ea;border-radius:8px;padding:16px 18px;
+    font-size:14.5px;line-height:1.6;color:#333;max-width:680px}
+  #aboutbody b{color:#1a2433}
+  /* category segmented control */
+  .catsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden}
+  .catsel button{appearance:none;border:none;background:#fff;color:#444;font:12.5px/1 inherit;padding:7px 11px;cursor:pointer}
+  .histsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden;vertical-align:middle;margin:0 3px}
+  .histsel button{appearance:none;border:none;background:#fff;color:#444;font:12px/1 inherit;padding:5px 9px;cursor:pointer}
+  .histsel button+button{border-left:1px solid #d5d5d5}
+  .histsel button.on{background:#2171b5;color:#fff}
+  .catsel button+button{border-left:1px solid #d5d5d5}
+  .catsel button.on{background:#2171b5;color:#fff}
+  /* thin slider with small vertical-line handles */
+  .noUi-target{height:3px;border:none;background:#dcdcdc;box-shadow:none}
+  .noUi-connect{background:#2171b5}
+  .noUi-horizontal .noUi-handle{width:4px;height:17px;right:-2px;top:-7px;border:none;
+    border-radius:1px;background:#1f5fa8;box-shadow:none;cursor:ew-resize}
+  .noUi-handle:after,.noUi-handle:before{display:none}
+  /* analysis tab */
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 20px 70px}
+  .wrap h2{font-size:16px;margin:0 0 2px}
+  .sub{color:#666;margin:0 0 12px}
+  .coverage{background:#fff;border:1px solid #e2e6ea;border-left:4px solid #f0ad4e;border-radius:6px;
+    padding:11px 14px;margin:0 0 18px;color:#444;font-size:12.5px;line-height:1.55}
+  .coverage b{color:#1a1a1a}
+  .actl{display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin:0 0 18px;
+    background:#fff;border:1px solid #e2e6ea;border-radius:6px;padding:12px 14px}
+  .actl .yr{font-weight:600;margin-bottom:5px}
+  #slider2{width:240px;margin:0}
+  .actl label.zc{font-size:12px;color:#555}
+  .card{background:#fff;border:1px solid #e2e6ea;border-radius:6px;padding:12px 14px;margin:0 0 18px}
+  .card .ttl{font-weight:600;margin-bottom:9px;font-size:12.5px}
+  .hist{display:flex;align-items:flex-end;gap:12px;height:158px}
+  .hbar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;cursor:pointer}
+  .hbar .hn{font-size:11px;color:#333;margin-bottom:3px;font-variant-numeric:tabular-nums}
+  .hbar .bar{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:opacity .12s}
+  .hbar:hover .bar{opacity:.8}
+  .hbar .hl{font-size:11px;color:#666;margin-top:5px}
+  .hbar.sel .hl{font-weight:700;color:#111}
+  .hbar.dim .bar{opacity:.28}
+  .zeronote{color:#777;font-size:11.5px;margin-top:9px;text-align:center}
+  .zeronote .haxis{font-weight:600;color:#555;font-size:12.5px}
+  .zeronote #hclear{color:#1559a3;font-weight:600;text-decoration:none}
+  .zeronote #hclear:hover{text-decoration:underline}
+  table.seg{width:100%;border-collapse:collapse;background:#fff;font-size:12.5px;
+    border:1px solid #e2e6ea;border-radius:6px;overflow:hidden}
+  table.seg th,table.seg td{padding:6px 10px;text-align:right;border-bottom:1px solid #eee;
+    white-space:nowrap;font-variant-numeric:tabular-nums}
+  table.seg th{position:sticky;top:0;background:#eaeef2;cursor:pointer;font-weight:600;color:#333;
+    border-bottom:2px solid #d3dae0;z-index:1}
+  table.seg th:first-child,table.seg td:first-child{text-align:left}
+  table.seg th.sorted{color:#1559a3}
+  table.seg tbody tr{cursor:pointer}
+  table.seg tbody tr:hover{background:#eaf3fb}
+  /* mobile: keep Road · Location · Crashes · Rate, fit to screen (no side-scroll) */
+  @media(max-width:620px){
+    .wrap{padding:14px 10px 70px}
+    table.seg{table-layout:fixed;width:100%}
+    table.seg th,table.seg td{padding:7px 6px;white-space:normal;font-size:12px}
+    table.seg td{word-break:break-word}
+    table.seg th{font-size:11px;vertical-align:bottom;line-height:1.2}
+    table.seg th:nth-child(3),table.seg td:nth-child(3),
+    table.seg th:nth-child(4),table.seg td:nth-child(4),
+    table.seg th:nth-child(6),table.seg td:nth-child(6),
+    table.seg th:nth-child(8),table.seg td:nth-child(8),
+    table.seg th:nth-child(9),table.seg td:nth-child(9),
+    table.seg th:nth-child(10),table.seg td:nth-child(10),
+    table.seg th:nth-child(11),table.seg td:nth-child(11){display:none}
+    table.seg th:nth-child(1),table.seg td:nth-child(1){width:22%}
+    table.seg th:nth-child(2),table.seg td:nth-child(2){width:46%}
+    table.seg th:nth-child(5),table.seg td:nth-child(5){width:15%}
+    table.seg th:nth-child(7),table.seg td:nth-child(7){width:17%}
+    /* controls: search across the top, slider full width, toggles + 3+ on one line */
+    .actl{gap:12px 14px}
+    .actl #search{order:1;width:100%}
+    .actl > div:first-child{order:2;width:100%}
+    .actl #slider2{width:100%}
+    .actl .catsel[data-which="ana"]{order:3}
+    .actl label.zc{order:4}
+  }
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
+  .rec{display:inline-flex;height:9px;width:46px;border-radius:2px;overflow:hidden;
+    vertical-align:-1px;margin-left:7px;border:1px solid #dcdcdc}
+  .rec i{display:block;height:100%}
+  .tablohint{color:#888;font-size:11.5px;margin:7px 2px 0}
+  #search{font:12px inherit;padding:5px 9px;border:1px solid #c3c3c3;border-radius:5px;width:190px}
+  .zbtn{margin-top:6px;font:11px/1 inherit;color:#1559a3;background:#eef4fb;border:1px solid #cfe0f2;
+    border-radius:4px;padding:4px 8px;cursor:pointer}
+  .zbtn:hover{background:#dceaf8}
+  .segpop{font:13.5px/1.55 -apple-system,Helvetica,Arial}
+  #hslists{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start}
+  @media(max-width:620px){ #hslists{grid-template-columns:1fr} }
+  .hsgrp{margin:0}
+  .hsgrp h3{font-size:13.5px;margin:0 0 10px;border-bottom:2px solid #e2e6ea;padding-bottom:5px}
+  .hsred{color:#c0392b}
+  .hsred .muted{color:#888;font-weight:400}
+  .hscards{display:flex;flex-direction:column;gap:7px}
+  .hscard{display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid #e2e6ea;
+    border-radius:6px;padding:9px 12px;cursor:pointer}
+  .hscard:hover{background:#eaf3fb;border-color:#bcd6ef}
+  .hsrank{flex:0 0 24px;height:24px;border-radius:50%;background:#1f2d3d;color:#fff;font-weight:700;
+    font-size:12px;display:flex;align-items:center;justify-content:center}
+  .hsttl{font-weight:600;font-size:13px}
+  .hsstat{color:#555;font-size:12px;margin-top:3px;line-height:1.5}
+</style></head>
+<body>
+<div id="tabbar">
+  <span id="brand" title="Back to the intro">THE <b>DEADLIEST</b> MILE</span>
+  <button class="tab active" data-tab="map">Map</button>
+  <button class="tab" data-tab="analysis">Risk analysis</button>
+  <button class="tab" data-tab="hotspots">Most dangerous areas</button>
+  <button class="tab" data-tab="info">About</button>
+  <select id="statesel" aria-label="Change state" title="Change state"><option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT" selected>Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option><option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option></select>
+</div>
+<div id="content">
+  <!-- MAP -->
+  <div id="map-view" class="view active introup">
+    <div id="map"></div>
+    <div id="ctrl" class="panel">
+      <div class="mslab">Search roads or communities:</div>
+      <input id="mapsearch" placeholder="Search communities, roads, or an address" autocomplete="off">
+      <div id="msmsg"></div>
+      <div class="yr" style="margin-top:9px">Years: <span id="yrlabel"></span></div>
+      <div id="slider"></div>
+      <div class="mslab" style="margin-top:9px">Map type:</div>
+      <select id="maptype">
+        <option value="risk">Fatal crash risk</option>
+        <option value="alc">Alcohol involvement</option>
+        <option value="nt">Nighttime crashes</option>
+        <option value="ix">Deadly intersections</option>
+        <option value="wx">Adverse weather</option>
+      </select>
+      <div class="mslab" style="margin-top:9px">Crashes shown:</div>
+      <div class="catsel" data-which="map" style="margin-top:3px">
+        <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button><button data-pts="off">None</button>
+      </div>
+      <div id="stat"></div>
+    </div>
+    <div id="leftstack">
+    <div id="risknote" class="panel"></div>
+    <div id="legend" class="panel"></div>
+    </div>
+    <div id="about" class="panel">
+      <button id="aboutx" aria-label="Close">×</button>
+      <div class="atitle">THE <b>DEADLIEST</b> MILE</div>
+      <div class="asub">Fatal crash risk on Montana roads</div>
+      <div class="adesc">The federal government documents every fatal vehicle crash. This map plots
+        more than two decades of that data — by road segment, adjusted for traffic — to show where
+        driving in Montana is most dangerous.</div>
+      <button id="aboutgo">Explore the map →</button>
+    </div>
+  </div>
+  <!-- ANALYSIS -->
+  <div id="analysis" class="view">
+    <div class="wrap">
+      <h2>Risk by road segment</h2>
+      <div class="actl">
+        <div><div class="yr">Years: <span id="yrlabel2"></span></div><div id="slider2"></div></div>
+        <div class="catsel" data-which="ana">
+          <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button>
+        </div>
+        <label class="zc"><input type="checkbox" id="min3" checked> show only segments with 3+ crashes</label>
+        <input id="search" placeholder="search road or place…" autocomplete="off">
+      </div>
+      <div class="card">
+        <div class="ttl">Distribution of segments by
+          <span class="histsel">
+            <button data-m="rate" class="on">rate /100M</button><button data-m="count">crash count</button>
+          </span></div>
+        <div id="hist" class="hist"></div>
+        <div id="zeronote" class="zeronote"></div>
+      </div>
+      <table class="seg" id="segtable"></table>
+      <div class="tablohint" id="rowhint"></div>
+      <div class="tablohint">Trend is computed on 5-year bands across 2001–2024, where sufficient data exists to show a pattern.</div>
+    </div>
+  </div>
+  <!-- HOT SPOTS -->
+  <div id="hotspots" class="view">
+    <div class="wrap">
+      <h2>Most dangerous areas</h2>
+      <div id="hslists"></div>
+    </div>
+  </div>
+  <!-- ABOUT -->
+  <div id="info" class="view">
+    <div class="wrap">
+      <h2>About this map</h2>
+      <div id="aboutbody"></div>
+    </div>
+  </div>
+</div>
+<script>
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 2369, "crTotal": 4760, "crAssigned": 2595, "crLocal": 1507, "crUnmatched": 658, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 373, "road": "US-2", "loc": "14 mi SW of Kalispell", "cty": "Flathead", "lat": 48.1079, "lon": -114.5906, "n": 11, "ped": 0, "aadt": 3161, "len": 5.0, "rate": 7.9, "marks": [[48.10034, -114.56359], [48.10173, -114.57058], [48.11442, -114.60268], [48.10734, -114.62779], [48.10079, -114.56673], [48.10066, -114.5662], [48.10971, -114.59349], [48.10499, -114.63136], [48.09669, -114.54977], [48.11141, -114.59651], [48.1145, -114.60147]]}, {"kind": "rate", "seg": 1734, "road": "US-212", "loc": "Busby", "cty": "Big Horn", "lat": 45.5284, "lon": -106.965, "n": 8, "ped": 0, "aadt": 2482, "len": 5.1, "rate": 7.2, "marks": [[45.52865, -106.97639], [45.52924, -107.00011], [45.53007, -106.95829], [45.52938, -107.00489], [45.52962, -106.95888], [45.52847, -106.96879], [45.52884, -106.98503], [45.52892, -106.99]]}, {"kind": "rate", "seg": 375, "road": "US-2", "loc": "6 mi SW of Kalispell", "cty": "Flathead", "lat": 48.1594, "lon": -114.4353, "n": 12, "ped": 2, "aadt": 5664, "len": 5.1, "rate": 4.8, "marks": [[48.18551, -114.40838], [48.17301, -114.42433], [48.17701, -114.42026], [48.18372, -114.40983], [48.14619, -114.4472], [48.16135, -114.43409], [48.15273, -114.43994], [48.15325, -114.43943], [48.14908, -114.4438], [48.13826, -114.4558], [48.1657, -114.43023], [48.14078, -114.45328]]}, {"kind": "rate", "seg": 1749, "road": "US-212", "loc": "39 mi SW of Billings", "cty": "Carbon", "lat": 45.3842, "lon": -109.139, "n": 9, "ped": 1, "aadt": 2873, "len": 8.0, "rate": 4.5, "marks": [[45.38239, -109.14634], [45.43155, -109.09834], [45.40718, -109.12293], [45.43961, -109.09196], [45.38343, -109.14085], [45.39193, -109.13269], [45.41845, -109.11078], [45.36749, -109.16123], [45.37041, -109.15815]]}, {"kind": "rate", "seg": 1535, "road": "MT-200", "loc": "38 mi SW of Polson", "cty": "Sanders", "lat": 47.4316, "lon": -114.8531, "n": 11, "ped": 1, "aadt": 3728, "len": 8.1, "rate": 4.2, "marks": [[47.43617, -114.85688], [47.42738, -114.84607], [47.44192, -114.85985], [47.44222, -114.86031], [47.39742, -114.81116], [47.41341, -114.83024], [47.40653, -114.82216], [47.41647, -114.83206], [47.41548, -114.83181], [47.41486, -114.83174], [47.47668, -114.89978]]}, {"kind": "rate", "seg": 61, "road": "US-93", "loc": "27 mi N of Missoula", "cty": "Lake", "lat": 47.2443, "lon": -114.1686, "n": 12, "ped": 0, "aadt": 7884, "len": 5.1, "rate": 3.4, "marks": [[47.23217, -114.15251], [47.22145, -114.13769], [47.21556, -114.12951], [47.22526, -114.14336], [47.24361, -114.16795], [47.23615, -114.15821], [47.24511, -114.16904], [47.22934, -114.14912], [47.26119, -114.16812], [47.25489, -114.17163], [47.25272, -114.17239], [47.21684, -114.13149]]}, {"kind": "rate", "seg": 62, "road": "US-93", "loc": "Ravalli", "cty": "Lake", "lat": 47.2932, "lon": -114.169, "n": 10, "ped": 0, "aadt": 7322, "len": 5.0, "rate": 3.1, "marks": [[47.31007, -114.12035], [47.27606, -114.18086], [47.29333, -114.16642], [47.29497, -114.15549], [47.27439, -114.17952], [47.27898, -114.18379], [47.29201, -114.17122], [47.31116, -114.11829], [47.2963, -114.14893], [47.27012, -114.17692]]}, {"kind": "rate", "seg": 59, "road": "US-93", "loc": "18 mi N of Missoula", "cty": "Lake", "lat": 47.1231, "lon": -114.0466, "n": 12, "ped": 0, "aadt": 8989, "len": 5.1, "rate": 3.0, "marks": [[47.08927, -114.04121], [47.12041, -114.04645], [47.11087, -114.04744], [47.12373, -114.04614], [47.11519, -114.04742], [47.1225, -114.04694], [47.10908, -114.04663], [47.13836, -114.04332], [47.11945, -114.0474], [47.13278, -114.04453], [47.1404, -114.04393], [47.14241, -114.04713]]}, {"kind": "rate", "seg": 54, "road": "US-93", "loc": "6 mi S of Polson", "cty": "Lake", "lat": 47.6124, "lon": -114.1132, "n": 14, "ped": 2, "aadt": 11533, "len": 5.0, "rate": 2.8, "marks": [[47.6324, -114.11317], [47.62367, -114.11313], [47.64599, -114.11344], [47.62933, -114.11311], [47.63125, -114.11312], [47.61453, -114.11328], [47.60373, -114.11328], [47.58022, -114.11289], [47.58779, -114.1132], [47.58029, -114.11356], [47.5803, -114.11352], [47.60905, -114.11294], [47.58575, -114.11328], [47.60222, -114.11301]]}, {"kind": "rate", "seg": 378, "road": "US-2", "loc": "7 mi NE of Kalispell", "cty": "Flathead", "lat": 48.304, "lon": -114.2489, "n": 18, "ped": 1, "aadt": 14606, "len": 5.0, "rate": 2.8, "marks": [[48.31728, -114.24284], [48.31324, -114.24436], [48.29109, -114.25531], [48.29139, -114.25554], [48.32142, -114.24084], [48.33427, -114.23395], [48.29031, -114.25571], [48.32725, -114.24091], [48.27591, -114.26286], [48.29989, -114.25073], [48.29734, -114.25218], [48.3332, -114.24094], [48.27307, -114.26434], [48.32643, -114.24099], [48.3059, -114.24811], [48.33257, -114.24131], [48.33211, -114.24092], [48.30518, -114.24852]]}, {"kind": "rate", "seg": 380, "road": "US-2", "loc": "14 mi NE of Kalispell", "cty": "Flathead", "lat": 48.3666, "lon": -114.1446, "n": 12, "ped": 0, "aadt": 9891, "len": 5.0, "rate": 2.8, "marks": [[48.3852, -114.1081], [48.38511, -114.10822], [48.37247, -114.13653], [48.3787, -114.12771], [48.37466, -114.1333], [48.36738, -114.17682], [48.38385, -114.11995], [48.38007, -114.12546], [48.36516, -114.16806], [48.38649, -114.10095], [48.38811, -114.0966], [48.38838, -114.09431]]}, {"kind": "rate", "seg": 52, "road": "US-93", "loc": "15 mi S of Polson", "cty": "Lake", "lat": 47.4725, "lon": -114.0969, "n": 11, "ped": 1, "aadt": 9146, "len": 5.1, "rate": 2.7, "marks": [[47.48484, -114.09719], [47.4425, -114.09694], [47.49301, -114.09717], [47.47688, -114.09703], [47.45704, -114.09689], [47.44519, -114.09697], [47.44305, -114.09699], [47.44962, -114.0969], [47.4984, -114.09696], [47.49879, -114.0969], [47.44551, -114.09696]]}], "ped": []}, CITIES=[["Billings", 45.7769, -108.5521, 12], ["Missoula", 46.8687, -114.0191, 12], ["Great Falls", 47.5066, -111.2866, 12], ["Helena", 46.5976, -112.0068, 12], ["Butte", 45.9902, -112.5241, 12], ["Bozeman", 45.686, -111.0497, 12], ["Kalispell", 48.21, -114.3216, 12], ["Polson", 47.6901, -114.1458, 12], ["Havre", 48.5505, -109.6748, 12], ["East Helena", 46.5874, -111.9164, 12], ["Cascade", 47.5636, -111.327, 12]];
+const NM_BOUNDS=[[44.555, -116.049], [49.0, -104.042]];
+const map=L.map('map',{attributionControl:true});
+// Fit the whole state. On phones the bottom panel covers the lower screen, so pad
+// the bottom by its height — the state then centers in the VISIBLE area above it.
+function fitState(){
+  const isM=window.matchMedia('(max-width:620px)').matches;
+  const c=document.getElementById('ctrl');
+  const pb=(isM && c && c.offsetParent!==null) ? c.offsetHeight+24 : 12;
+  // desktop: reserve room on the left for the wider legend so the state sits
+  // slightly right of center (not behind it)
+  const padL=isM?12:150;
+  map.fitBounds(NM_BOUNDS,{paddingTopLeft:[padL,12],paddingBottomRight:[12,pb]});
+}
+fitState();   // padded fit up front so the orientation matches the post-load re-fit (no jump)
+map.attributionControl.setPrefix(false);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OSM, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+const canvas=L.canvas({padding:.5});
+const segLayer=L.layerGroup().addTo(map), rhlLayer=L.layerGroup().addTo(map),
+      hlLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map),
+      markLayer=L.layerGroup().addTo(map);
+// the individual deaths that make up a hot spot — yellow ring, red center
+function drawMarks(marks){ markLayer.clearLayers();
+  (marks||[]).forEach(m=>L.circleMarker(m,{radius:5,color:'#ffd11a',weight:2.5,
+    fillColor:'#cb181d',fillOpacity:1,interactive:false}).addTo(markLayer)); }
+function msMsg(t){ const e=document.getElementById('msmsg'); if(e) e.textContent=t||''; }
+function mapSearch(q){
+  q=(q||'').trim().toLowerCase(); if(!q){ msMsg(''); return; }
+  // exact municipality -> center on it (its zoom depends on the place's size)
+  const exact=CITIES.find(c=>c[0].toLowerCase()===q);
+  if(exact){ rhlLayer.clearLayers(); map.setView([exact[1],exact[2]],exact[3]||12); msMsg(''); return; }
+  // otherwise treat as a road/place: highlight the matching segments' real geometry
+  const segs=SEG.filter(s=>((s.lab||'')+' '+(s.loc||'')).toLowerCase().includes(q));
+  if(segs.length){
+    rhlLayer.clearLayers();
+    const bnds=L.latLngBounds([]);
+    segs.forEach(s=>{ L.polyline(s.c,{color:'#1d6fd8',weight:hlWeight(),opacity:.55,interactive:false}).addTo(rhlLayer);
+      s.c.forEach(p=>bnds.extend(p)); });
+    map.fitBounds(bnds,{padding:[45,45],maxZoom:14}); msMsg(''); return;
+  }
+  const city=CITIES.find(c=>c[0].toLowerCase().includes(q));
+  if(city){ rhlLayer.clearLayers(); map.setView([city[1],city[2]],city[3]||12); msMsg(''); return; }
+  geocodeAddr(q);   // not a known road/town — try a street address (centers the map, selects nothing)
+}
+function geocodeAddr(q){
+  msMsg('Searching…');
+  const b=NM_BOUNDS, vb=[b[0][1],b[1][0],b[1][1],b[0][0]].join(',');   // west,north,east,south (viewbox bias)
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&viewbox=${vb}&q=${encodeURIComponent(q)}`)
+    .then(r=>r.json()).then(j=>{
+      if(j&&j.length){ rhlLayer.clearLayers(); map.setView([+j[0].lat,+j[0].lon],14); msMsg(''); }
+      else msMsg(`No match for “${q}”. Try a community, a major road, or a full street address.`);
+    }).catch(()=>msMsg(`Couldn’t look up “${q}”. Try a community or major road.`));
+}
+function hlWeight(){ return segWeight().hit*2.0 + 5; }   // translucent highlight, fatter than the route
+// light up THIS segment's own fatal crashes (yellow ring); on a share layer, only
+// the crashes of that type (e.g. just the alcohol-involved deaths on the stretch)
+function highlightSegCrashes(i){ markLayer.clearLayers();
+  const mt=MAPTYPES[maptype];
+  for(const c of CR){ if(c.sg!==i) continue;
+    if(c.y<y0||c.y>y1||!inCat(c.pc)) continue;
+    if(mt.share){ if(mt.since&&c.y<mt.since) continue; if(!c[mt.crkey]) continue; }
+    L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k)+3.5,color:'#ffd11a',
+      weight:2.5,fillColor:'#cb181d',fillOpacity:1,interactive:false}).addTo(markLayer);
+  }
+}
+function highlightSeg(i){ hlLayer.clearLayers();
+  if(SEG[i]) L.polyline(SEG[i].c,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
+    lineCap:'round',interactive:false}).addTo(hlLayer); }
+function highlightSpot(h){ hlLayer.clearLayers();
+  const lines = (h.geom && h.geom.length) ? h.geom : [h.e];   // real road geometry, else smoothed line
+  lines.forEach(ln=>L.polyline(ln,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
+    lineCap:'round',interactive:false}).addTo(hlLayer)); }
+const RATE_CUTS=[2.2, 3.7, 5.7, 10.0];   // per-state rate color thresholds (scaled to this state's data)
+function rateColor(r,n){ if(!n||r==null) return '#d4d4d4'; const c=RATE_CUTS;
+  return r<c[0]?'#1a9850':r<c[1]?'#a6d96a':r<c[2]?'#fee08b':r<c[3]?'#fdae61':'#d73027'; }
+const DOW=['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function crashPopup(c){
+  let cas=`${c.k} killed`;
+  if(c.inj) cas+=` · ${c.inj} injured`+(c.si?` (${c.si} serious)`:'');
+  let date=[c.dw?DOW[c.dw]:'', `${MON[c.m]||''} ${c.dy||''}, ${c.y}`.trim()].filter(Boolean).join(', ');
+  if(c.hr!=null){ const h=c.hr%12||12; date+=` · ${h} ${c.hr<12?'AM':'PM'}`; }
+  const details=[c.ev, c.d?'alcohol involved':''].filter(Boolean).join(' · ');
+  let html=`<div style="font:13.5px/1.6 -apple-system,Helvetica,Arial"><b>${cas}</b>`
+    +`<br><span style="color:#555">${date}</span>`;
+  if(details) html+=`<br>${details}`;
+  return html+'</div>';
+}
+
+let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all', ptsOff=false, maptype='risk';
+let segPolys=[], ptMarkers=[], curTab='map', syncing=false;
+let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
+
+const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
+const _rc=RATE_CUTS;
+const RATE_BUCKETS=[{lab:'<'+_rc[0],c:RAMP[0]},{lab:_rc[0]+'–'+_rc[1],c:RAMP[1]},{lab:_rc[1]+'–'+_rc[2],c:RAMP[2]},{lab:_rc[2]+'–'+_rc[3],c:RAMP[3]},{lab:_rc[3]+'+',c:RAMP[4]}];
+const COUNT_BUCKETS=[{lab:'1',c:RAMP[0]},{lab:'2–3',c:RAMP[1]},{lab:'4–6',c:RAMP[2]},{lab:'7–10',c:RAMP[3]},{lab:'11+',c:RAMP[4]}];
+function rateBucket(r){ const c=RATE_CUTS; return r<c[0]?0:r<c[1]?1:r<c[2]?2:r<c[3]?3:4; }
+function countBucket(n){ return n<=1?0:n<=3?1:n<=6?2:n<=10?3:4; }
+function curBuckets(){ return histMode==='rate'?RATE_BUCKETS:COUNT_BUCKETS; }
+// Trend of risk over the FULL period (2001–2024) in 5-year bands, category-filtered.
+// AADT is constant per segment, so rate-trend == crash-count-trend. Slope sign of
+// counts vs band index; needs >=4 crashes to call, else 'na'.
+function trendOf(s){
+  const b=[0,0,0,0,0];
+  s.cr.forEach(a=>{ if(!inCat(a[1])) return; const y=a[0];
+    b[y<=2005?0:y<=2010?1:y<=2015?2:y<=2020?3:4]++; });
+  if(b[0]+b[1]+b[2]+b[3]+b[4]<4) return 'na';
+  let slope=0; for(let x=0;x<5;x++) slope+=(x-2)*b[x]; slope/=10;
+  return slope>=0.25?'up':slope<=-0.25?'down':'flat';
+}
+function inCat(pc){ return cat==='all' ? true : (cat==='ped'? pc===1 : pc===0); }
+function sel(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&inCat(a[1])); }
+// Route COLORING uses all crashes in the window (overall risk) — independent of the
+// crash-type toggle, which only filters the dots. Routes never recolor on toggle.
+function selWin(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1); }
+function pedN(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&a[1]===1).length; }
+function rateOf(s,n,ny){ const vmt=s.a*365*ny*s.l; return vmt? n/vmt*1e8 : null; }
+function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehicle ':''; }
+
+// ---------- map types ----------
+// 'risk' = the fatal-crash rate (needs AADT). The others color each segment by the
+// SHARE of its crashes with a given trait (composition, AADT-independent).
+// cr per-crash array layout: [year, pc, alcohol, night, intersection, weather]
+const MAPTYPES={
+  risk:{lab:'Fatal crash risk'},
+  alc :{lab:'Alcohol involvement', share:1, fi:2, crkey:'d',  metric:'alcohol-involved', avg:'involving alcohol', dot:'alcohol-involved crashes',
+        note:'Recent-year alcohol involvement is under-counted.'},
+  nt  :{lab:'Nighttime crashes',   share:1, fi:3, crkey:'nt', metric:'at night', avg:'at night', dot:'nighttime crashes'},
+  ix  :{lab:'Deadly intersections',share:1, fi:4, crkey:'ix', since:2010, metric:'at an intersection', avg:'at intersections', dot:'intersection crashes',
+        note:'Based on 2010–2024 data only.'},
+  wx  :{lab:'Adverse weather',     share:1, fi:5, crkey:'wx', metric:'in adverse weather', avg:'in adverse weather', dot:'adverse-weather crashes'},
+};
+const SHARE_RAMP=['#f7fcfd','#bfd3e6','#8c96c6','#8856a7','#810f7c'];   // sequential (distinct from the rate ramp)
+const MINSHARE=4;   // need >=this many crashes in the window for a stable share
+function _hx(c){ return [parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)]; }
+function ramp(stops,t){ t=Math.max(0,Math.min(1,t||0)); const x=t*(stops.length-1),
+  i=Math.min(stops.length-2,Math.floor(x)), f=x-i, a=_hx(stops[i]), b=_hx(stops[i+1]);
+  return '#'+[0,1,2].map(j=>Math.round(a[j]+(b[j]-a[j])*f).toString(16).padStart(2,'0')).join(''); }
+function shareOf(s){ const mt=MAPTYPES[maptype], fi=mt.fi, since=mt.since||0; let num=0,den=0;
+  for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; if(since&&a[0]<since) continue; den++; if(a[fi]) num++; }
+  return den>=MINSHARE ? {share:num/den, n:den, k:num} : null; }
+function segHasData(s){ return MAPTYPES[maptype].share ? !!shareOf(s) : selWin(s).length>0; }
+function segColor(s,maxShare){
+  if(MAPTYPES[maptype].share){ const r=shareOf(s); return r? ramp(SHARE_RAMP, maxShare? r.share/maxShare:0) : '#dcdcdc'; }
+  const ny=y1-y0+1, n=selWin(s).length; return rateColor(rateOf(s,n,ny), n); }
+
+// ---------- map ----------
+function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
+  // Consistent regardless of the crash toggle — routes don't change when crashes hide.
+  return {hit:1.8+5.0*f, miss:0.6+1.0*f}; }   // higher floor so roads read at low (mobile) zoom
+// crash dots: tiny at statewide zoom (so they don't blob together), bigger as you zoom in
+function crashZ(){ return Math.max(0,Math.min(1,(map.getZoom()-6)/8)); }
+function crashR(k){ return 0.8+2.6*crashZ()+(k-1)*0.9; }
+function crashW(){ return 0.35+0.65*crashZ(); }
+function segTip(i){ const s=SEG[i], mt=MAPTYPES[maptype];
+  let body;
+  if(mt.share){ const r=shareOf(s);
+    body = r ? `<b>${Math.round(100*r.share)}%</b> of its ${r.n} fatal crashes were ${mt.metric}`
+             : `too few crashes to compare (under ${MINSHARE})`;
+  } else { const ny=y1-y0+1, n=selWin(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
+    body = `${s.l.toFixed(1)} miles with AADT ${s.a.toLocaleString()} · ${n} fatal crash${n===1?'':'es'}`
+      +(pc?` (${pc} ped/bike)`:'')+(rate!=null?` · ${rate.toFixed(1)} crashes per 100 million vehicle miles`:''); }
+  return `<div class="segpop"><b>${s.lab}</b>`
+    +`<br>${body}<br><button class="zbtn" onclick="toggleView()"></button></div>`; }
+const BIG_STATE=20000;   // above this many crashes, default the slider to recent years (lighter load)
+function drawCrashes(){
+  ptLayer.clearLayers(); ptMarkers=[];
+  const mt=MAPTYPES[maptype];
+  let nc=0,nk=0;
+  for(const c of CR){
+    if(c.y<y0||c.y>y1||!inCat(c.pc)) continue;
+    if(mt.share){ if(mt.since&&c.y<mt.since) continue; if(!c[mt.crkey]) continue; }
+    nc++; nk+=c.k;
+    if(ptsOff) continue;
+    const m=L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k),color:'#67000d',
+      weight:crashW(),fillColor:'#cb181d',fillOpacity:.85}).bindPopup(crashPopup(c)).addTo(ptLayer);
+    ptMarkers.push([m,c.k]);
+  }
+  document.getElementById('stat').innerHTML = ptsOff ? `Crash points hidden`
+    : mt.share ? `${nc.toLocaleString()} ${catWord()||''}fatal crashes ${mt.avg}`
+    : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
+}
+function drawMap(){
+  const zw=segWeight(), mt=MAPTYPES[maptype];
+  let maxShare=0;
+  if(mt.share) SEG.forEach(s=>{ const r=shareOf(s); if(r&&r.share>maxShare) maxShare=r.share; });
+  segLayer.clearLayers(); segPolys=[];
+  SEG.forEach((s,i)=>{
+    const has=segHasData(s);
+    const pl=L.polyline(s.c,{color:segColor(s,maxShare),weight:has?zw.hit:zw.miss,opacity:.85})
+      .bindPopup(segTip(i)).on('popupopen',()=>{ detail={t:'seg',i}; atState=(map.getZoom()<=8); highlightSeg(i); highlightSegCrashes(i); zbtnText(); });
+    pl.addTo(segLayer); segPolys[i]=pl;
+  });
+  document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
+  drawCrashes();
+  updateLegend(maxShare);
+}
+function riskLegendHtml(){
+  const c=RATE_CUTS;
+  return `<b class="lgttl">Fatal crashes per 100M vehicle-miles</b>`
+    +`<div class="lgscale"><span class="sw" style="background:#1a9850;margin-left:0"></span>&lt;${c[0]}`
+    +`<span class="sw" style="background:#a6d96a"></span>${c[0]}–${c[1]}`
+    +`<span class="sw" style="background:#fee08b"></span>${c[1]}–${c[2]}`
+    +`<span class="sw" style="background:#fdae61"></span>${c[2]}–${c[3]}`
+    +`<span class="sw" style="background:#d73027"></span>${c[3]}+`
+    +`<span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>`
+    +`<div class="muted lgfoot">Crash rate is calculated using 2017 AADT. Sources: crash data from `
+    +`<a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>; `
+    +`AADT from <a href="https://www.fhwa.dot.gov/policyinformation/hpms.cfm" target="_blank" rel="noopener">FHWA HPMS</a>. `
+    +`Address search <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</div>`;
+}
+// Statewide share for the current map type, over CR within the year window (and >=since).
+function statewideAvg(){ const mt=MAPTYPES[maptype]; if(!mt.share) return null;
+  const k=mt.crkey, since=mt.since||0; let num=0,den=0;
+  for(const c of CR){ if(c.y<y0||c.y>y1) continue; if(since&&c.y<since) continue; den++; if(c[k]) num++; }
+  return den? num/den : 0; }
+function updateLegend(maxShare){
+  const el=document.getElementById('legend'); if(!el) return;
+  const mt=MAPTYPES[maptype];
+  // The "what you're seeing" note (#risknote, above the legend) is relevant ONLY to
+  // Fatal crash risk — hidden in every other map type so the legend stays put.
+  const rn=document.getElementById('risknote'); if(rn) rn.style.display = (maptype==='risk') ? '' : 'none';
+  if(!mt.share){ el.innerHTML=riskLegendHtml(); return; }
+  const pct=Math.round(100*(maxShare||0))||100, avg=Math.round(100*statewideAvg());
+  el.innerHTML=`<b class="lgttl">Share of crashes ${mt.metric}</b>`
+    +`<div class="lgbar" style="background:linear-gradient(to right,${SHARE_RAMP.join(',')})"></div>`
+    +`<div class="lgbarlab"><span>0%</span><span>${pct}%</span></div>`
+    +`<div class="lgstat">Fatal crashes ${mt.avg} statewide: <b>${avg}%</b></div>`
+    +`<div class="lgna"><span class="sw" style="background:#dcdcdc;margin-left:0"></span>Insufficient crashes to assess</div>`
+    +(mt.note?`<div class="muted lgfoot">${mt.note}</div>`:'');
+}
+// zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
+map.on('zoomend',()=>{ const zw=segWeight(), cw=crashW();
+  segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:segHasData(SEG[i])?zw.hit:zw.miss}); });
+  ptMarkers.forEach(([m,k])=>{ m.setRadius(crashR(k)); m.setStyle({weight:cw}); });
+  hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); });
+  rhlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
+map.on('popupclose',()=>{ hlLayer.clearLayers(); markLayer.clearLayers(); });
+// Explicit view state so the toggle direction never depends on a zoom guess.
+let detail=null, atState=false, ready=false, hashLock=false;
+// Shareable URL: encodes the current tab and (on the map) center+zoom in the hash.
+function updateHash(){
+  if(!ready||hashLock) return;
+  let h=curTab;
+  if(curTab==='map'){ const c=map.getCenter(); h=`map=${c.lat.toFixed(4)},${c.lng.toFixed(4)},${map.getZoom()}`; }
+  history.replaceState(null,'','#'+h);
+}
+function applyHash(){
+  const h=decodeURIComponent((location.hash||'').replace(/^#/,'')); if(!h) return false;
+  const m=h.match(/^map=(-?\d+\.?\d*),(-?\d+\.?\d*),(\d+)/);
+  if(m){ hashLock=true; setTab('map'); map.setView([+m[1],+m[2]],+m[3]); hashLock=false; return true; }
+  if(h==='analysis'||h==='hotspots'||h==='map'){ setTab(h); return true; }
+  return false;
+}
+map.on('moveend',()=>{ if(curTab==='map') updateHash(); });
+function zbtnText(){ const b=document.querySelector('.leaflet-popup-content .zbtn');
+  if(b) b.textContent = atState ? '▴ Segment view' : '▾ Statewide view'; }
+map.on('popupopen',zbtnText);
+function toggleView(){
+  if(!atState){ atState=true; fitState(); }
+  else { atState=false;
+    if(detail&&detail.t==='seg') map.fitBounds(SEG[detail.i].c,{padding:[70,70],maxZoom:14});
+    else if(detail&&detail.t==='spot') map.fitBounds(detail.h.e,{padding:[80,80],maxZoom:14}); }
+  zbtnText();
+}
+function gotoSeg(i){
+  setTab('map');
+  map.fitBounds(SEG[i].c,{padding:[70,70],maxZoom:14});
+  setTimeout(()=>{ if(segPolys[i]) segPolys[i].openPopup(); }, 320);   // popupopen sets detail+highlight+label
+}
+function spotTip(h){
+  const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
+  return `<div class="segpop"><b>${h.road}</b> <span style="color:#555">— ${place}</span>`
+    +`<br><b>${h.n}</b> pedestrian / cyclist deaths over ${h.mi} mi · <b>${h.permi}/mile</b> (2001–2024)`
+    +`<br><button class="zbtn" onclick="toggleView()">▾ Statewide view</button></div>`;
+}
+function gotoSpot(h){
+  setTab('map');
+  if(h.seg!=null && SEG[h.seg]){ gotoSeg(h.seg); setTimeout(()=>drawMarks(h.marks),360); return; }
+  detail={t:'spot',h}; atState=false;
+  map.fitBounds(h.e,{padding:[80,80],maxZoom:14});
+  const mid=h.e[Math.floor(h.e.length/2)];
+  // open the popup FIRST (it fires popupclose on any prior popup, which clears
+  // the highlight layer), THEN draw the line + death markers so they survive.
+  setTimeout(()=>{ L.popup({maxWidth:260}).setLatLng(mid).setContent(spotTip(h)).openOn(map);
+                   highlightSpot(h); drawMarks(h.marks); }, 360);
+}
+let alcSpots=[], rateSpots=[], pedSpots=[];
+function renderHotspots(){
+  const NY=YMAX-YMIN+1;
+  let totCr=0,totVmt=0,totMi=0,totPed=0;
+  SEG.forEach(s=>{ totCr+=s.cr.length; totMi+=s.l; totVmt+=s.a*365*NY*s.l; for(const a of s.cr) if(a[1]) totPed++; });
+  let crAlc=0; for(const c of CR) if(c.d) crAlc++;
+  const avgRate=totVmt?totCr/totVmt*1e8:0, avgAlc=CR.length?crAlc/CR.length:0, avgPed=totMi?totPed/totMi:0;
+  const xLine=(v,avg)=> avg>0 ? `<b style="color:#c0392b">${(v/avg).toFixed(1)}×</b> statewide average` : '';
+  // Adaptive crash threshold: highest in [8,6,5,4] that still yields a usable pool
+  // (small states drop lower so the lists aren't near-empty).
+  const counts=SEG.map(s=>s.cr.length); let T=4;
+  for(const t of [8,6,5,4]){ if(counts.filter(n=>n>=t).length>=10){ T=t; break; } }
+  const rated = SEG.map((s,i)=>{ let alc=0,ped=0; for(const a of s.cr){ if(a[2])alc++; if(a[1])ped++; }
+      const vmt=s.a*365*NY*s.l, rate=vmt? s.cr.length/vmt*1e8 : 0;
+      return {road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length, ped, rate,
+              share:s.cr.length?alc/s.cr.length:0, len:s.l, aadt:s.a, segIndex:i}; }).filter(x=>x.n>=T);
+  // Only ABOVE-statewide-average areas — these tabs are the *worst*, top-down.
+  rateSpots = rated.filter(x=>x.rate>avgRate).sort((a,b)=>b.rate-a.rate);
+  alcSpots  = rated.filter(x=>x.share>avgAlc).sort((a,b)=>(b.share-a.share)||(b.n-a.n));
+  pedSpots  = (HOTSPOTS.ped||[]).filter(h=>h.permi>avgPed);
+  // Balance: equal count across shown categories (aim >=5); drop a too-thin one.
+  let cats=[{k:'rate',l:rateSpots},{k:'alc',l:alcSpots},{k:'ped',l:pedSpots}].filter(c=>c.l.length>=3);
+  let N=Math.min(12, ...cats.map(c=>c.l.length).concat([12]));
+  if(N<5 && cats.length>1){ cats=cats.slice().sort((a,b)=>a.l.length-b.l.length); cats.shift();
+    N=Math.min(12, ...cats.map(c=>c.l.length).concat([12])); }
+  const HEAD={
+    rate:['Highest death rate', `fatal crashes per 100M VMT, among segments with ≥${T} crashes · statewide average ${avgRate.toFixed(1)}`],
+    alc:['Most alcohol-involvement', `share of fatal crashes with alcohol involved (≥${T} crashes) · statewide average ${Math.round(100*avgAlc)}%`],
+    ped:['Pedestrian & cyclist death clusters', `most deaths on one road, regardless of traffic · statewide average ${avgPed.toFixed(2)}/mile`]};
+  const card=(h,k,i)=>{
+    const place=[h.loc, h.cty?`${h.cty} Co.`:''].filter(Boolean).join(' · ');
+    let lines;
+    if(k==='rate') lines=[`${h.len} mi · AADT ${h.aadt.toLocaleString()}`,
+        `${h.n} fatal crashes · <b>${h.rate.toFixed(1)}</b> per 100M VMT`, xLine(h.rate,avgRate)];
+    else if(k==='alc') lines=[`${h.n} fatal crashes`, `<b>${Math.round(100*h.share)}%</b> alcohol-involved`, xLine(h.share,avgAlc)];
+    else lines=[`${h.n} ped/cyclist deaths · ${h.mi} mi`, `<b>${h.permi}</b> per mile`, xLine(h.permi,avgPed)];
+    return `<div class="hscard" data-k="${k}" data-i="${i}"><div class="hsrank">${i+1}</div>`
+      +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${lines.filter(Boolean).join('<br>')}</div></div></div>`; };
+  document.getElementById('hslists').innerHTML = cats.map(c=>
+     `<div class="hsgrp"><h3 class="hsred">${HEAD[c.k][0]} <span class="muted">— ${HEAD[c.k][1]}</span></h3>`
+    +`<div class="hscards">`+c.l.slice(0,N).map((h,i)=>card(h,c.k,i)).join('')+`</div></div>`).join('')
+    || `<p class="sub">Not enough segments to rank for this state.</p>`;
+  document.querySelectorAll('.hscard').forEach(el=>el.onclick=()=>{
+    const k=el.dataset.k, i=+el.dataset.i;
+    if(k==='ped') gotoSpot(pedSpots[i]); else gotoSeg((k==='rate'?rateSpots:alcSpots)[i].segIndex); });
+}
+
+// ---------- analysis ----------
+// share of a segment's fatal crashes (in the year window) with a given flag (cr index)
+function shareWin(s,fi){ let num=0,den=0; for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; den++; if(a[fi]) num++; } return den? num/den : null; }
+function buildAnalysis(){
+  const ny=y1-y0+1;
+  document.getElementById('yrlabel2').textContent=y0===y1?y0:`${y0}–${y1}`;
+  const BK=curBuckets(), counts=BK.map(()=>0);
+  const rows=[]; let zero=0;
+  SEG.forEach((s,i)=>{
+    const c=sel(s), n=c.length;
+    if(n===0){ zero++;   // zero-crash segments are always listed (just sort to the bottom)
+      rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n:0,rate:rateOf(s,0,ny),ped:pedN(s),bkt:-1,trend:trendOf(s),
+        alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)}); return; }
+    const rate=rateOf(s,n,ny);
+    const bkt = histMode==='rate' ? rateBucket(rate) : countBucket(n);
+    counts[bkt]++;
+    rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n,rate,ped:pedN(s),bkt,trend:trendOf(s),
+      alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)});
+  });
+  renderHist(counts, BK);
+  let r = bucketFilter!=null ? rows.filter(x=>x.bkt===bucketFilter) : rows;
+  if(min3) r=r.filter(x=>x.n>=3);
+  if(search) r=r.filter(x=>((x.lab||'')+' '+(x.loc||'')).toLowerCase().includes(search));
+  const k=sort.key;
+  r.sort((A,B)=>{ if(k==='lab'||k==='loc') return sort.dir*String(A[k]||'').localeCompare(String(B[k]||''));
+    let va=A[k], vb=B[k]; va=(va==null?-1:va); vb=(vb==null?-1:vb); return sort.dir*(va-vb); });
+  renderTable(r);
+}
+function renderHist(counts, BK){
+  const max=Math.max(1,...counts), h=document.getElementById('hist');
+  h.innerHTML=BK.map((b,i)=>{
+    const cls='hbar'+(bucketFilter===i?' sel':'')+(bucketFilter!=null&&bucketFilter!==i?' dim':'');
+    return `<div class="${cls}" data-b="${i}"><div class="hn">${counts[i]}</div>`
+      +`<div class="bar" style="height:${Math.round(100*counts[i]/max)}%;background:${b.c}"></div>`
+      +`<div class="hl">${b.lab}</div></div>`; }).join('');
+  const axis = histMode==='rate'
+    ? 'crashes per 100 million vehicle miles traveled (VMT)'
+    : 'fatal crashes in the selected years';
+  const zn=document.getElementById('zeronote');
+  zn.innerHTML = `<span class="haxis">${axis}</span>`
+    + (bucketFilter!=null ? ` &nbsp;·&nbsp; <a href="#" id="hclear">show all segments</a>` : '');
+  const hc=document.getElementById('hclear');
+  if(hc) hc.onclick=(ev)=>{ ev.preventDefault(); bucketFilter=null; buildAnalysis(); };
+  h.querySelectorAll('.hbar').forEach(el=>el.onclick=()=>{
+    const b=+el.dataset.b; bucketFilter = (bucketFilter===b? null : b); buildAnalysis(); });
+}
+function renderCoverage(){
+  const off=STATS.crLocal+STATS.crUnmatched, pon=Math.round(100*STATS.crAssigned/STATS.crTotal);
+  const html=
+    `<b>What you're seeing — and what you're not:</b><br>`
+    +`Busy roads have more crashes on them in part because they have more traffic, so to assess `
+    +`<i>risk</i>, vehicle safety experts compare segments of road by the number of crashes per annual `
+    +`average daily traffic (AADT). FHWA HPMS publishes AADT for the highway network `
+    +`(${STATS.segTotal.toLocaleString()} segments) but not county and local roads.<br><br>`
+    +`Of ${STATS.crTotal.toLocaleString()} geocoded fatal crashes in Montana ${STATS.yMin}–${STATS.yMax}, `
+    +`<b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> occurred on a rated segment, and can be compared below `
+    +`according to their crashes per 100 million vehicle miles traveled (VMT). `
+    +`<b>${off.toLocaleString()} (${100-pon}%)</b> occurred on local/county roads or could not be matched to a `
+    +`segment — they appear as points on the map but can not be compared according to risk.`;
+  ['risknote','aboutbody'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+}
+const COLS=[['lab','Road'],['loc','Location'],['l','Length (miles)'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
+const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['Insufficient data','#aaa']};
+function renderTable(rows){
+  const SHARE_COLS=[['alcSh','% alcohol','Share of the segment’s fatal crashes that were alcohol-involved (in the selected years)'],
+                    ['ntSh','% night','Share of the segment’s fatal crashes that happened in the dark'],
+                    ['wxSh','% weather','Share of the segment’s fatal crashes in adverse weather']];
+  const head='<thead><tr>'+COLS.map(([k,t])=>
+      `<th data-k="${k}" class="${sort.key===k?'sorted':''}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
+    +`<th title="Direction of risk in 5-year bands across 2001–2024 (independent of the year slider). ↑ rising · ↓ falling · → little change · ‘Insufficient data’ = too few crashes to tell.">Trend (2001–24)</th>`
+    +SHARE_COLS.map(([k,t,ti])=>`<th class="shcol ${sort.key===k?'sorted':''}" data-k="${k}" title="${ti}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
+    +`</tr></thead>`;
+  const pctc=v=>v!=null?Math.round(100*v)+'%':'—';
+  const body='<tbody>'+rows.map(r=>{
+    const col=rateColor(r.rate,r.n), tr=TREND[r.trend];
+    return `<tr data-i="${r.i}"><td>${r.lab}</td><td>${r.loc||''}</td><td>${r.l.toFixed(2)}</td><td>${r.a.toLocaleString()}</td>`
+      +`<td>${r.n}</td><td>${r.ped||''}</td>`
+      +`<td><span class="dot" style="background:${col}"></span>${r.rate!=null?r.rate.toFixed(1):'—'}</td>`
+      +`<td style="color:${tr[1]};font-weight:600">${tr[0]}</td>`
+      +`<td class="shcol">${pctc(r.alcSh)}</td><td class="shcol">${pctc(r.ntSh)}</td><td class="shcol">${pctc(r.wxSh)}</td></tr>`; }).join('')+'</tbody>';
+  const t=document.getElementById('segtable');
+  t.innerHTML=head+body;
+  t.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sort.key===k) sort.dir*=-1; else { sort.key=k; sort.dir=(k==='lab'?1:-1); }
+    buildAnalysis(); });
+  t.querySelectorAll('tr[data-i]').forEach(tr=>tr.onclick=()=>gotoSeg(+tr.dataset.i));
+  const parts=[]; if(min3) parts.push('3+ crashes'); if(search) parts.push(`“${search}”`);
+  const filtered = bucketFilter!=null || parts.length>0;
+  document.getElementById('rowhint').textContent=
+    `${filtered?'Filtered to':'Showing'} ${rows.length.toLocaleString()} segments`
+    +(bucketFilter!=null?` “${curBuckets()[bucketFilter].lab}${histMode==='rate'?' crashes/100M VMT':' crashes'}”`:'')
+    +(parts.length?' · '+parts.join(' · '):'');
+}
+
+// ---------- shared filter state ----------
+function apply(){ drawMap(); if(curTab==='analysis') buildAnalysis(); }
+function setYears(a,b,from){ y0=a; y1=b; syncing=true;
+  if(from!=='map'&&sMap&&sMap.noUiSlider) sMap.noUiSlider.set([a,b]);
+  if(from!=='ana'&&sAna&&sAna.noUiSlider) sAna.noUiSlider.set([a,b]);
+  syncing=false; apply(); }
+function setCat(c){ cat=c; ptsOff=false;
+  document.querySelectorAll('.catsel button').forEach(b=>b.classList.toggle('on',b.dataset.cat===c));
+  apply(); }
+// map-only: hide all crash points but keep the risk-shaded roads
+function setPts(off){ ptsOff=off;
+  const row=document.querySelector('.catsel[data-which="map"]');
+  if(row) row.querySelectorAll('button').forEach(b=>
+    b.classList.toggle('on', off ? b.dataset.pts==='off' : b.dataset.cat===cat));
+  drawMap(); }
+function setTab(t){ curTab=t;
+  const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');   // dismiss intro on navigation
+  document.getElementById('map-view').classList.remove('introup');                // reveal the map controls
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  document.getElementById('map-view').classList.toggle('active',t==='map');
+  document.getElementById('analysis').classList.toggle('active',t==='analysis');
+  document.getElementById('hotspots').classList.toggle('active',t==='hotspots');
+  document.getElementById('info').classList.toggle('active',t==='info');
+  if(t==='map') setTimeout(()=>map.invalidateSize(),0);
+  else if(t==='analysis') buildAnalysis();
+  else if(t==='hotspots') renderHotspots();
+  updateHash();
+}
+
+const sMap=document.getElementById('slider'), sAna=document.getElementById('slider2');
+[[sMap,'map'],[sAna,'ana']].forEach(([el,which])=>{
+  noUiSlider.create(el,{start:[YMIN,YMAX],connect:true,step:1,margin:0,
+    range:{min:YMIN,max:YMAX},format:{to:v=>Math.round(v),from:v=>Number(v)}});
+  el.noUiSlider.on('update',v=>{ if(syncing) return; setYears(+v[0],+v[1],which); });
+});
+document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>{
+  if(b.dataset.pts==='off') setPts(true); else setCat(b.dataset.cat); }));
+updateLegend(0);   // populate the (risk) legend immediately, before data loads
+document.getElementById('maptype').addEventListener('change',e=>{
+  maptype=e.target.value;
+  hlLayer.clearLayers(); markLayer.clearLayers(); map.closePopup(); detail=null;   // clear any illuminated segment
+  drawMap();
+});
+document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
+document.getElementById('search').addEventListener('change',e=>logSearch(e.target.value,'analysis'));
+document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
+document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ mapSearch(e.target.value); logSearch(e.target.value,'map'); } });
+
+// ---- anonymous search logging: the term + coarse location/session, no raw IP.
+//      Inert until LOG_ENDPOINT (a Google Apps Script web-app URL) is filled in. ----
+const LOG_ENDPOINT='https://script.google.com/macros/s/AKfycbx-g-FIWOpyeJxaenE2WCt_zAHpoSONIcqEtXfi6exeTTVslo8BboxsnmfjUvkygKPb/exec';
+let _sid=null,_geo=null;
+function _sessId(){ if(_sid) return _sid;
+  try{ _sid=localStorage.getItem('nmsid'); if(!_sid){ _sid=Math.random().toString(36).slice(2,10); localStorage.setItem('nmsid',_sid); } }
+  catch(e){ _sid='nostore'; } return _sid; }
+async function _coarseGeo(){ if(_geo!==null) return _geo;
+  try{ const j=await (await fetch('https://ipapi.co/json/')).json();
+       _geo={country:j.country_name||'',region:j.region||'',city:j.city||''}; }
+  catch(e){ _geo={}; } return _geo; }
+async function logSearch(term,where){
+  term=(term||'').trim(); if(!term||!LOG_ENDPOINT) return;
+  const g=await _coarseGeo();
+  const body=JSON.stringify({term,where,sid:_sessId(),country:g.country,region:g.region,
+    city:g.city,ref:document.referrer||'',lang:navigator.language||'',
+    screen:`${screen.width}x${screen.height}`,ua:navigator.userAgent});
+  try{ fetch(LOG_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body}); }catch(e){}
+}
+function dismissIntro(){
+  const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');
+  document.getElementById('map-view').classList.remove('introup');   // reveal controls
+  if(curTab==='map'){ map.invalidateSize(); fitState(); }            // re-center NM in the now-visible area
+}
+['aboutx','aboutgo'].forEach(id=>document.getElementById(id).addEventListener('click',dismissIntro));
+document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('click',()=>{
+  histMode=b.dataset.m; bucketFilter=null;
+  document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
+  buildAnalysis(); }));
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+document.getElementById('statesel').addEventListener('change',e=>{ location.assign("../"+e.target.value+"/"+location.hash); });
+// clicking the wordmark returns to this state's home with the intro blurb showing
+document.getElementById('brand').addEventListener('click',()=>{ if(location.hash) location.href=location.pathname; else location.reload(); });
+renderCoverage();   // fills the About tab
+// phones: fold the legend into the bottom control panel so the map gets more room
+if(window.matchMedia('(max-width:620px)').matches){
+  const ctrl=document.getElementById('ctrl'), lg=document.getElementById('legend');
+  if(ctrl&&lg) ctrl.appendChild(lg);
+}
+
+// crashes.json is positional arrays (smaller download) — rehydrate to objects so the
+// rest of the code keeps using c.la/c.lo/etc. Order must match the build's CR writer.
+const CR_FIELDS=['la','lo','y','m','dy','dw','hr','k','inj','si','ev','d','pc','nt','ix','wx','sg'];
+function rehydrate(rows){ return rows.map(r=>{ const o={}; for(let i=0;i<CR_FIELDS.length;i++) o[CR_FIELDS[i]]=r[i]; return o; }); }
+Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
+  .then(([s,c])=>{ SEG=s; CR=rehydrate(c);
+    if(CR.length>BIG_STATE){            // big state: start on the last 5 years so it loads light; expandable
+      y0=Math.max(YMIN,YMAX-4);
+      if(sMap&&sMap.noUiSlider) sMap.noUiSlider.set([y0,y1]);
+      if(sAna&&sAna.noUiSlider) sAna.noUiSlider.set([y0,y1]);
+    }
+    drawMap();
+    ready=true; setTimeout(()=>{ map.invalidateSize(); fitState(); },0); });
+</script>
+</body></html>

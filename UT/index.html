@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Deadliest Mile — fatal crash risk on Utah roads</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{display:flex;flex-direction:column;font:13px/1.45 -apple-system,Helvetica,Arial;color:#222}
+  /* tab bar */
+  #tabbar{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:2px;background:#1f2d3d;padding:0 10px}
+  #brand{font:800 16px/1 -apple-system,Helvetica,Arial;letter-spacing:.5px;color:#fff;
+    white-space:nowrap;padding:12px 18px 12px 6px;margin-right:4px}
+  #brand{cursor:pointer}
+  #brand b{color:#e3120b}
+  #statesel{margin-left:auto;align-self:center;background:#2a3a4d;color:#fff;border:1px solid #3a4d63;
+    border-radius:5px;font:600 12.5px inherit;padding:6px 8px;cursor:pointer}
+  #tabbar .tab{appearance:none;border:none;background:transparent;color:#5fc9bb;
+    font:600 14.5px/1 -apple-system,Helvetica,Arial;padding:13px 18px;cursor:pointer;border-bottom:3px solid transparent}
+  #tabbar .tab:hover{color:#9fe5da}
+  #tabbar .tab.active{color:#fff;border-bottom-color:#2ec4b6}
+  #content{flex:1 1 auto;position:relative;min-height:0}
+  .view{display:none;position:absolute;inset:0}
+  .view.active{display:block}
+  #map{height:100%}
+  #analysis,#info{overflow:auto;background:#f4f6f8}
+  /* floating panels on the map */
+  .panel{position:absolute;z-index:1000;background:rgba(255,255,255,.96);border:1px solid #ccc;
+    border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.2);font:13.5px/1.5 -apple-system,Helvetica,Arial}
+  #ctrl{bottom:18px;right:14px;padding:12px 15px;width:270px}
+  #ctrl .mslab{font-weight:600;margin-bottom:4px}
+  #mapsearch{width:100%;font:13.5px inherit;padding:6px 9px;border:1px solid #c3c3c3;border-radius:5px}
+  #msmsg{color:#b00;font-size:12.5px;line-height:1.35;margin-top:3px;min-height:0}
+  #maptype{width:100%;font:13px inherit;padding:6px 8px;border:1px solid #c3c3c3;border-radius:5px;background:#fff;margin-top:3px}
+  #legend .lgbar{height:11px;border-radius:2px;margin:4px 0 2px}
+  #legend .lgbarlab{display:flex;justify-content:space-between;font-size:11px;color:#555}
+  #legend .lgstat{margin-top:5px;font-size:12px;color:#333;white-space:nowrap}
+  #legend .lgna{margin-top:4px;font-size:11.5px;color:#555;white-space:nowrap}
+  #legend .lgna .sw{width:13px;height:8px}
+  #ctrl .yr{font-weight:600;margin-bottom:9px}
+  #slider,#slider2{margin:2px 7px 4px}
+  #stat{margin-top:8px;color:#444}
+  #legend{bottom:18px;left:14px;padding:8px 11px;color:#333}
+  /* fixed min-height so the legend never resizes when switching map types; width
+     comes from #leftstack so it always matches the "what you're seeing" note (desktop) */
+  @media(min-width:621px){ #legend{min-height:152px} }
+  #legend .lgttl{display:block;margin-bottom:4px;font-weight:700;white-space:nowrap}
+  #legend .lgscale{white-space:nowrap;font-size:11.5px}
+  #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
+  #legend .lgfoot a{color:#1559a3;text-decoration:underline}
+  #legend .sw{display:inline-block;width:13px;height:9px;margin:0 2px 0 5px;vertical-align:1px}
+  #legend .lgshort{display:none}
+  /* desktop: the methodology note sits in a stack beneath the legend */
+  #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
+    flex-direction:column;gap:10px;width:506px}   /* fixed width → legend matches the note; wide enough for the rate scale on one line */
+  #leftstack .panel{position:static;max-width:none}
+  #risknote{padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
+  #risknote b{color:#1a2433}
+  /* the 'About' tab is mobile-only; desktop keeps the note under the legend */
+  @media(min-width:621px){ .tab[data-tab="info"]{display:none} }
+  @media(max-width:620px){
+    #leftstack{display:none}                       /* the note lives in the About tab on mobile */
+    #map-view.introup #ctrl{display:none}          /* intro card shows alone on phones */
+    /* one compact panel at the bottom: search + toggles + legend */
+    #ctrl{left:8px;right:8px;width:auto;bottom:10px;padding:11px 13px;max-height:52vh;overflow:auto}
+    #ctrl .yr,#slider,#stat{display:none}           /* drop the year slider and the crash/killed count */
+    #ctrl #legend{position:static;background:none;border:none;box-shadow:none;
+      padding:9px 0 0;margin-top:9px;border-top:1px solid #e6e9ec;color:#333}
+    #legend .lgttl{font-size:12.5px;margin-bottom:3px}
+    #legend .lgscale{white-space:nowrap;font-size:11.5px}
+    #legend .sw{margin:0 2px 0 5px;width:13px;height:8px}
+    #legend .lgfoot{display:none}                    /* drop the note under the legend */
+    #legend .lgfull{display:none} #legend .lgshort{display:inline}
+    .leaflet-control-zoom{display:none}
+  }
+  .muted{color:#888;font-size:12px}
+  #about{top:50%;left:50%;transform:translate(-50%,-50%);width:420px;max-width:calc(100vw - 32px);
+    padding:30px 32px;z-index:1200;text-align:center}
+  #about .atitle{font:800 34px/1.05 -apple-system,Helvetica,Arial;letter-spacing:.5px;margin:0 0 4px;color:#1a2433}
+  #about .atitle b{color:#e3120b}
+  #about .asub{font-size:16px;font-weight:600;color:#555;margin:0 0 14px}
+  #about .adesc{font-size:15.5px;line-height:1.55;color:#333}
+  #about #aboutx{position:absolute;top:7px;right:11px;border:none;background:none;font-size:21px;
+    color:#999;cursor:pointer;line-height:1;padding:0}
+  #about #aboutx:hover{color:#444}
+  #about #aboutgo{margin-top:15px;font:13px/1 inherit;background:#2171b5;color:#fff;border:none;
+    border-radius:5px;padding:8px 14px;cursor:pointer}
+  #about #aboutgo:hover{background:#1559a3}
+  #about.hidden{display:none}
+  @media(max-width:620px){ #about{left:12px;right:12px;width:auto;top:54px;transform:none;max-height:84vh;overflow:auto}
+    #about .atitle{font-size:27px} }
+  #aboutbody{background:#fff;border:1px solid #e2e6ea;border-radius:8px;padding:16px 18px;
+    font-size:14.5px;line-height:1.6;color:#333;max-width:680px}
+  #aboutbody b{color:#1a2433}
+  /* category segmented control */
+  .catsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden}
+  .catsel button{appearance:none;border:none;background:#fff;color:#444;font:12.5px/1 inherit;padding:7px 11px;cursor:pointer}
+  .histsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden;vertical-align:middle;margin:0 3px}
+  .histsel button{appearance:none;border:none;background:#fff;color:#444;font:12px/1 inherit;padding:5px 9px;cursor:pointer}
+  .histsel button+button{border-left:1px solid #d5d5d5}
+  .histsel button.on{background:#2171b5;color:#fff}
+  .catsel button+button{border-left:1px solid #d5d5d5}
+  .catsel button.on{background:#2171b5;color:#fff}
+  /* thin slider with small vertical-line handles */
+  .noUi-target{height:3px;border:none;background:#dcdcdc;box-shadow:none}
+  .noUi-connect{background:#2171b5}
+  .noUi-horizontal .noUi-handle{width:4px;height:17px;right:-2px;top:-7px;border:none;
+    border-radius:1px;background:#1f5fa8;box-shadow:none;cursor:ew-resize}
+  .noUi-handle:after,.noUi-handle:before{display:none}
+  /* analysis tab */
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 20px 70px}
+  .wrap h2{font-size:16px;margin:0 0 2px}
+  .sub{color:#666;margin:0 0 12px}
+  .coverage{background:#fff;border:1px solid #e2e6ea;border-left:4px solid #f0ad4e;border-radius:6px;
+    padding:11px 14px;margin:0 0 18px;color:#444;font-size:12.5px;line-height:1.55}
+  .coverage b{color:#1a1a1a}
+  .actl{display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin:0 0 18px;
+    background:#fff;border:1px solid #e2e6ea;border-radius:6px;padding:12px 14px}
+  .actl .yr{font-weight:600;margin-bottom:5px}
+  #slider2{width:240px;margin:0}
+  .actl label.zc{font-size:12px;color:#555}
+  .card{background:#fff;border:1px solid #e2e6ea;border-radius:6px;padding:12px 14px;margin:0 0 18px}
+  .card .ttl{font-weight:600;margin-bottom:9px;font-size:12.5px}
+  .hist{display:flex;align-items:flex-end;gap:12px;height:158px}
+  .hbar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;cursor:pointer}
+  .hbar .hn{font-size:11px;color:#333;margin-bottom:3px;font-variant-numeric:tabular-nums}
+  .hbar .bar{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:opacity .12s}
+  .hbar:hover .bar{opacity:.8}
+  .hbar .hl{font-size:11px;color:#666;margin-top:5px}
+  .hbar.sel .hl{font-weight:700;color:#111}
+  .hbar.dim .bar{opacity:.28}
+  .zeronote{color:#777;font-size:11.5px;margin-top:9px;text-align:center}
+  .zeronote .haxis{font-weight:600;color:#555;font-size:12.5px}
+  .zeronote #hclear{color:#1559a3;font-weight:600;text-decoration:none}
+  .zeronote #hclear:hover{text-decoration:underline}
+  table.seg{width:100%;border-collapse:collapse;background:#fff;font-size:12.5px;
+    border:1px solid #e2e6ea;border-radius:6px;overflow:hidden}
+  table.seg th,table.seg td{padding:6px 10px;text-align:right;border-bottom:1px solid #eee;
+    white-space:nowrap;font-variant-numeric:tabular-nums}
+  table.seg th{position:sticky;top:0;background:#eaeef2;cursor:pointer;font-weight:600;color:#333;
+    border-bottom:2px solid #d3dae0;z-index:1}
+  table.seg th:first-child,table.seg td:first-child{text-align:left}
+  table.seg th.sorted{color:#1559a3}
+  table.seg tbody tr{cursor:pointer}
+  table.seg tbody tr:hover{background:#eaf3fb}
+  /* mobile: keep Road · Location · Crashes · Rate, fit to screen (no side-scroll) */
+  @media(max-width:620px){
+    .wrap{padding:14px 10px 70px}
+    table.seg{table-layout:fixed;width:100%}
+    table.seg th,table.seg td{padding:7px 6px;white-space:normal;font-size:12px}
+    table.seg td{word-break:break-word}
+    table.seg th{font-size:11px;vertical-align:bottom;line-height:1.2}
+    table.seg th:nth-child(3),table.seg td:nth-child(3),
+    table.seg th:nth-child(4),table.seg td:nth-child(4),
+    table.seg th:nth-child(6),table.seg td:nth-child(6),
+    table.seg th:nth-child(8),table.seg td:nth-child(8),
+    table.seg th:nth-child(9),table.seg td:nth-child(9),
+    table.seg th:nth-child(10),table.seg td:nth-child(10),
+    table.seg th:nth-child(11),table.seg td:nth-child(11){display:none}
+    table.seg th:nth-child(1),table.seg td:nth-child(1){width:22%}
+    table.seg th:nth-child(2),table.seg td:nth-child(2){width:46%}
+    table.seg th:nth-child(5),table.seg td:nth-child(5){width:15%}
+    table.seg th:nth-child(7),table.seg td:nth-child(7){width:17%}
+    /* controls: search across the top, slider full width, toggles + 3+ on one line */
+    .actl{gap:12px 14px}
+    .actl #search{order:1;width:100%}
+    .actl > div:first-child{order:2;width:100%}
+    .actl #slider2{width:100%}
+    .actl .catsel[data-which="ana"]{order:3}
+    .actl label.zc{order:4}
+  }
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
+  .rec{display:inline-flex;height:9px;width:46px;border-radius:2px;overflow:hidden;
+    vertical-align:-1px;margin-left:7px;border:1px solid #dcdcdc}
+  .rec i{display:block;height:100%}
+  .tablohint{color:#888;font-size:11.5px;margin:7px 2px 0}
+  #search{font:12px inherit;padding:5px 9px;border:1px solid #c3c3c3;border-radius:5px;width:190px}
+  .zbtn{margin-top:6px;font:11px/1 inherit;color:#1559a3;background:#eef4fb;border:1px solid #cfe0f2;
+    border-radius:4px;padding:4px 8px;cursor:pointer}
+  .zbtn:hover{background:#dceaf8}
+  .segpop{font:13.5px/1.55 -apple-system,Helvetica,Arial}
+  #hslists{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start}
+  @media(max-width:620px){ #hslists{grid-template-columns:1fr} }
+  .hsgrp{margin:0}
+  .hsgrp h3{font-size:13.5px;margin:0 0 10px;border-bottom:2px solid #e2e6ea;padding-bottom:5px}
+  .hsred{color:#c0392b}
+  .hsred .muted{color:#888;font-weight:400}
+  .hscards{display:flex;flex-direction:column;gap:7px}
+  .hscard{display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid #e2e6ea;
+    border-radius:6px;padding:9px 12px;cursor:pointer}
+  .hscard:hover{background:#eaf3fb;border-color:#bcd6ef}
+  .hsrank{flex:0 0 24px;height:24px;border-radius:50%;background:#1f2d3d;color:#fff;font-weight:700;
+    font-size:12px;display:flex;align-items:center;justify-content:center}
+  .hsttl{font-weight:600;font-size:13px}
+  .hsstat{color:#555;font-size:12px;margin-top:3px;line-height:1.5}
+</style></head>
+<body>
+<div id="tabbar">
+  <span id="brand" title="Back to the intro">THE <b>DEADLIEST</b> MILE</span>
+  <button class="tab active" data-tab="map">Map</button>
+  <button class="tab" data-tab="analysis">Risk analysis</button>
+  <button class="tab" data-tab="hotspots">Most dangerous areas</button>
+  <button class="tab" data-tab="info">About</button>
+  <select id="statesel" aria-label="Change state" title="Change state"><option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT" selected>Utah</option><option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option></select>
+</div>
+<div id="content">
+  <!-- MAP -->
+  <div id="map-view" class="view active introup">
+    <div id="map"></div>
+    <div id="ctrl" class="panel">
+      <div class="mslab">Search roads or communities:</div>
+      <input id="mapsearch" placeholder="Search communities, roads, or an address" autocomplete="off">
+      <div id="msmsg"></div>
+      <div class="yr" style="margin-top:9px">Years: <span id="yrlabel"></span></div>
+      <div id="slider"></div>
+      <div class="mslab" style="margin-top:9px">Map type:</div>
+      <select id="maptype">
+        <option value="risk">Fatal crash risk</option>
+        <option value="alc">Alcohol involvement</option>
+        <option value="nt">Nighttime crashes</option>
+        <option value="ix">Deadly intersections</option>
+        <option value="wx">Adverse weather</option>
+      </select>
+      <div class="mslab" style="margin-top:9px">Crashes shown:</div>
+      <div class="catsel" data-which="map" style="margin-top:3px">
+        <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button><button data-pts="off">None</button>
+      </div>
+      <div id="stat"></div>
+    </div>
+    <div id="leftstack">
+    <div id="risknote" class="panel"></div>
+    <div id="legend" class="panel"></div>
+    </div>
+    <div id="about" class="panel">
+      <button id="aboutx" aria-label="Close">×</button>
+      <div class="atitle">THE <b>DEADLIEST</b> MILE</div>
+      <div class="asub">Fatal crash risk on Utah roads</div>
+      <div class="adesc">The federal government documents every fatal vehicle crash. This map plots
+        more than two decades of that data — by road segment, adjusted for traffic — to show where
+        driving in Utah is most dangerous.</div>
+      <button id="aboutgo">Explore the map →</button>
+    </div>
+  </div>
+  <!-- ANALYSIS -->
+  <div id="analysis" class="view">
+    <div class="wrap">
+      <h2>Risk by road segment</h2>
+      <div class="actl">
+        <div><div class="yr">Years: <span id="yrlabel2"></span></div><div id="slider2"></div></div>
+        <div class="catsel" data-which="ana">
+          <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button>
+        </div>
+        <label class="zc"><input type="checkbox" id="min3" checked> show only segments with 3+ crashes</label>
+        <input id="search" placeholder="search road or place…" autocomplete="off">
+      </div>
+      <div class="card">
+        <div class="ttl">Distribution of segments by
+          <span class="histsel">
+            <button data-m="rate" class="on">rate /100M</button><button data-m="count">crash count</button>
+          </span></div>
+        <div id="hist" class="hist"></div>
+        <div id="zeronote" class="zeronote"></div>
+      </div>
+      <table class="seg" id="segtable"></table>
+      <div class="tablohint" id="rowhint"></div>
+      <div class="tablohint">Trend is computed on 5-year bands across 2001–2024, where sufficient data exists to show a pattern.</div>
+    </div>
+  </div>
+  <!-- HOT SPOTS -->
+  <div id="hotspots" class="view">
+    <div class="wrap">
+      <h2>Most dangerous areas</h2>
+      <div id="hslists"></div>
+    </div>
+  </div>
+  <!-- ABOUT -->
+  <div id="info" class="view">
+    <div class="wrap">
+      <h2>About this map</h2>
+      <div id="aboutbody"></div>
+    </div>
+  </div>
+</div>
+<script>
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 3240, "crTotal": 5319, "crAssigned": 3108, "crLocal": 1765, "crUnmatched": 446, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 2934, "road": "UT-203", "loc": "Ogden", "cty": "Weber", "lat": 41.2384, "lon": -111.9457, "n": 9, "ped": 1, "aadt": 22329, "len": 0.6, "rate": 8.4, "marks": [[41.23504, -111.9467], [41.24006, -111.94553], [41.23412, -111.94708], [41.23067, -111.94791], [41.24201, -111.94537], [41.23875, -111.94565], [41.23553, -111.94659], [41.23083, -111.94793], [41.23084, -111.94794]]}, {"kind": "rate", "seg": 635, "road": "I-80", "loc": "Wendover", "cty": "Tooele", "lat": 40.7381, "lon": -113.8341, "n": 12, "ped": 0, "aadt": 7959, "len": 5.1, "rate": 3.4, "marks": [[40.73973, -113.88034], [40.73821, -113.82556], [40.73959, -113.88039], [40.73816, -113.82712], [40.74242, -113.86862], [40.73812, -113.78827], [40.73945, -113.82385], [40.73763, -113.8187], [40.73814, -113.86794], [40.73189, -113.80203], [40.73877, -113.86903], [40.73927, -113.84086]]}, {"kind": "rate", "seg": 1499, "road": "UT-39", "loc": "Ogden (3 mi E)", "cty": "Weber", "lat": 41.2371, "lon": -111.9166, "n": 18, "ped": 1, "aadt": 12608, "len": 5.1, "rate": 3.2, "marks": [[41.23697, -111.91654], [41.24222, -111.89828], [41.24408, -111.95535], [41.24423, -111.95347], [41.24411, -111.95079], [41.24122, -111.90076], [41.23696, -111.92273], [41.23656, -111.92801], [41.24152, -111.94441], [41.24429, -111.96825], [41.23685, -111.92023], [41.24415, -111.95444], [41.24424, -111.96436], [41.24413, -111.95345], [41.24429, -111.96995], [41.24875, -111.8866], [41.23835, -111.90946], [41.24065, -111.90261]]}, {"kind": "rate", "seg": 984, "road": "US-40", "loc": "Vernal", "cty": "Uintah", "lat": 40.4037, "lon": -109.5911, "n": 9, "ped": 0, "aadt": 6680, "len": 5.1, "rate": 3.0, "marks": [[40.37532, -109.60854], [40.38526, -109.60648], [40.39878, -109.59213], [40.39055, -109.59599], [40.40516, -109.5905], [40.38527, -109.6], [40.37508, -109.60797], [40.40317, -109.5912], [40.36366, -109.61597]]}, {"kind": "rate", "seg": 619, "road": "I-80", "loc": "25 mi NW of Tooele", "cty": "Tooele", "lat": 40.7646, "lon": -112.7851, "n": 11, "ped": 0, "aadt": 8708, "len": 5.1, "rate": 2.8, "marks": [[40.75739, -112.76596], [40.75698, -112.76317], [40.76112, -112.77827], [40.75784, -112.75097], [40.75784, -112.76254], [40.75661, -112.75875], [40.75558, -112.76504], [40.75479, -112.76382], [40.78755, -112.82562], [40.75541, -112.75146], [40.77257, -112.79966]]}, {"kind": "rate", "seg": 916, "road": "US-191", "loc": "Moab (10 mi SE)", "cty": "Grand", "lat": 38.52, "lon": -109.4951, "n": 8, "ped": 2, "aadt": 7482, "len": 5.1, "rate": 2.4, "marks": [[38.53611, -109.51125], [38.50396, -109.47934], [38.53763, -109.51267], [38.5373, -109.51233], [38.54844, -109.52317], [38.54755, -109.52253], [38.51252, -109.48785], [38.52981, -109.50483]]}, {"kind": "rate", "seg": 47, "road": "UT-68", "loc": "Salt Lake City (3 mi NW)", "cty": "Salt Lake", "lat": 40.7715, "lon": -111.9393, "n": 21, "ped": 8, "aadt": 20688, "len": 5.1, "rate": 2.3, "marks": [[40.75493, -111.93953], [40.79126, -111.93927], [40.79106, -111.93919], [40.7557, -111.93899], [40.77813, -111.93941], [40.76544, -111.93912], [40.74838, -111.939], [40.74369, -111.93887], [40.77152, -111.93927], [40.76071, -111.93894], [40.7407, -111.939], [40.77705, -111.93937], [40.79102, -111.93904], [40.74679, -111.93909], [40.74079, -111.93896], [40.77174, -111.93915], [40.78461, -111.93943], [40.7442, -111.93917], [40.75276, -111.93891], [40.76486, -111.93903], [40.74452, -111.93908]]}, {"kind": "rate", "seg": 1230, "road": "US-6", "loc": "Spanish Fork (2 mi SE)", "cty": "Utah", "lat": 40.0314, "lon": -111.5127, "n": 12, "ped": 0, "aadt": 11808, "len": 5.1, "rate": 2.3, "marks": [[40.03392, -111.51501], [40.03129, -111.51192], [40.03827, -111.53486], [40.02308, -111.49921], [40.01401, -111.49213], [40.03899, -111.53656], [40.04197, -111.54405], [40.01337, -111.49167], [40.01476, -111.49278], [40.00846, -111.49166], [40.02892, -111.50545], [40.01981, -111.4969]]}, {"kind": "rate", "seg": 495, "road": "UT-30", "loc": "Collinston", "cty": "Box Elder", "lat": 41.7918, "lon": -112.032, "n": 8, "ped": 0, "aadt": 8324, "len": 5.1, "rate": 2.2, "marks": [[41.79457, -112.03778], [41.79457, -112.05701], [41.76208, -112.00823], [41.75928, -112.00574], [41.77791, -112.0212], [41.79374, -112.03604], [41.78209, -112.02432], [41.76067, -112.007]]}, {"kind": "rate", "seg": 616, "road": "I-80", "loc": "Grantsville", "cty": "Tooele", "lat": 40.7571, "lon": -113.0207, "n": 8, "ped": 1, "aadt": 8213, "len": 5.2, "rate": 2.2, "marks": [[40.75085, -113.04466], [40.76598, -113.00812], [40.75869, -113.01788], [40.76107, -113.00572], [40.75642, -113.02317], [40.75135, -113.04538], [40.76794, -112.98494], [40.76077, -113.00702]]}, {"kind": "rate", "seg": 56, "road": "UT-68", "loc": "West Valley City (3 mi E)", "cty": "Salt Lake", "lat": 40.7057, "lon": -111.9389, "n": 29, "ped": 9, "aadt": 33254, "len": 4.7, "rate": 2.1, "marks": [[40.73465, -111.93889], [40.66771, -111.93881], [40.68949, -111.93918], [40.6987, -111.93914], [40.69782, -111.93905], [40.68281, -111.93891], [40.68994, -111.93895], [40.72079, -111.93899], [40.69897, -111.93901], [40.73329, -111.93875], [40.68353, -111.93886], [40.71121, -111.93896], [40.68157, -111.93889], [40.67968, -111.93889], [40.70588, -111.93895], [40.72876, -111.93902], [40.68125, -111.93879], [40.6892, -111.93876], [40.66787, -111.93899], [40.70631, -111.93889], [40.67979, -111.93897], [40.68452, -111.93889], [40.68476, -111.93891], [40.6885, -111.93878], [40.71575, -111.93904], [40.6756, -111.93893], [40.7106, -111.93889], [40.70407, -111.93903], [40.6706, -111.93868]]}, {"kind": "rate", "seg": 2207, "road": "I-84", "loc": "Snowville", "cty": "Box Elder", "lat": 41.9558, "lon": -112.6799, "n": 8, "ped": 0, "aadt": 8926, "len": 5.1, "rate": 2.0, "marks": [[41.94833, -112.66873], [41.95796, -112.68265], [41.95489, -112.67578], [41.93928, -112.65885], [41.96073, -112.71516], [41.95902, -112.6872], [41.93681, -112.65567], [41.95395, -112.67495]]}], "ped": [{"kind": "ped", "road": "UT-68", "loc": "Salt Lake City", "cty": "Salt Lake", "lat": 40.7054, "lon": -111.936, "n": 23, "e": [[40.7825, -111.9392], [40.7782, -111.9392], [40.7755, -111.9392], [40.7679, -111.9391], [40.7599, -111.9391], [40.7544, -111.9391], [40.7434, -111.939], [40.7316, -111.939], [40.7219, -111.939], [40.7127, -111.9255], [40.7017, -111.9254], [40.6973, -111.9253], [40.693, -111.9253], [40.6885, -111.9253], [40.685, -111.9388], [40.6831, -111.9389], [40.6785, -111.9389], [40.6692, -111.9389], [40.66, -111.9388], [40.6485, -111.9389], [40.6362, -111.9388], [40.6289, -111.9388], [40.6258, -111.9388]], "mi": 12.4, "permi": 1.9, "marks": [[40.68157, -111.93889], [40.76544, -111.93912], [40.70588, -111.93895], [40.68125, -111.93879], [40.6892, -111.93876], [40.66536, -111.93884], [40.67979, -111.93897], [40.63825, -111.93883], [40.68452, -111.93889], [40.69867, -111.87123], [40.6885, -111.93878], [40.62387, -111.939], [40.61835, -111.93878], [40.79102, -111.93904], [40.7106, -111.93889], [40.63531, -111.93877], [40.77174, -111.93915], [40.70407, -111.93903], [40.78461, -111.93943], [40.7442, -111.93917], [40.75276, -111.93891], [40.76486, -111.93903], [40.74452, -111.93908]], "geom": [[[40.6145, -111.9388], [40.6151, -111.9388], [40.6163, -111.9388], [40.6166, -111.9388]], [[40.6166, -111.9388], [40.6168, -111.9388], [40.6172, -111.9388], [40.618, -111.9388], [40.6182, -111.9388], [40.6184, -111.9388], [40.6195, -111.9387], [40.6198, -111.9387], [40.621, -111.9388], [40.6224, -111.9388], [40.6239, -111.9388], [40.624, -111.9388], [40.6249, -111.9387], [40.6253, -111.9387], [40.6268, -111.9387], [40.6275, -111.9387], [40.6282, -111.9387], [40.6291, -111.9387], [40.6297, -111.9387], [40.6304, -111.9387], [40.6311, -111.9388], [40.6315, -111.9388], [40.6324, -111.9388], [40.6326, -111.9388], [40.6327, -111.9388], [40.6338, -111.9388], [40.634, -111.9388], [40.6346, -111.9387], [40.635, -111.9387], [40.6355, -111.9387], [40.6369, -111.9388], [40.6384, -111.9388], [40.6385, -111.9388], [40.6398, -111.9388]], [[40.7372, -111.939], [40.7378, -111.939], [40.7386, -111.939], [40.7387, -111.939], [40.7401, -111.939], [40.7404, -111.939], [40.7405, -111.939], [40.7407, -111.939], [40.7407, -111.939], [40.7416, -111.939], [40.743, -111.939], [40.7436, -111.939], [40.7441, -111.939], [40.7445, -111.939], [40.746, -111.939], [40.746, -111.939], [40.7474, -111.939], [40.7477, -111.939], [40.7489, -111.939], [40.7495, -111.939], [40.7502, -111.939], [40.7503, -111.939], [40.7512, -111.939], [40.7518, -111.939], [40.7522, -111.939], [40.7531, -111.939], [40.7532, -111.939], [40.7532, -111.939], [40.7541, -111.939], [40.7546, -111.939], [40.7551, -111.939], [40.7561, -111.939], [40.7568, -111.939], [40.7575, -111.939], [40.7584, -111.939], [40.7584, -111.939], [40.759, -111.939], [40.7592, -111.939], [40.7604, -111.939], [40.7606, -111.939], [40.7606, -111.939], [40.7619, -111.939], [40.7619, -111.939], [40.7619, -111.939], [40.7628, -111.9391], [40.7634, -111.9391], [40.7638, -111.9391], [40.7643, -111.9391], [40.7648, -111.9391], [40.7648, -111.9391], [40.7649, -111.9391], [40.765, -111.9391], [40.7652, -111.9391], [40.7654, -111.9391], [40.7659, -111.9391], [40.7659, -111.9391], [40.766, -111.9391], [40.7662, -111.9391], [40.7663, -111.9391], [40.7665, -111.9391], [40.7672, -111.9391], [40.7677, -111.9392], [40.7692, -111.9392], [40.7694, -111.9392], [40.7704, -111.9392], [40.7706, -111.9392], [40.7715, -111.9393], [40.7721, -111.9393], [40.7729, -111.9393], [40.7735, -111.9393], [40.7735, -111.9393], [40.775, -111.9393], [40.7751, -111.9393], [40.7761, -111.9393], [40.7764, -111.9393], [40.7773, -111.9394], [40.7779, -111.9394], [40.7781, -111.9394], [40.779, -111.9394], [40.7793, -111.9394], [40.7802, -111.9394], [40.7808, -111.9394], [40.7812, -111.9394], [40.7823, -111.9394], [40.7829, -111.9394], [40.7831, -111.9394], [40.7837, -111.9394], [40.7847, -111.9394], [40.7852, -111.9394], [40.7866, -111.9394], [40.787, -111.9394], [40.7878, -111.9394], [40.7881, -111.9394], [40.7882, -111.9394], [40.7886, -111.9393], [40.789, -111.9393], [40.7893, -111.9393], [40.7895, -111.9392], [40.7897, -111.9392], [40.7901, -111.9392], [40.7908, -111.9392], [40.7909, -111.9392], [40.791, -111.9392], [40.7911, -111.9392], [40.7921, -111.9392], [40.7924, -111.9392], [40.7926, -111.9392], [40.7934, -111.9392], [40.7939, -111.9392]], [[40.7358, -111.939], [40.7372, -111.939]], [[40.6675, -111.9388], [40.6677, -111.9388], [40.6689, -111.9389], [40.6692, -111.9389], [40.6698, -111.9389], [40.6702, -111.9389], [40.6704, -111.9389], [40.6717, -111.9389], [40.6718, -111.9389], [40.6726, -111.9389], [40.6733, -111.9389], [40.6738, -111.9389], [40.6747, -111.9389], [40.6762, -111.9389], [40.6776, -111.9389], [40.678, -111.9389], [40.6791, -111.9389], [40.6797, -111.9389], [40.6805, -111.9389], [40.6805, -111.9389], [40.6813, -111.9389], [40.682, -111.9389], [40.6821, -111.9389], [40.6834, -111.9389], [40.6849, -111.9389], [40.6863, -111.9389], [40.6869, -111.9389], [40.6878, -111.9389], [40.688, -111.9389], [40.6893, -111.9389], [40.6893, -111.9389], [40.6903, -111.9389], [40.6907, -111.9389], [40.691, -111.9389], [40.6917, -111.9389], [40.6921, -111.9389], [40.6928, -111.9389], [40.6934, -111.9389], [40.6936, -111.9389], [40.6944, -111.9389], [40.6951, -111.9389], [40.6965, -111.9389], [40.6966, -111.9389], [40.698, -111.9389], [40.6985, -111.9389], [40.6994, -111.9389], [40.7003, -111.9389], [40.7009, -111.9389], [40.7024, -111.9389], [40.7038, -111.9389], [40.7039, -111.9389], [40.7053, -111.9389], [40.7057, -111.9389], [40.7067, -111.9389], [40.7081, -111.9389], [40.7082, -111.9389], [40.7089, -111.9389], [40.7096, -111.9389], [40.7098, -111.9389], [40.7107, -111.9389], [40.7111, -111.9389], [40.7112, -111.9389], [40.7117, -111.939], [40.7125, -111.939], [40.7126, -111.939], [40.7134, -111.939], [40.714, -111.939], [40.7143, -111.939], [40.7152, -111.939], [40.7154, -111.939], [40.7161, -111.939], [40.7169, -111.939], [40.717, -111.939], [40.7178, -111.939], [40.7183, -111.939], [40.7185, -111.939], [40.7193, -111.939], [40.7197, -111.939], [40.7208, -111.939], [40.7212, -111.939], [40.7226, -111.939], [40.7227, -111.939], [40.7227, -111.939], [40.7239, -111.939], [40.724, -111.939], [40.7241, -111.939], [40.7242, -111.939], [40.7243, -111.939], [40.7247, -111.939], [40.7249, -111.9389], [40.7255, -111.939], [40.7259, -111.939], [40.727, -111.939], [40.7285, -111.939], [40.7287, -111.939], [40.7299, -111.939], [40.7314, -111.939], [40.7328, -111.939], [40.7331, -111.939], [40.7332, -111.939], [40.7341, -111.939], [40.7343, -111.939], [40.735, -111.939], [40.7358, -111.939]], [[40.6645, -111.9388], [40.6646, -111.9388], [40.665, -111.9388], [40.666, -111.9388], [40.6675, -111.9388]], [[40.6558, -111.9388], [40.6559, -111.9388], [40.6572, -111.9388], [40.6573, -111.9388], [40.6587, -111.9388], [40.6602, -111.9388], [40.6603, -111.9388], [40.6616, -111.9388], [40.6631, -111.9388], [40.6641, -111.9388], [40.6645, -111.9388]], [[40.6544, -111.9388], [40.6558, -111.9388]], [[40.6532, -111.9388], [40.6544, -111.9388]], [[40.6449, -111.9388], [40.6449, -111.9388], [40.645, -111.9388], [40.6457, -111.9388], [40.6458, -111.9388], [40.6465, -111.9388], [40.6466, -111.9388], [40.6471, -111.9388], [40.6471, -111.9388]], [[40.6413, -111.9388], [40.6418, -111.9388], [40.6427, -111.9388], [40.6427, -111.9388], [40.6434, -111.9388], [40.6442, -111.9388], [40.6443, -111.9388], [40.6445, -111.9388], [40.6445, -111.9388], [40.6448, -111.9388], [40.6449, -111.9388]], [[40.65, -111.9388], [40.6515, -111.9388], [40.6529, -111.9388], [40.6532, -111.9388]], [[40.6398, -111.9388], [40.6413, -111.9388]], [[40.6486, -111.9388], [40.6491, -111.9388], [40.6494, -111.9388], [40.65, -111.9388]], [[40.6471, -111.9388], [40.648, -111.9388], [40.6486, -111.9388]]]}, {"kind": "ped", "road": "US-89", "loc": "Salt Lake City", "cty": "Salt Lake", "lat": 40.7118, "lon": -111.8937, "n": 20, "e": [[40.8436, -111.9022], [40.8228, -111.9009], [40.8091, -111.8984], [40.7838, -111.8976], [40.7603, -111.8952], [40.7471, -111.8901], [40.7417, -111.8883], [40.7371, -111.8883], [40.7262, -111.8883], [40.7159, -111.8883], [40.7059, -111.8883], [40.6924, -111.8883], [40.6787, -111.8883], [40.673, -111.8883], [40.6659, -111.8982], [40.6515, -111.8987], [40.638, -111.8992], [40.6223, -111.8997], [40.6124, -111.9025], [40.5994, -111.8908]], "mi": 21.7, "permi": 0.9, "marks": [[40.69049, -111.88826], [40.68702, -111.88827], [40.85641, -111.90044], [40.58404, -111.8908], [40.66187, -111.88825], [40.65139, -111.93771], [40.80283, -111.91404], [40.73691, -111.8884], [40.73143, -111.88829], [40.76059, -111.89704], [40.87149, -111.8922], [40.73886, -111.88836], [40.61503, -111.89073], [40.73343, -111.88827], [40.66288, -111.88828], [40.74482, -111.88829], [40.66615, -111.88839], [40.59909, -111.89078], [40.68714, -111.88839], [40.75426, -111.88818]], "geom": [[[40.6208, -111.8906], [40.6218, -111.8905], [40.6222, -111.8904], [40.623, -111.8903], [40.6232, -111.8903], [40.6238, -111.8903], [40.6245, -111.8902], [40.6246, -111.8902], [40.6249, -111.8902], [40.6258, -111.8901], [40.6261, -111.8901], [40.6269, -111.89], [40.6275, -111.8899], [40.628, -111.8899], [40.628, -111.8899], [40.629, -111.8898], [40.6304, -111.8897], [40.6311, -111.8896], [40.6313, -111.8896], [40.6314, -111.8896], [40.6314, -111.8896], [40.6317, -111.8896], [40.6319, -111.8895], [40.632, -111.8895], [40.6321, -111.8895], [40.6323, -111.8895], [40.6333, -111.8894], [40.6333, -111.8894], [40.6347, -111.8893], [40.6359, -111.8893], [40.6362, -111.8892], [40.6373, -111.8892], [40.6377, -111.8892], [40.6385, -111.8891], [40.6391, -111.8891], [40.6405, -111.889], [40.641, -111.889], [40.642, -111.8889], [40.6429, -111.8889], [40.643, -111.8889], [40.6434, -111.8889], [40.6449, -111.8888], [40.646, -111.8888], [40.6463, -111.8887], [40.6477, -111.8886], [40.6478, -111.8886], [40.6492, -111.8886], [40.6493, -111.8885], [40.6498, -111.8885], [40.6507, -111.8885], [40.651, -111.8885], [40.6518, -111.8884], [40.6521, -111.8884], [40.6525, -111.8884], [40.6536, -111.8884], [40.6546, -111.8883], [40.655, -111.8883], [40.6561, -111.8883], [40.6565, -111.8883], [40.6578, -111.8883], [40.6579, -111.8883], [40.6594, -111.8883], [40.6594, -111.8883], [40.6604, -111.8883], [40.6609, -111.8883], [40.6613, -111.8883], [40.6623, -111.8883], [40.6629, -111.8883], [40.6636, -111.8883], [40.6638, -111.8883], [40.6643, -111.8883], [40.6643, -111.8883], [40.6651, -111.8883], [40.6652, -111.8883], [40.6655, -111.8883], [40.6667, -111.8883], [40.6669, -111.8883], [40.6669, -111.8883], [40.6682, -111.8883], [40.6687, -111.8883], [40.669, -111.8883], [40.6696, -111.8883], [40.6699, -111.8883], [40.6703, -111.8883], [40.6711, -111.8882], [40.6719, -111.8882], [40.6726, -111.8883], [40.674, -111.8883], [40.6743, -111.8883], [40.6755, -111.8883], [40.6758, -111.8883], [40.6769, -111.8883], [40.677, -111.8883], [40.678, -111.8883], [40.6784, -111.8883], [40.6786, -111.8883], [40.6795, -111.8883], [40.6796, -111.8883], [40.6799, -111.8882], [40.6804, -111.8882], [40.6811, -111.8882], [40.6813, -111.8882], [40.6822, -111.8882], [40.6828, -111.8882], [40.6831, -111.8883], [40.6836, -111.8883], [40.6842, -111.8882], [40.6845, -111.8882], [40.6857, -111.8882], [40.687, -111.8882], [40.687, -111.8882], [40.6872, -111.8882], [40.6886, -111.8883], [40.6888, -111.8883], [40.6898, -111.8883], [40.6901, -111.8883], [40.6915, -111.8883], [40.692, -111.8883], [40.693, -111.8883], [40.693, -111.8883], [40.6945, -111.8883]], [[40.6945, -111.8883], [40.6946, -111.8883], [40.6947, -111.8883], [40.6959, -111.8883], [40.6972, -111.8882], [40.6972, -111.8882], [40.6974, -111.8883], [40.6986, -111.8883], [40.6989, -111.8883], [40.699, -111.8883], [40.6992, -111.8883], [40.6998, -111.8882], [40.7003, -111.8883], [40.7009, -111.8883], [40.7016, -111.8883], [40.7018, -111.8883], [40.7018, -111.8883], [40.7027, -111.8883], [40.7032, -111.8883], [40.7036, -111.8883], [40.7042, -111.8882], [40.7047, -111.8882], [40.7047, -111.8882], [40.7049, -111.8883], [40.7051, -111.8882], [40.7055, -111.8883], [40.7056, -111.8883], [40.706, -111.8883], [40.706, -111.8883], [40.7062, -111.8883], [40.7073, -111.8882], [40.7074, -111.8882], [40.7076, -111.8882], [40.7082, -111.8883], [40.709, -111.8882], [40.7091, -111.8882], [40.7092, -111.8882], [40.7097, -111.8882], [40.71, -111.8883], [40.7105, -111.8882], [40.711, -111.8882], [40.7118, -111.8883], [40.712, -111.8883], [40.7127, -111.8883], [40.7127, -111.8883], [40.7135, -111.8882], [40.7135, -111.8882], [40.7136, -111.8882], [40.7143, -111.8882], [40.7145, -111.8882], [40.7149, -111.8882], [40.7151, -111.8882], [40.7154, -111.8882], [40.7163, -111.8882], [40.7164, -111.8882], [40.7169, -111.8882], [40.7171, -111.8882], [40.7179, -111.8882], [40.7179, -111.8882], [40.718, -111.8882], [40.7183, -111.8882], [40.7185, -111.8882], [40.7186, -111.8882], [40.7193, -111.8882], [40.7195, -111.8882], [40.7202, -111.8882], [40.7208, -111.8882], [40.721, -111.8882], [40.7222, -111.8882], [40.7223, -111.8882], [40.7228, -111.8882], [40.7236, -111.8882], [40.7237, -111.8882], [40.7238, -111.8882], [40.7244, -111.8882], [40.7252, -111.8882], [40.7255, -111.8882], [40.7255, -111.8882], [40.7261, -111.8882], [40.7266, -111.8882], [40.7272, -111.8882], [40.7281, -111.8882], [40.7287, -111.8882], [40.7296, -111.8882], [40.7302, -111.8882], [40.7307, -111.8882], [40.731, -111.8882], [40.7315, -111.8882], [40.7322, -111.8882], [40.7325, -111.8882], [40.7335, -111.8882], [40.7335, -111.8882], [40.7339, -111.8882], [40.7351, -111.8882], [40.7354, -111.8882], [40.7356, -111.8882], [40.7368, -111.8882], [40.7368, -111.8882], [40.7383, -111.8882], [40.7383, -111.8882], [40.7398, -111.8882], [40.7403, -111.8882], [40.7412, -111.8882], [40.7416, -111.8882], [40.7416, -111.8882], [40.7427, -111.8882], [40.7429, -111.8882], [40.7433, -111.8882], [40.7437, -111.8882], [40.7442, -111.8882], [40.7443, -111.8882], [40.7448, -111.8882], [40.7454, -111.8882], [40.7456, -111.8882], [40.746, -111.8882], [40.7464, -111.8882], [40.7469, -111.8882], [40.7471, -111.8882], [40.748, -111.8882], [40.7486, -111.8882], [40.7497, -111.8882], [40.7498, -111.8882], [40.75, -111.8882], [40.7504, -111.8882], [40.7515, -111.8882], [40.752, -111.8882], [40.7529, -111.8882], [40.7541, -111.8882], [40.7544, -111.8882], [40.7554, -111.8882], [40.7559, -111.8882], [40.7563, -111.8882], [40.7573, -111.8882], [40.7585, -111.8882], [40.7588, -111.8882], [40.7602, -111.8882], [40.7606, -111.8882], [40.7606, -111.8896], [40.7606, -111.8897], [40.7606, -111.8911], [40.7606, -111.8912], [40.7606, -111.8915], [40.7606, -111.8935], [40.7606, -111.894], [40.7606, -111.8954], [40.7606, -111.8968], [40.7606, -111.8973], [40.7606, -111.8982], [40.7606, -111.8993]], [[40.7606, -111.8993], [40.7606, -111.8997], [40.7619, -111.8997], [40.7628, -111.8997], [40.7634, -111.8997], [40.7638, -111.8997], [40.7648, -111.8997], [40.765, -111.8997], [40.7663, -111.8997], [40.7672, -111.8997], [40.7677, -111.8997], [40.7692, -111.8997], [40.7694, -111.8997], [40.7706, -111.8997], [40.7715, -111.8997], [40.7715, -111.8997], [40.772, -111.8997], [40.7721, -111.8997], [40.7736, -111.8997], [40.7737, -111.8997], [40.775, -111.8997], [40.7759, -111.8997], [40.7764, -111.8997], [40.7772, -111.8997], [40.7779, -111.8997], [40.778, -111.8997], [40.7788, -111.8997], [40.7791, -111.8997], [40.7794, -111.8997], [40.7802, -111.8997], [40.7808, -111.8997], [40.7814, -111.8997], [40.7823, -111.8997], [40.7824, -111.8997], [40.7837, -111.8997], [40.7843, -111.8997], [40.7846, -111.8997], [40.785, -111.8997], [40.7852, -111.8997], [40.7856, -111.8997], [40.7859, -111.8997], [40.7866, -111.8997], [40.7867, -111.8997], [40.787, -111.8997], [40.7878, -111.8997], [40.788, -111.8998], [40.7889, -111.9003], [40.7894, -111.9006], [40.7901, -111.901], [40.7907, -111.9014], [40.7911, -111.9016], [40.792, -111.9022], [40.7933, -111.903], [40.794, -111.9034], [40.794, -111.9034], [40.7945, -111.9037], [40.7945, -111.9037], [40.7946, -111.9038], [40.7948, -111.904], [40.7957, -111.9052], [40.7967, -111.9065], [40.7969, -111.9067], [40.7977, -111.9077], [40.7978, -111.9078], [40.7984, -111.9086], [40.7985, -111.9087], [40.7988, -111.9091], [40.7994, -111.9099], [40.7998, -111.9104], [40.7999, -111.9105], [40.8009, -111.9117], [40.8009, -111.9118], [40.802, -111.9131], [40.8021, -111.9133], [40.8028, -111.9142], [40.803, -111.9145], [40.8036, -111.9152], [40.8041, -111.9158], [40.8043, -111.916], [40.805, -111.9169], [40.8052, -111.917], [40.8058, -111.9176], [40.8058, -111.9176], [40.8062, -111.9179], [40.8064, -111.918], [40.807, -111.9182], [40.8075, -111.9183], [40.8078, -111.9184], [40.8081, -111.9184], [40.8086, -111.9184], [40.8093, -111.9185], [40.8094, -111.9185], [40.8107, -111.9186], [40.8107, -111.9186], [40.8114, -111.9187], [40.8122, -111.9188], [40.8124, -111.9188], [40.8128, -111.9188], [40.8129, -111.9188], [40.8131, -111.9188], [40.8132, -111.9188], [40.8135, -111.9188], [40.8136, -111.9188], [40.8139, -111.9187], [40.814, -111.9187], [40.8143, -111.9186], [40.8146, -111.9185], [40.8149, -111.9183], [40.815, -111.9183], [40.8152, -111.9182], [40.8163, -111.9175], [40.8167, -111.9172], [40.8173, -111.9168], [40.8177, -111.9166], [40.818, -111.9164], [40.8182, -111.9163], [40.8184, -111.9162], [40.8188, -111.916], [40.819, -111.9159], [40.8192, -111.9159], [40.8195, -111.9158], [40.8197, -111.9158], [40.82, -111.9158], [40.8204, -111.9158], [40.8204, -111.9158]], [[40.6189, -111.8906], [40.6195, -111.8906], [40.6203, -111.8906], [40.6207, -111.8906], [40.6208, -111.8906]], [[40.6174, -111.8907], [40.6178, -111.8906], [40.6189, -111.8906]], [[40.5805, -111.8909], [40.5806, -111.8909], [40.5806, -111.8909], [40.5806, -111.8909], [40.5809, -111.8909], [40.5823, -111.8908], [40.583, -111.8908], [40.5838, -111.8908], [40.5841, -111.8908], [40.5851, -111.8909], [40.5853, -111.8909], [40.5867, -111.8909], [40.5881, -111.8909], [40.5881, -111.8909], [40.5881, -111.8909], [40.5888, -111.8909], [40.5896, -111.8908], [40.5896, -111.8909], [40.5903, -111.8909], [40.591, -111.8909], [40.5911, -111.8909], [40.5917, -111.8909], [40.5922, -111.8908], [40.5924, -111.8908], [40.5925, -111.8908], [40.5931, -111.8908], [40.5932, -111.8908], [40.5932, -111.8908], [40.5939, -111.8908], [40.594, -111.8908], [40.5941, -111.8908], [40.5946, -111.8908], [40.595, -111.8908], [40.595, -111.8908], [40.5954, -111.8908], [40.5961, -111.8908], [40.5963, -111.8908], [40.5969, -111.8908], [40.5976, -111.8908], [40.5979, -111.8908], [40.5981, -111.8908], [40.5984, -111.8908], [40.5988, -111.8908], [40.599, -111.8908], [40.5997, -111.8908], [40.5999, -111.8908], [40.6003, -111.8908], [40.6006, -111.8908], [40.601, -111.8908], [40.6013, -111.8908], [40.6015, -111.8908], [40.6026, -111.8907], [40.6028, -111.8907], [40.6042, -111.8908], [40.6043, -111.8908], [40.6057, -111.8908], [40.6058, -111.8908], [40.6058, -111.8908], [40.6071, -111.8908], [40.6086, -111.8908]], [[40.6086, -111.8908], [40.6095, -111.8908], [40.6101, -111.8908], [40.611, -111.8908], [40.6115, -111.8907], [40.6121, -111.8907], [40.6129, -111.8907], [40.613, -111.8907], [40.6133, -111.8907], [40.6139, -111.8907], [40.6145, -111.8907], [40.6147, -111.8907], [40.6151, -111.8907], [40.6159, -111.8907], [40.6172, -111.8907], [40.6174, -111.8907]], [[40.8641, -111.8944], [40.8648, -111.8937], [40.8653, -111.8934], [40.8654, -111.8933], [40.8661, -111.8927], [40.8665, -111.8925], [40.8667, -111.8924], [40.867, -111.8923], [40.8673, -111.8922], [40.8678, -111.8922], [40.8679, -111.8922], [40.8683, -111.8922], [40.8691, -111.8922], [40.8694, -111.8922], [40.8706, -111.8922], [40.8708, -111.8922], [40.8715, -111.8923], [40.8722, -111.8923], [40.8737, -111.8922], [40.8747, -111.8922], [40.8751, -111.8922]], [[40.8543, -111.9022], [40.8543, -111.9021], [40.8546, -111.9019], [40.8552, -111.9014], [40.8555, -111.9012], [40.856, -111.9007], [40.8561, -111.9007], [40.8567, -111.9002], [40.8576, -111.8995], [40.8578, -111.8993], [40.858, -111.8993], [40.8592, -111.8983], [40.8595, -111.898], [40.8604, -111.8973], [40.8605, -111.8972], [40.8616, -111.8963], [40.8625, -111.8956], [40.8628, -111.8953], [40.8636, -111.8948], [40.8641, -111.8944]], [[40.8428, -111.9098], [40.8436, -111.9093], [40.8441, -111.909], [40.8445, -111.9089], [40.845, -111.9086], [40.8454, -111.9083], [40.8462, -111.908], [40.8466, -111.9077], [40.8468, -111.9076], [40.8481, -111.9069], [40.8484, -111.9068], [40.8484, -111.9068], [40.8493, -111.906], [40.8498, -111.9057], [40.8506, -111.9051], [40.8507, -111.905], [40.8518, -111.9042], [40.8518, -111.9041], [40.8521, -111.9039], [40.853, -111.9032], [40.8532, -111.903], [40.8543, -111.9022]], [[40.8415, -111.9105], [40.8418, -111.9103], [40.8418, -111.9103], [40.8428, -111.9098]], [[40.8348, -111.9141], [40.8349, -111.914], [40.8351, -111.9139], [40.8359, -111.9135], [40.8362, -111.9133], [40.8367, -111.913], [40.8371, -111.9128], [40.8372, -111.9128], [40.8373, -111.9127], [40.8375, -111.9126], [40.8376, -111.9126], [40.8388, -111.9119], [40.8389, -111.9118], [40.839, -111.9118], [40.8401, -111.9112], [40.8415, -111.9105]], [[40.8335, -111.9145], [40.8339, -111.9143], [40.8339, -111.9143], [40.8344, -111.9142], [40.8348, -111.9141]], [[40.8331, -111.9146], [40.8335, -111.9145]], [[40.832, -111.9149], [40.8327, -111.9147], [40.8331, -111.9146]], [[40.8218, -111.9159], [40.8219, -111.9159], [40.8222, -111.9158], [40.8231, -111.9158], [40.8233, -111.9157], [40.8242, -111.9157], [40.8248, -111.9157], [40.8262, -111.9156], [40.8273, -111.9156], [40.8277, -111.9156], [40.8285, -111.9156], [40.829, -111.9155], [40.8291, -111.9155], [40.8299, -111.9154], [40.8303, -111.9154], [40.8305, -111.9153], [40.8306, -111.9153], [40.8312, -111.9151], [40.832, -111.9149], [40.832, -111.9149]], [[40.8204, -111.9158], [40.8208, -111.9159], [40.821, -111.9159], [40.821, -111.9159], [40.8215, -111.9159], [40.8218, -111.9159]]]}, {"kind": "ped", "road": "UT-171", "loc": "South Salt Lake", "cty": "Salt Lake", "lat": 40.6984, "lon": -111.9372, "n": 15, "e": [[40.6966, -112.056], [40.6966, -112.0379], [40.6966, -111.9976], [40.6966, -111.9721], [40.6966, -111.9506], [40.6972, -111.9388], [40.6982, -111.9302], [40.6991, -111.9238], [40.6994, -111.9188], [40.6995, -111.9121], [40.6996, -111.9045], [40.6998, -111.8959], [40.6998, -111.8859], [40.6999, -111.8694], [40.6999, -111.8585]], "mi": 13.1, "permi": 1.1, "marks": [[40.69994, -111.84573], [40.69649, -112.08824], [40.69657, -112.00172], [40.69666, -111.9472], [40.69662, -112.02378], [40.69941, -111.91697], [40.69989, -111.87134], [40.69982, -111.89117], [40.69973, -111.89518], [40.69941, -111.91803], [40.69658, -111.9674], [40.69943, -111.92126], [40.6966, -111.93714], [40.69973, -111.90127], [40.69848, -111.93216]], "geom": [[[40.6994, -111.9135], [40.6994, -111.9134], [40.6995, -111.9125], [40.6996, -111.912], [40.6996, -111.9117], [40.6997, -111.9112], [40.6998, -111.9103], [40.6998, -111.9098], [40.6998, -111.9095], [40.6999, -111.9093], [40.6999, -111.9089], [40.6999, -111.9085], [40.6998, -111.9079], [40.6998, -111.9078], [40.6998, -111.9074], [40.6998, -111.9069], [40.6998, -111.9064], [40.6998, -111.906], [40.6998, -111.9055], [40.6998, -111.904], [40.6999, -111.9037], [40.6999, -111.9022], [40.6999, -111.9021], [40.6999, -111.9005], [40.6999, -111.9003], [40.6999, -111.9001], [40.6999, -111.8997], [40.6999, -111.8997], [40.6999, -111.8984], [40.6998, -111.8976], [40.6998, -111.8965], [40.6998, -111.8946], [40.6998, -111.894], [40.6998, -111.893], [40.6998, -111.8927], [40.6998, -111.8922], [40.6998, -111.8911], [40.6998, -111.8907], [40.6998, -111.8888], [40.6998, -111.8882], [40.6999, -111.8869], [40.6999, -111.8868], [40.6999, -111.8855], [40.6999, -111.8853], [40.6999, -111.885], [40.6999, -111.885], [40.6999, -111.8834], [40.6999, -111.8831], [40.6999, -111.8827], [40.6999, -111.8812], [40.6999, -111.8798], [40.6999, -111.8793], [40.6999, -111.8788], [40.6999, -111.8779], [40.6999, -111.8774], [40.6999, -111.8769], [40.6999, -111.8757], [40.6999, -111.8755], [40.6999, -111.8748], [40.6999, -111.8736], [40.6999, -111.8726], [40.6999, -111.8717], [40.6999, -111.8713], [40.6999, -111.8703], [40.6999, -111.8698], [40.6999, -111.8683], [40.6999, -111.8679], [40.6999, -111.8676], [40.6999, -111.866], [40.6999, -111.8654], [40.6999, -111.8654], [40.6999, -111.8641], [40.6999, -111.864], [40.6999, -111.8626], [40.6999, -111.8622], [40.6999, -111.8603], [40.6999, -111.8597], [40.6999, -111.8584], [40.6999, -111.8574], [40.6999, -111.8565], [40.6999, -111.8565], [40.6999, -111.8553], [40.6999, -111.8546], [40.6999, -111.854], [40.6999, -111.8529], [40.6999, -111.8527], [40.6999, -111.8508], [40.6999, -111.8507], [40.6999, -111.8507], [40.6999, -111.8491], [40.6999, -111.8489], [40.6999, -111.8478], [40.6999, -111.847], [40.6999, -111.8467], [40.6999, -111.8465], [40.6999, -111.8453], [40.6999, -111.8451], [40.7, -111.8435], [40.7, -111.8432], [40.7, -111.8425]], [[40.6994, -111.9212], [40.6994, -111.9198], [40.6994, -111.9193], [40.6994, -111.9174], [40.6994, -111.9169], [40.6994, -111.9155], [40.6994, -111.9139], [40.6994, -111.9135]], [[40.6994, -111.925], [40.6994, -111.9249], [40.6994, -111.9243], [40.6994, -111.9231], [40.6994, -111.9226], [40.6994, -111.9212], [40.6994, -111.9212]], [[40.6994, -111.9269], [40.6994, -111.9263], [40.6994, -111.9257], [40.6994, -111.9251], [40.6994, -111.925]], [[40.6966, -112.0288], [40.6966, -112.0284], [40.6966, -112.0273], [40.6966, -112.0268], [40.6966, -112.025], [40.6966, -112.0248], [40.6966, -112.023], [40.6966, -112.0213], [40.6966, -112.0211], [40.6966, -112.0195], [40.6966, -112.0193], [40.6966, -112.0173], [40.6966, -112.0173], [40.6966, -112.0154], [40.6966, -112.0153], [40.6966, -112.0135], [40.6966, -112.0134], [40.6966, -112.0116], [40.6966, -112.0109], [40.6966, -112.0097], [40.6966, -112.0095], [40.6966, -112.0078], [40.6966, -112.0059], [40.6966, -112.0057], [40.6966, -112.005], [40.6966, -112.004], [40.6966, -112.0021], [40.6966, -112.0019], [40.6966, -112.0002], [40.6966, -111.9987], [40.6966, -111.9983], [40.6966, -111.9964], [40.6966, -111.9962], [40.6966, -111.9945], [40.6966, -111.9938], [40.6966, -111.9927], [40.6966, -111.9925], [40.6966, -111.9921], [40.6966, -111.9915], [40.6966, -111.9906], [40.6966, -111.9903], [40.6966, -111.9887], [40.6966, -111.9868], [40.6966, -111.9866], [40.6966, -111.9865], [40.6966, -111.9849], [40.6966, -111.983], [40.6966, -111.9811], [40.6966, -111.9808], [40.6966, -111.9793], [40.6966, -111.9792], [40.6966, -111.9773], [40.6966, -111.9771], [40.6966, -111.9771], [40.6966, -111.9755], [40.6966, -111.9736], [40.6966, -111.9735], [40.6966, -111.9719], [40.6966, -111.9717], [40.6966, -111.9712], [40.6966, -111.9698], [40.6966, -111.9679], [40.6966, -111.9675], [40.6966, -111.9675], [40.6966, -111.966], [40.6966, -111.9652], [40.6966, -111.9642], [40.6966, -111.9641], [40.6966, -111.9631], [40.6966, -111.9622], [40.6966, -111.962], [40.6966, -111.9619], [40.6966, -111.9603], [40.6966, -111.9602], [40.6966, -111.9592], [40.6966, -111.9584], [40.6966, -111.958], [40.6966, -111.9565], [40.6966, -111.9555], [40.6966, -111.9546], [40.6966, -111.9545], [40.6967, -111.9536], [40.6966, -111.9533], [40.6966, -111.9527], [40.6966, -111.9526], [40.6966, -111.9522], [40.6966, -111.9521], [40.6966, -111.9517], [40.6966, -111.9507], [40.6966, -111.9501], [40.6966, -111.9498], [40.6966, -111.9496], [40.6967, -111.9488], [40.6967, -111.9485], [40.6967, -111.9479], [40.6967, -111.9472], [40.6967, -111.9472], [40.6967, -111.9469], [40.6967, -111.9462], [40.6966, -111.945], [40.6966, -111.9446], [40.6966, -111.9435], [40.6966, -111.9431], [40.6966, -111.9412], [40.6966, -111.9403], [40.6966, -111.9393], [40.6966, -111.9389], [40.6966, -111.9374], [40.6966, -111.9373], [40.6966, -111.9372], [40.6966, -111.9367], [40.6967, -111.9361], [40.6968, -111.9358], [40.6968, -111.9355], [40.6968, -111.9354], [40.6969, -111.9351], [40.6971, -111.9346], [40.6972, -111.9343], [40.6973, -111.9339], [40.6974, -111.9338]], [[40.6974, -111.9338], [40.6974, -111.9337], [40.6977, -111.9333], [40.6982, -111.9324], [40.6983, -111.9323], [40.6986, -111.9317], [40.6988, -111.9313], [40.6989, -111.9311], [40.699, -111.9308], [40.699, -111.9307], [40.699, -111.9306], [40.6991, -111.9304], [40.6991, -111.9301], [40.6992, -111.9299], [40.6992, -111.9295], [40.6992, -111.9288], [40.6993, -111.9275], [40.6993, -111.9274], [40.6994, -111.9269]], [[40.6965, -112.0326], [40.6966, -112.0307], [40.6966, -112.0296], [40.6966, -112.0288]], [[40.6965, -112.044], [40.6965, -112.0439], [40.6965, -112.0421], [40.6965, -112.0413], [40.6965, -112.0402], [40.6965, -112.04], [40.6965, -112.0387], [40.6965, -112.0383], [40.6965, -112.0364], [40.6965, -112.036], [40.6965, -112.0345], [40.6965, -112.0344], [40.6965, -112.0326]], [[40.6965, -112.0459], [40.6965, -112.044]], [[40.6965, -112.0535], [40.6965, -112.0534], [40.6965, -112.0516], [40.6965, -112.0515], [40.6965, -112.0506], [40.6965, -112.0497], [40.6965, -112.0491], [40.6965, -112.0486], [40.6965, -112.0478], [40.6965, -112.0477], [40.6965, -112.0459]], [[40.6965, -112.0669], [40.6965, -112.0662], [40.6965, -112.0655], [40.6965, -112.0651], [40.6965, -112.0649], [40.6965, -112.0631], [40.6965, -112.063], [40.6965, -112.062], [40.6965, -112.0611], [40.6965, -112.0593], [40.6965, -112.0592], [40.6965, -112.0573], [40.6965, -112.0567], [40.6965, -112.0556], [40.6965, -112.0554], [40.6965, -112.0536], [40.6965, -112.0535]], [[40.6965, -112.0707], [40.6965, -112.0702], [40.6965, -112.0687], [40.6965, -112.068], [40.6965, -112.0669]], [[40.6965, -112.0726], [40.6965, -112.0722], [40.6965, -112.0713], [40.6965, -112.0707]], [[40.6965, -112.0897], [40.6965, -112.0883], [40.6965, -112.0878], [40.6965, -112.087], [40.6965, -112.086], [40.6965, -112.0859], [40.6965, -112.084], [40.6965, -112.0823], [40.6965, -112.0821], [40.6965, -112.0803], [40.6965, -112.0802], [40.6965, -112.0783], [40.6965, -112.0764], [40.6965, -112.0757], [40.6965, -112.0744], [40.6965, -112.0731], [40.6965, -112.0727], [40.6965, -112.0726]], [[40.6965, -112.0918], [40.6965, -112.09], [40.6965, -112.0897]]]}, {"kind": "ped", "road": "US-89", "loc": "Ogden", "cty": "Weber", "lat": 41.2235, "lon": -111.9698, "n": 9, "e": [[41.2681, -111.9766], [41.2601, -111.9743], [41.2396, -111.97], [41.2258, -111.9703], [41.2158, -111.9706], [41.2149, -111.9706], [41.2115, -111.9707], [41.1944, -111.9645], [41.1847, -111.9615]], "mi": 9.1, "permi": 1.0, "marks": [[41.21439, -111.9706], [41.21669, -111.97056], [41.27817, -111.98358], [41.25803, -111.9696], [41.20608, -111.97081], [41.21647, -111.97059], [41.21396, -111.97064], [41.16329, -111.95216], [41.24421, -111.96972]], "geom": [[[41.1617, -111.9489], [41.1621, -111.9496], [41.1623, -111.95], [41.1629, -111.9513], [41.1633, -111.9522], [41.1636, -111.9529], [41.1637, -111.9531], [41.1643, -111.9546], [41.165, -111.9562], [41.1656, -111.9576], [41.1657, -111.9579], [41.1664, -111.9596], [41.1671, -111.9612], [41.1678, -111.9629], [41.168, -111.9632], [41.1686, -111.9646], [41.1686, -111.9648], [41.1689, -111.9654], [41.1692, -111.9662], [41.1696, -111.9671], [41.17, -111.9678], [41.17, -111.9679], [41.1705, -111.9685], [41.1708, -111.969], [41.171, -111.9692], [41.1717, -111.9699], [41.1722, -111.9703], [41.1725, -111.9705], [41.173, -111.9708], [41.173, -111.9708], [41.1733, -111.971], [41.1735, -111.9711], [41.1741, -111.9714], [41.1749, -111.9715], [41.175, -111.9715], [41.176, -111.9715], [41.1763, -111.9715], [41.1774, -111.9715], [41.1778, -111.9715]], [[41.1778, -111.9715], [41.1792, -111.9714], [41.1793, -111.9714], [41.1806, -111.9714], [41.1814, -111.9714], [41.1821, -111.9714], [41.1832, -111.9714], [41.1835, -111.9714], [41.1847, -111.9713], [41.185, -111.9713], [41.1864, -111.9713], [41.1878, -111.9712], [41.1893, -111.9712], [41.1898, -111.9712], [41.1906, -111.9712], [41.1907, -111.9712], [41.1919, -111.9712], [41.1922, -111.9712], [41.1936, -111.9711], [41.1938, -111.9711], [41.1951, -111.9711], [41.1958, -111.971], [41.1965, -111.971], [41.1978, -111.971], [41.1978, -111.971], [41.1979, -111.971], [41.1983, -111.971], [41.1994, -111.971], [41.1997, -111.971], [41.2003, -111.9709], [41.2005, -111.9709], [41.2008, -111.9709], [41.2019, -111.9709], [41.2022, -111.9709], [41.2034, -111.9709], [41.2037, -111.9709], [41.2046, -111.9708], [41.2051, -111.9708], [41.2061, -111.9708], [41.2066, -111.9708], [41.2075, -111.9707], [41.208, -111.9707], [41.2081, -111.9707], [41.2082, -111.9707], [41.2092, -111.9707], [41.2094, -111.9707], [41.2102, -111.9707], [41.2109, -111.9707], [41.2123, -111.9707], [41.2123, -111.9707], [41.2135, -111.9706], [41.2138, -111.9706], [41.2144, -111.9706], [41.2152, -111.9706], [41.2165, -111.9706], [41.2166, -111.9706], [41.2172, -111.9706], [41.2181, -111.9705], [41.2186, -111.9705], [41.2195, -111.9705], [41.2206, -111.9705], [41.2209, -111.9705], [41.2224, -111.9704], [41.2228, -111.9704], [41.2238, -111.9704], [41.2249, -111.9704], [41.2253, -111.9704], [41.2261, -111.9703], [41.2267, -111.9704], [41.2269, -111.9704], [41.2281, -111.9703], [41.229, -111.9703], [41.2296, -111.9703], [41.2299, -111.9703], [41.231, -111.9702], [41.2311, -111.9702], [41.2324, -111.9702], [41.2329, -111.9702], [41.2336, -111.9702], [41.2338, -111.9702], [41.2339, -111.9702], [41.2348, -111.9702], [41.2353, -111.9701], [41.2357, -111.9701], [41.2367, -111.9701], [41.2367, -111.9701], [41.2377, -111.9701], [41.2381, -111.9701], [41.2382, -111.9701], [41.2387, -111.9701], [41.2396, -111.97], [41.2398, -111.97], [41.2411, -111.97], [41.2413, -111.97], [41.2425, -111.97], [41.2427, -111.97], [41.2439, -111.9699], [41.2443, -111.9699], [41.2454, -111.9699], [41.2459, -111.9699], [41.2468, -111.9699], [41.2468, -111.9699], [41.248, -111.9699], [41.2482, -111.9699], [41.2486, -111.9698], [41.2493, -111.9698], [41.2497, -111.9698]], [[41.2497, -111.9698], [41.2502, -111.9698], [41.2511, -111.9698], [41.2517, -111.9698], [41.2525, -111.9698], [41.2532, -111.9698], [41.254, -111.9698], [41.2546, -111.9697], [41.2547, -111.9697], [41.2554, -111.9697], [41.2555, -111.9697], [41.2562, -111.9697], [41.2563, -111.9697], [41.2569, -111.9697], [41.258, -111.9697], [41.2582, -111.9697], [41.2583, -111.9697], [41.2592, -111.9696], [41.2596, -111.97], [41.2599, -111.9702], [41.2607, -111.9707], [41.2609, -111.9708], [41.2609, -111.9708], [41.2617, -111.9713], [41.2622, -111.9716], [41.2636, -111.9725], [41.2645, -111.973], [41.2649, -111.9733], [41.2662, -111.9741], [41.2666, -111.9744], [41.2667, -111.9744], [41.2675, -111.9749], [41.2688, -111.9757], [41.2699, -111.9764], [41.2701, -111.9765], [41.2705, -111.9767], [41.2707, -111.9769], [41.271, -111.9772], [41.2712, -111.9775], [41.2712, -111.9776], [41.2713, -111.9777], [41.2719, -111.9784], [41.2723, -111.9789], [41.2728, -111.9795], [41.2734, -111.9801], [41.274, -111.9806], [41.2746, -111.9811], [41.2751, -111.9815], [41.2753, -111.9816], [41.2757, -111.9819], [41.2758, -111.9819], [41.2759, -111.982], [41.2772, -111.9829], [41.2773, -111.9829], [41.2784, -111.9837], [41.2797, -111.9846], [41.2799, -111.9847], [41.281, -111.9855], [41.2814, -111.9857], [41.2814, -111.9858]]]}, {"kind": "ped", "road": "I-15", "loc": "Salt Lake City", "cty": "Salt Lake", "lat": 40.7075, "lon": -111.9062, "n": 8, "e": [[40.7921, -111.9164], [40.7712, -111.9125], [40.7376, -111.9077], [40.7032, -111.9036], [40.6861, -111.9028], [40.6757, -111.9022], [40.6554, -111.9021], [40.6439, -111.9021]], "mi": 12.4, "permi": 0.6, "marks": [[40.62595, -111.90294], [40.66188, -111.90122], [40.68688, -111.90304], [40.79407, -111.91724], [40.67823, -111.90228], [40.79012, -111.91551], [40.72935, -111.9047], [40.69332, -111.90301]], "geom": [[[40.6229, -111.9031], [40.623, -111.9031], [40.6235, -111.903], [40.6245, -111.9028], [40.6248, -111.9027], [40.6251, -111.9027], [40.6256, -111.9027], [40.6259, -111.9027], [40.626, -111.9027], [40.6266, -111.9027], [40.6273, -111.9028], [40.6273, -111.9028], [40.6279, -111.9029], [40.6282, -111.903], [40.6284, -111.903], [40.6285, -111.9031], [40.6288, -111.9031], [40.6295, -111.9034], [40.6301, -111.9036], [40.6302, -111.9036], [40.6305, -111.9038], [40.6311, -111.904], [40.6315, -111.9042], [40.6316, -111.9042], [40.6319, -111.9044], [40.6322, -111.9045], [40.6324, -111.9046], [40.6324, -111.9046], [40.6329, -111.9047], [40.6329, -111.9047], [40.6332, -111.9048], [40.6334, -111.9048], [40.6337, -111.9048], [40.634, -111.9049], [40.6343, -111.9049], [40.6344, -111.9049], [40.6345, -111.9049], [40.6346, -111.9049], [40.6347, -111.9049], [40.6349, -111.9048], [40.635, -111.9048]], [[40.725, -111.9042], [40.7251, -111.9042], [40.7252, -111.9042], [40.7252, -111.9042], [40.7254, -111.9042], [40.7266, -111.9042], [40.7281, -111.9043], [40.7295, -111.9044], [40.7309, -111.9045], [40.7314, -111.9045], [40.7324, -111.9045], [40.7331, -111.9045], [40.7335, -111.9045], [40.7335, -111.9045], [40.7337, -111.9045], [40.7338, -111.9045], [40.7352, -111.9045], [40.7353, -111.9045], [40.7367, -111.9044], [40.7382, -111.9043], [40.7394, -111.9042], [40.7394, -111.9042], [40.7396, -111.9042], [40.7411, -111.9041], [40.7411, -111.9041], [40.7413, -111.9041], [40.7416, -111.904], [40.7416, -111.904], [40.7418, -111.904], [40.7425, -111.904], [40.7431, -111.9039], [40.7436, -111.904], [40.744, -111.904], [40.7441, -111.9041], [40.7444, -111.9041], [40.7447, -111.9042], [40.745, -111.9043], [40.7451, -111.9043], [40.7453, -111.9044], [40.7454, -111.9044], [40.7455, -111.9045], [40.7455, -111.9045], [40.7457, -111.9046], [40.7458, -111.9047], [40.746, -111.9048], [40.7461, -111.905], [40.7464, -111.9052], [40.7465, -111.9054], [40.7466, -111.9055], [40.7471, -111.9062], [40.7473, -111.9065], [40.7476, -111.9067], [40.7476, -111.9068], [40.7487, -111.9081], [40.7488, -111.9083], [40.7498, -111.9094], [40.75, -111.9096], [40.7508, -111.9101], [40.7511, -111.9102], [40.7515, -111.9104], [40.7519, -111.9106], [40.7525, -111.9107], [40.7529, -111.9107], [40.7539, -111.911], [40.7543, -111.9111], [40.7553, -111.9116], [40.7553, -111.9116], [40.7564, -111.9121], [40.7565, -111.9121], [40.7566, -111.9122], [40.7569, -111.9123], [40.758, -111.9129], [40.7582, -111.9131], [40.7593, -111.9136], [40.7598, -111.9138], [40.7599, -111.9138], [40.76, -111.9139], [40.7606, -111.914], [40.7607, -111.914], [40.7608, -111.914], [40.7611, -111.9141], [40.7612, -111.9141], [40.7619, -111.9141], [40.7622, -111.9141], [40.7627, -111.9141], [40.763, -111.914], [40.7631, -111.9139], [40.7635, -111.9139], [40.7636, -111.9138], [40.7637, -111.9138], [40.7637, -111.9138], [40.7641, -111.9136], [40.7644, -111.9135], [40.7645, -111.9134], [40.765, -111.9132], [40.765, -111.9132], [40.766, -111.9128], [40.7664, -111.9126], [40.7677, -111.912], [40.7677, -111.912], [40.769, -111.9115], [40.7691, -111.9114], [40.7693, -111.9113], [40.7694, -111.9113], [40.7705, -111.9108], [40.771, -111.9106], [40.771, -111.9106], [40.7715, -111.9105], [40.7716, -111.9104], [40.7719, -111.9104], [40.7723, -111.9103], [40.7733, -111.9102], [40.7733, -111.9102], [40.7737, -111.9102], [40.7739, -111.9102], [40.7748, -111.9102], [40.7755, -111.9102], [40.7755, -111.9102], [40.7758, -111.9103], [40.776, -111.9103], [40.7762, -111.9103], [40.7774, -111.9103], [40.7777, -111.9103], [40.7781, -111.9103], [40.7791, -111.9103], [40.7805, -111.9103], [40.7806, -111.9103], [40.7818, -111.9105], [40.782, -111.9105], [40.7822, -111.9105], [40.7824, -111.9106], [40.7825, -111.9106], [40.7826, -111.9106], [40.7834, -111.911], [40.7834, -111.911], [40.7845, -111.9116], [40.7847, -111.9118], [40.7858, -111.9124], [40.786, -111.9125], [40.7866, -111.9129], [40.7867, -111.913], [40.7873, -111.9134], [40.7886, -111.9143], [40.7897, -111.915], [40.7899, -111.9151], [40.7911, -111.9157], [40.7913, -111.9158], [40.7927, -111.9163], [40.793, -111.9164], [40.794, -111.9168]], [[40.794, -111.9168], [40.7944, -111.917], [40.7946, -111.9171], [40.7954, -111.9174], [40.7961, -111.9176], [40.7968, -111.918], [40.7975, -111.9183]], [[40.7209, -111.9043], [40.721, -111.9042], [40.7213, -111.9042], [40.7217, -111.9042], [40.722, -111.9042], [40.7222, -111.9042], [40.7223, -111.9042], [40.7223, -111.9042], [40.7224, -111.9042], [40.7224, -111.9042], [40.7226, -111.9042], [40.7237, -111.9042], [40.7244, -111.9042], [40.725, -111.9042]], [[40.7179, -111.9043], [40.718, -111.9043], [40.7182, -111.9043], [40.7184, -111.9043], [40.7185, -111.9043], [40.7185, -111.9043], [40.7194, -111.9043], [40.7196, -111.9043], [40.7205, -111.9043], [40.7209, -111.9043]], [[40.6741, -111.9013], [40.6742, -111.9013], [40.6744, -111.9013], [40.6745, -111.9013], [40.6745, -111.9013], [40.6746, -111.9014], [40.6748, -111.9014], [40.6748, -111.9014], [40.6757, -111.9014], [40.6762, -111.9015], [40.6768, -111.9016], [40.6775, -111.9016], [40.6776, -111.9016], [40.6791, -111.9018], [40.68, -111.9019], [40.6805, -111.902], [40.6818, -111.9022], [40.682, -111.9022], [40.6832, -111.9022], [40.6834, -111.9023], [40.6836, -111.9023], [40.6849, -111.9025], [40.6858, -111.9026], [40.6863, -111.9026], [40.6867, -111.9027], [40.6878, -111.9028], [40.6892, -111.903], [40.6897, -111.903], [40.6904, -111.9031], [40.6906, -111.9031], [40.6908, -111.9031], [40.691, -111.9031], [40.6916, -111.9031], [40.6919, -111.903], [40.6921, -111.903], [40.6924, -111.9029], [40.6929, -111.9028], [40.6931, -111.9027], [40.6935, -111.9025], [40.6935, -111.9025], [40.6939, -111.9024], [40.6941, -111.9023], [40.6944, -111.9022], [40.6944, -111.9022], [40.6949, -111.902], [40.6951, -111.902], [40.6956, -111.9018], [40.6957, -111.9018], [40.6961, -111.9017], [40.6963, -111.9017], [40.6964, -111.9017], [40.6965, -111.9016], [40.6974, -111.9016], [40.6978, -111.9016], [40.6979, -111.9016], [40.6983, -111.9016], [40.6986, -111.9017], [40.6989, -111.9017], [40.6992, -111.9018], [40.6993, -111.9018], [40.6994, -111.9018], [40.6994, -111.9018], [40.6998, -111.902], [40.7001, -111.9021], [40.7003, -111.9022], [40.7008, -111.9023], [40.7022, -111.9028], [40.7025, -111.903], [40.7032, -111.9032], [40.7036, -111.9033], [40.7039, -111.9034], [40.7043, -111.9035], [40.7046, -111.9035], [40.705, -111.9035], [40.7052, -111.9035], [40.7059, -111.9035], [40.7064, -111.9035], [40.7074, -111.9036], [40.7079, -111.9036], [40.7093, -111.9037], [40.7096, -111.9037], [40.7102, -111.9037], [40.7108, -111.9038], [40.7115, -111.9038], [40.7118, -111.9039], [40.7122, -111.9039], [40.7125, -111.9039], [40.7126, -111.904], [40.713, -111.904], [40.7137, -111.904], [40.715, -111.9041], [40.7151, -111.9041], [40.7165, -111.9042], [40.717, -111.9043], [40.7177, -111.9043], [40.7178, -111.9043], [40.7179, -111.9043]], [[40.6671, -111.9012], [40.6674, -111.9012], [40.6674, -111.9012], [40.6675, -111.9012], [40.669, -111.9012], [40.6691, -111.9012], [40.6704, -111.9012], [40.6708, -111.9012], [40.6714, -111.9012], [40.6718, -111.9012], [40.6733, -111.9013], [40.6741, -111.9013]], [[40.6618, -111.9012], [40.6621, -111.9012], [40.6632, -111.9012], [40.6647, -111.9012], [40.6661, -111.9012], [40.6671, -111.9012]], [[40.6575, -111.9013], [40.6582, -111.9012], [40.6589, -111.9012], [40.6601, -111.9012], [40.6604, -111.9012], [40.6607, -111.9012], [40.6618, -111.9012]], [[40.6561, -111.9014], [40.6575, -111.9013]], [[40.6364, -111.9046], [40.6367, -111.9045], [40.6372, -111.9043], [40.6372, -111.9043], [40.638, -111.904], [40.6385, -111.9038], [40.6386, -111.9038], [40.6388, -111.9036], [40.6393, -111.9035], [40.6399, -111.9032], [40.64, -111.9032], [40.6406, -111.9031], [40.6414, -111.9029], [40.6419, -111.9028], [40.6426, -111.9028], [40.6427, -111.9028], [40.6429, -111.9027], [40.6429, -111.9027], [40.643, -111.9027], [40.6442, -111.9026], [40.6457, -111.9025], [40.646, -111.9024], [40.6466, -111.9024], [40.6471, -111.9023], [40.6484, -111.9022], [40.6498, -111.9021], [40.6499, -111.9021], [40.6512, -111.9019], [40.6518, -111.9018], [40.6526, -111.9018], [40.6528, -111.9018], [40.6534, -111.9017], [40.654, -111.9016], [40.6543, -111.9016], [40.6547, -111.9016], [40.6548, -111.9016], [40.6549, -111.9016], [40.6554, -111.9015], [40.6554, -111.9015], [40.6561, -111.9014]], [[40.6358, -111.9047], [40.6359, -111.9047], [40.6362, -111.9046], [40.6364, -111.9046], [40.6364, -111.9046]], [[40.635, -111.9048], [40.6352, -111.9048], [40.6358, -111.9047]]]}, {"kind": "ped", "road": "I-215", "loc": "West Valley City", "cty": "Salt Lake", "lat": 40.677, "lon": -111.9102, "n": 8, "e": [[40.7188, -111.9512], [40.7085, -111.9512], [40.691, -111.9519], [40.6714, -111.9458], [40.6543, -111.9337], [40.6382, -111.8936], [40.6547, -111.8474], [40.6639, -111.8135]], "mi": 20.5, "permi": 0.4, "marks": [[40.63396, -111.83088], [40.68202, -111.95137], [40.68782, -111.95139], [40.73426, -111.94955], [40.6939, -111.79616], [40.7033, -111.95281], [40.63632, -111.91529], [40.64446, -111.93451]], "geom": [[[40.6302, -111.8641], [40.6302, -111.865], [40.6303, -111.8659], [40.6303, -111.866], [40.6302, -111.8679], [40.6302, -111.8692], [40.6302, -111.8698], [40.6302, -111.8711], [40.6302, -111.8717], [40.6302, -111.8721], [40.6302, -111.8725], [40.6302, -111.8736], [40.6302, -111.8737], [40.6303, -111.8744], [40.6304, -111.8752], [40.6304, -111.8755], [40.6304, -111.8759], [40.6305, -111.8766], [40.6306, -111.8773], [40.6306, -111.8774], [40.6308, -111.8793], [40.631, -111.8812], [40.631, -111.8813], [40.6311, -111.8829], [40.6312, -111.8831], [40.6314, -111.885], [40.6314, -111.8853], [40.6316, -111.8868], [40.6317, -111.8878], [40.6318, -111.8885], [40.6318, -111.8887], [40.6319, -111.8892], [40.632, -111.8896], [40.632, -111.8896], [40.6321, -111.8901], [40.6322, -111.8906], [40.6324, -111.891], [40.6328, -111.8917], [40.633, -111.8921], [40.6332, -111.8925], [40.6338, -111.8935], [40.6339, -111.8936], [40.6341, -111.894], [40.6344, -111.8948], [40.6346, -111.8953], [40.6348, -111.8959], [40.6349, -111.8965], [40.635, -111.8971], [40.635, -111.8971], [40.635, -111.8979], [40.6351, -111.8986], [40.6352, -111.899], [40.6352, -111.8992], [40.6352, -111.8997], [40.6353, -111.9003], [40.6354, -111.9007], [40.6355, -111.9009], [40.6357, -111.9017], [40.636, -111.9027], [40.636, -111.903], [40.6361, -111.9034], [40.6362, -111.904], [40.6362, -111.9043], [40.6362, -111.9045], [40.6362, -111.9046], [40.6362, -111.9054], [40.6362, -111.906], [40.6362, -111.9064], [40.6362, -111.9065], [40.6362, -111.9069], [40.6361, -111.9083], [40.6361, -111.9086], [40.6361, -111.9091], [40.6361, -111.9095], [40.6361, -111.9099], [40.6362, -111.9102], [40.6362, -111.9103], [40.6363, -111.9119], [40.6363, -111.9121], [40.6363, -111.9123], [40.6365, -111.9137], [40.6365, -111.914], [40.6366, -111.9149], [40.6367, -111.9158], [40.6367, -111.9159], [40.6368, -111.9165], [40.6369, -111.9171], [40.6371, -111.9177], [40.6371, -111.9178], [40.6372, -111.9182], [40.6375, -111.9191], [40.6377, -111.9195], [40.6377, -111.9196], [40.638, -111.9202], [40.6381, -111.9205], [40.6382, -111.9207], [40.6384, -111.9211], [40.6385, -111.9213], [40.6387, -111.9217], [40.6389, -111.922], [40.639, -111.9221], [40.6393, -111.9226], [40.6393, -111.9226], [40.6396, -111.923], [40.6399, -111.9233], [40.6404, -111.9239], [40.6404, -111.9239], [40.6409, -111.9244], [40.6415, -111.9251], [40.6425, -111.926], [40.6427, -111.9262], [40.6427, -111.9263], [40.6431, -111.9267], [40.6434, -111.9273], [40.6436, -111.9276], [40.6437, -111.9278], [40.6439, -111.9283], [40.6443, -111.9291], [40.6443, -111.9293], [40.6444, -111.9297], [40.6446, -111.9303], [40.6447, -111.931], [40.6447, -111.9311], [40.6448, -111.9314], [40.6448, -111.9319], [40.6448, -111.932], [40.6448, -111.9322], [40.6448, -111.9325], [40.6448, -111.9329], [40.6448, -111.933], [40.6448, -111.935], [40.6448, -111.936], [40.6448, -111.9369], [40.6448, -111.938], [40.6448, -111.9385], [40.6448, -111.9385], [40.6448, -111.9388], [40.6448, -111.9388], [40.6448, -111.9392], [40.6448, -111.9398], [40.6448, -111.9407], [40.6448, -111.9411], [40.6448, -111.9414], [40.6449, -111.9421], [40.6449, -111.9426], [40.6449, -111.9426], [40.645, -111.9431], [40.6451, -111.9437], [40.6452, -111.9444], [40.6453, -111.9444], [40.6454, -111.9451], [40.6458, -111.9462], [40.6458, -111.9462], [40.646, -111.9468], [40.6463, -111.9472], [40.6466, -111.9478], [40.6466, -111.9479], [40.6469, -111.9484], [40.6472, -111.9488], [40.6475, -111.9492], [40.6476, -111.9492], [40.6477, -111.9494], [40.648, -111.9497], [40.6482, -111.9499], [40.6484, -111.9501], [40.6487, -111.9504], [40.6487, -111.9504], [40.6489, -111.9506], [40.6493, -111.9509], [40.6496, -111.9511], [40.6499, -111.9513], [40.6504, -111.9516], [40.6509, -111.9519], [40.6513, -111.952]], [[40.6513, -111.952], [40.6514, -111.952], [40.6519, -111.9522], [40.6522, -111.9523], [40.6526, -111.9523], [40.6527, -111.9523], [40.6528, -111.9524], [40.653, -111.9524], [40.6532, -111.9524], [40.6535, -111.9524], [40.6541, -111.9524], [40.6556, -111.9524], [40.657, -111.9524], [40.6578, -111.9524], [40.6585, -111.9524], [40.6599, -111.9524], [40.6611, -111.9524], [40.6614, -111.9524], [40.6628, -111.9524], [40.6643, -111.9524], [40.6647, -111.9524], [40.6657, -111.9524], [40.6672, -111.9524], [40.6673, -111.9524], [40.6673, -111.9524], [40.6675, -111.9524], [40.6676, -111.9524], [40.6677, -111.9524], [40.6678, -111.9524], [40.6679, -111.9524], [40.6686, -111.9524], [40.6701, -111.9524], [40.671, -111.9524], [40.6715, -111.9524], [40.673, -111.9524], [40.6744, -111.9524], [40.675, -111.9524], [40.6756, -111.9523], [40.6759, -111.9523], [40.6763, -111.9523], [40.6773, -111.9521], [40.6774, -111.952], [40.6788, -111.9518], [40.6793, -111.9517], [40.68, -111.9516], [40.6802, -111.9515], [40.6806, -111.9515], [40.6812, -111.9514], [40.6816, -111.9514], [40.6819, -111.9513], [40.6821, -111.9513], [40.6831, -111.9513], [40.6835, -111.9513], [40.6845, -111.9513], [40.6849, -111.9513], [40.686, -111.9513], [40.6864, -111.9514], [40.6874, -111.9514], [40.6887, -111.9515], [40.6889, -111.9516], [40.6892, -111.9516], [40.6894, -111.9516], [40.6895, -111.9516], [40.6903, -111.9517], [40.6913, -111.9518], [40.6918, -111.9518], [40.6923, -111.9518], [40.6932, -111.9519], [40.6935, -111.952], [40.6947, -111.9521], [40.6953, -111.9521], [40.6961, -111.9522], [40.6962, -111.9522]], [[40.6306, -111.8546], [40.6305, -111.856], [40.6304, -111.8565], [40.6304, -111.8569], [40.6303, -111.8584], [40.6302, -111.8591], [40.6302, -111.8603], [40.6302, -111.8604], [40.6302, -111.8614], [40.6302, -111.862], [40.6302, -111.8622], [40.6302, -111.8625], [40.6302, -111.8628], [40.6302, -111.8639], [40.6302, -111.8641]], [[40.7348, -111.9492], [40.7348, -111.9492], [40.736, -111.9492], [40.7362, -111.9492], [40.7365, -111.9492], [40.7377, -111.9492], [40.7378, -111.9492]], [[40.6307, -111.8527], [40.6306, -111.8546]], [[40.6308, -111.8508], [40.6308, -111.8512], [40.6307, -111.8525], [40.6307, -111.8527]], [[40.6805, -111.7985], [40.6803, -111.7985], [40.6798, -111.7988], [40.6792, -111.7993], [40.6788, -111.7995], [40.6785, -111.7997], [40.6779, -111.8002], [40.6778, -111.8002], [40.6766, -111.8011], [40.6754, -111.8021], [40.6752, -111.8022], [40.6745, -111.8027], [40.6745, -111.8027], [40.6743, -111.8029], [40.6741, -111.803], [40.6733, -111.8037], [40.6728, -111.804], [40.6723, -111.8043], [40.672, -111.8046], [40.6716, -111.8049], [40.6709, -111.8053], [40.6708, -111.8054], [40.6702, -111.8055], [40.67, -111.8056], [40.6694, -111.8057], [40.6688, -111.8057], [40.6674, -111.8057], [40.6673, -111.8057], [40.6659, -111.8058], [40.6656, -111.8058], [40.6644, -111.8059], [40.6631, -111.8059], [40.663, -111.806], [40.6624, -111.806], [40.6617, -111.8061], [40.6615, -111.8062], [40.6601, -111.8065], [40.6593, -111.8066], [40.6587, -111.8068], [40.6578, -111.807], [40.6572, -111.8072], [40.6572, -111.8072], [40.6558, -111.8075], [40.6549, -111.8078], [40.6544, -111.8079], [40.6543, -111.8079], [40.654, -111.8079], [40.6531, -111.8081], [40.6529, -111.8081], [40.6523, -111.8082], [40.6515, -111.8082], [40.65, -111.8083], [40.6496, -111.8083], [40.6486, -111.8083], [40.6475, -111.8084], [40.6471, -111.8084], [40.6464, -111.8085], [40.646, -111.8085], [40.6459, -111.8085], [40.6457, -111.8086], [40.6445, -111.8087], [40.6442, -111.8087], [40.6436, -111.8086], [40.6428, -111.8086], [40.6427, -111.8086], [40.6421, -111.8085], [40.6413, -111.8085], [40.6399, -111.8083], [40.6399, -111.8083], [40.6394, -111.8084], [40.6389, -111.8084], [40.6387, -111.8084], [40.6384, -111.8085], [40.6382, -111.8085], [40.6382, -111.8085], [40.6379, -111.8086], [40.6376, -111.8088], [40.6375, -111.8088], [40.6375, -111.8088], [40.6373, -111.8089], [40.6371, -111.8091], [40.637, -111.8091], [40.6369, -111.8092], [40.6367, -111.8094], [40.6364, -111.8096], [40.6361, -111.8099], [40.636, -111.8101], [40.6359, -111.8102], [40.6357, -111.8105], [40.6354, -111.8109], [40.6353, -111.811], [40.6351, -111.8114], [40.635, -111.8116], [40.635, -111.8117], [40.6348, -111.812], [40.6346, -111.8127], [40.6344, -111.8134], [40.6343, -111.8144], [40.6343, -111.8153], [40.6343, -111.8153], [40.6343, -111.8159], [40.6344, -111.8171], [40.6344, -111.8172], [40.6345, -111.8185], [40.6345, -111.8191], [40.6345, -111.8195], [40.6346, -111.8205], [40.6346, -111.821], [40.6346, -111.8222], [40.6346, -111.8229], [40.6345, -111.8245], [40.6345, -111.8247], [40.6345, -111.8248], [40.6345, -111.8264], [40.6345, -111.8267], [40.6345, -111.8273], [40.6345, -111.8279], [40.6345, -111.8284], [40.6344, -111.8286], [40.6344, -111.8289], [40.6343, -111.8292], [40.6343, -111.8295], [40.6341, -111.8302], [40.6341, -111.8305], [40.6338, -111.8314], [40.6336, -111.8323], [40.6332, -111.834], [40.6331, -111.8341], [40.6331, -111.8341], [40.633, -111.8347], [40.6327, -111.8359], [40.6322, -111.8377], [40.6321, -111.838], [40.632, -111.8386], [40.6318, -111.8394], [40.6317, -111.8395], [40.6315, -111.8405], [40.6313, -111.8413], [40.6312, -111.8416], [40.6311, -111.8423], [40.6311, -111.8426], [40.631, -111.8432], [40.631, -111.8436], [40.6309, -111.8443], [40.6309, -111.8451]], [[40.6309, -111.8451], [40.6309, -111.8457], [40.6309, -111.847], [40.6309, -111.848], [40.6309, -111.8489], [40.6309, -111.8496], [40.6308, -111.8508]], [[40.6819, -111.798], [40.6817, -111.798], [40.6814, -111.7981], [40.6808, -111.7983], [40.6805, -111.7985]], [[40.6833, -111.7977], [40.6832, -111.7977], [40.6826, -111.7978], [40.6819, -111.798]], [[40.6948, -111.7964], [40.6937, -111.7965], [40.6934, -111.7966], [40.692, -111.797], [40.692, -111.797], [40.6916, -111.797], [40.6906, -111.7973], [40.6905, -111.7973], [40.6901, -111.7974], [40.6899, -111.7974], [40.6895, -111.7975], [40.6892, -111.7975], [40.6891, -111.7976], [40.6891, -111.7976], [40.6886, -111.7976], [40.688, -111.7977], [40.6876, -111.7977], [40.6873, -111.7976], [40.6873, -111.7976], [40.687, -111.7976], [40.6868, -111.7976], [40.6862, -111.7976], [40.6855, -111.7976], [40.6847, -111.7976], [40.684, -111.7976], [40.6833, -111.7977]], [[40.7034, -111.7954], [40.7023, -111.7953], [40.702, -111.7953], [40.7006, -111.7953], [40.7004, -111.7953], [40.6999, -111.7953], [40.6998, -111.7953], [40.6996, -111.7953], [40.6992, -111.7954], [40.6991, -111.7954], [40.6985, -111.7955], [40.6977, -111.7957], [40.6963, -111.796], [40.6963, -111.796], [40.6949, -111.7963], [40.6948, -111.7964]], [[40.7049, -111.7956], [40.7045, -111.7955], [40.7042, -111.7955], [40.7039, -111.7954], [40.7037, -111.7954], [40.7035, -111.7954], [40.7034, -111.7954]], [[40.7019, -111.9527], [40.7032, -111.9528], [40.7033, -111.9528], [40.7033, -111.9528], [40.7039, -111.9528], [40.7048, -111.9529], [40.7054, -111.953], [40.7062, -111.953], [40.7077, -111.9531], [40.7091, -111.9532], [40.7105, -111.9534], [40.712, -111.9535], [40.7122, -111.9535], [40.7132, -111.9536], [40.7134, -111.9536], [40.7148, -111.9536], [40.7149, -111.9536], [40.7163, -111.9535], [40.7163, -111.9535], [40.7178, -111.9533], [40.7179, -111.9533], [40.7187, -111.9531], [40.7192, -111.953], [40.72, -111.9528], [40.7206, -111.9527], [40.721, -111.9526], [40.722, -111.9522], [40.7222, -111.9522], [40.7233, -111.9517], [40.7234, -111.9517], [40.7246, -111.9512], [40.7248, -111.9511], [40.7249, -111.9511], [40.7249, -111.9511], [40.7251, -111.951], [40.7252, -111.951], [40.7255, -111.9509], [40.7257, -111.9509], [40.7262, -111.9507], [40.7263, -111.9507], [40.7272, -111.9505], [40.7276, -111.9504], [40.7291, -111.9501], [40.7305, -111.9498], [40.7305, -111.9498], [40.7319, -111.9496], [40.7326, -111.9495], [40.7328, -111.9495], [40.7329, -111.9495], [40.7332, -111.9494], [40.7334, -111.9494], [40.7341, -111.9493], [40.7348, -111.9492]], [[40.6975, -111.9523], [40.6977, -111.9523], [40.699, -111.9524], [40.6995, -111.9525], [40.7004, -111.9525], [40.7019, -111.9527]], [[40.6969, -111.9522], [40.6975, -111.9523]], [[40.6963, -111.9522], [40.6964, -111.9522], [40.6967, -111.9522], [40.6969, -111.9522]], [[40.7122, -111.8065], [40.7122, -111.8064], [40.712, -111.8056], [40.7119, -111.8048], [40.7118, -111.8047], [40.7118, -111.8042], [40.7117, -111.8041], [40.7115, -111.8033], [40.7114, -111.8029], [40.7113, -111.8027], [40.7111, -111.8021], [40.7109, -111.8017], [40.7107, -111.8014], [40.7106, -111.8012], [40.7103, -111.8008], [40.7099, -111.8001], [40.7096, -111.7998], [40.7094, -111.7996], [40.7091, -111.7992], [40.709, -111.7991], [40.7088, -111.7988], [40.7086, -111.7985], [40.7082, -111.798], [40.7081, -111.7978], [40.7076, -111.7974], [40.7075, -111.7973], [40.7074, -111.7972], [40.7072, -111.797], [40.7071, -111.7969], [40.7063, -111.7964], [40.7062, -111.7963], [40.7058, -111.796], [40.7052, -111.7957], [40.7049, -111.7956]], [[40.7134, -111.8138], [40.7135, -111.8131], [40.7135, -111.8131], [40.7135, -111.8123], [40.7135, -111.8119], [40.7135, -111.8117], [40.7135, -111.8113], [40.7135, -111.8107], [40.7134, -111.81], [40.7133, -111.81], [40.7132, -111.8093], [40.7129, -111.8084], [40.7128, -111.8082], [40.7125, -111.8074], [40.7122, -111.8065]], [[40.7125, -111.8174], [40.7125, -111.817], [40.7126, -111.8166], [40.7129, -111.8157], [40.7129, -111.8156], [40.7131, -111.815], [40.7131, -111.8149], [40.7133, -111.814], [40.7134, -111.8138]], [[40.7124, -111.8178], [40.7124, -111.8177], [40.7125, -111.8174]], [[40.7124, -111.8185], [40.7124, -111.8182], [40.7124, -111.8178]], [[40.7124, -111.8193], [40.7124, -111.8187], [40.7124, -111.8185]]]}, {"kind": "ped", "road": "UT-173", "loc": "Kearns", "cty": "Salt Lake", "lat": 40.6531, "lon": -111.9801, "n": 7, "e": [[40.6531, -112.015], [40.6531, -112.0138], [40.653, -112.0009], [40.6531, -111.9871], [40.6531, -111.9645], [40.6531, -111.9474], [40.6531, -111.9347]], "mi": 5.1, "permi": 1.4, "marks": [[40.65308, -111.97697], [40.65307, -111.97272], [40.65301, -112.01414], [40.6531, -112.0158], [40.65304, -112.01157], [40.65306, -111.94381], [40.65305, -111.92569]], "geom": [[[40.6531, -112.018], [40.653, -112.0171], [40.6531, -112.0161], [40.6531, -112.016], [40.6531, -112.015], [40.6531, -112.0142], [40.653, -112.0141], [40.6531, -112.0123], [40.6531, -112.0123], [40.6531, -112.0111], [40.653, -112.0104], [40.653, -112.0101], [40.653, -112.0091], [40.653, -112.0087], [40.653, -112.0085], [40.653, -112.0084], [40.6528, -112.0078], [40.6528, -112.0076], [40.6528, -112.0075], [40.6528, -112.0071], [40.6528, -112.0066], [40.6528, -112.0063], [40.6528, -112.0061], [40.6528, -112.0053], [40.6528, -112.0047], [40.6528, -112.0047], [40.6528, -112.0045], [40.6528, -112.0038], [40.6528, -112.0028], [40.6528, -112.0012], [40.6528, -112.0009], [40.6528, -111.999], [40.6528, -111.9974], [40.6528, -111.9971], [40.6528, -111.9964], [40.6528, -111.9952], [40.6528, -111.9941], [40.6528, -111.9934], [40.6528, -111.9929], [40.6528, -111.9917], [40.6528, -111.9914], [40.6528, -111.9895], [40.6528, -111.9893], [40.6528, -111.9877], [40.6528, -111.9877], [40.6528, -111.9875], [40.653, -111.987], [40.653, -111.9869], [40.6531, -111.9862], [40.6531, -111.9858], [40.6531, -111.9839], [40.6531, -111.982], [40.6531, -111.9818], [40.6531, -111.9814], [40.6531, -111.9801], [40.6531, -111.9782], [40.6531, -111.9769], [40.6531, -111.9763], [40.6531, -111.9744], [40.6531, -111.9743], [40.6531, -111.9725], [40.6531, -111.9722], [40.6531, -111.9706], [40.6531, -111.9687], [40.6531, -111.9674], [40.6531, -111.9668], [40.6531, -111.9649], [40.6531, -111.9639], [40.6531, -111.963], [40.6531, -111.9611], [40.6531, -111.9608], [40.6531, -111.9592], [40.6531, -111.9591], [40.6531, -111.9579], [40.6531, -111.9579], [40.6531, -111.9573], [40.6531, -111.9573], [40.6531, -111.9555], [40.6531, -111.9553], [40.6531, -111.9551], [40.653, -111.9534], [40.653, -111.9532], [40.653, -111.9529], [40.653, -111.9527], [40.653, -111.9526], [40.653, -111.9524], [40.6531, -111.9515], [40.6531, -111.9514], [40.6531, -111.9496], [40.6531, -111.9484], [40.6531, -111.9477], [40.6531, -111.9465], [40.6531, -111.9458], [40.6531, -111.9443], [40.6531, -111.9439], [40.6531, -111.943], [40.6531, -111.942], [40.6531, -111.9401], [40.6532, -111.9388], [40.6532, -111.9382], [40.6531, -111.9363], [40.6531, -111.936], [40.6531, -111.9344], [40.6531, -111.9342], [40.6531, -111.9341], [40.6531, -111.9325], [40.653, -111.9306], [40.653, -111.9298], [40.653, -111.9293], [40.653, -111.9287], [40.653, -111.9285], [40.653, -111.9268], [40.653, -111.9259], [40.653, -111.9249], [40.653, -111.9247], [40.6531, -111.9238], [40.6531, -111.9236], [40.6531, -111.9233], [40.6531, -111.923], [40.6531, -111.923], [40.653, -111.9221]], [[40.6531, -112.0183], [40.6531, -112.018]]]}, {"kind": "ped", "road": "UT-71", "loc": "Salt Lake City", "cty": "Salt Lake", "lat": 40.6704, "lon": -111.869, "n": 7, "e": [[40.7562, -111.8711], [40.7417, -111.8712], [40.7067, -111.8694], [40.667, -111.8677], [40.6368, -111.8659], [40.6048, -111.868], [40.5898, -111.869]], "mi": 14.6, "permi": 0.5, "marks": [[40.75413, -111.87104], [40.71266, -111.8713], [40.55743, -111.87223], [40.62213, -111.8658], [40.75834, -111.87111], [40.63487, -111.86586], [40.65337, -111.86599]], "geom": [[[40.5963, -111.8722], [40.5968, -111.8722], [40.5973, -111.8722], [40.5978, -111.8722], [40.5982, -111.8722], [40.5987, -111.8722], [40.5987, -111.8722], [40.5987, -111.8722], [40.5992, -111.8722], [40.5992, -111.8722], [40.6006, -111.8722], [40.6007, -111.8722], [40.6009, -111.8722], [40.601, -111.8722], [40.6021, -111.8722], [40.6027, -111.8722], [40.6036, -111.8722], [40.6036, -111.8722], [40.6041, -111.8722], [40.6045, -111.8722], [40.605, -111.8722], [40.6059, -111.8722], [40.6059, -111.8722], [40.6059, -111.8722], [40.6063, -111.8722], [40.6065, -111.8722], [40.6073, -111.8722], [40.6078, -111.8722], [40.6079, -111.8722], [40.6084, -111.8722], [40.6094, -111.8722], [40.6094, -111.8722], [40.6095, -111.8722], [40.6096, -111.8722], [40.6105, -111.8722], [40.6108, -111.8722], [40.6111, -111.8722], [40.6113, -111.8722], [40.6115, -111.8721], [40.6117, -111.8721], [40.6118, -111.872], [40.612, -111.872], [40.6121, -111.8719], [40.6122, -111.8718], [40.6123, -111.8717], [40.6125, -111.8716], [40.6128, -111.8713], [40.6132, -111.8708], [40.6134, -111.8706], [40.6138, -111.87], [40.6144, -111.8693], [40.6145, -111.8692], [40.615, -111.8686], [40.6155, -111.868], [40.6156, -111.8678], [40.616, -111.8673], [40.6162, -111.8671], [40.6164, -111.867], [40.6166, -111.8668], [40.6167, -111.8667], [40.6168, -111.8667], [40.6171, -111.8665], [40.6172, -111.8664], [40.6175, -111.8663], [40.6179, -111.8662], [40.618, -111.8662], [40.6182, -111.8661], [40.6185, -111.8661], [40.6194, -111.866], [40.62, -111.866], [40.6202, -111.866], [40.6208, -111.866], [40.6214, -111.866], [40.6222, -111.866], [40.6223, -111.866], [40.6234, -111.866], [40.6237, -111.866], [40.6239, -111.866], [40.6247, -111.866], [40.6252, -111.866], [40.6252, -111.866], [40.6266, -111.8659], [40.6267, -111.8659], [40.6268, -111.8659], [40.6275, -111.8659], [40.628, -111.8659], [40.6281, -111.8659], [40.6288, -111.8659], [40.6289, -111.8659], [40.6295, -111.8659], [40.6295, -111.8659], [40.6295, -111.8659], [40.63, -111.8659], [40.6301, -111.8659], [40.6305, -111.8659], [40.631, -111.8659], [40.6315, -111.866], [40.6324, -111.866], [40.6336, -111.8659], [40.6339, -111.8659], [40.6353, -111.8659], [40.6364, -111.8659], [40.6368, -111.8659], [40.6382, -111.866], [40.6382, -111.866], [40.6385, -111.866], [40.6386, -111.866], [40.6392, -111.866], [40.6395, -111.866], [40.6397, -111.866], [40.64, -111.866], [40.6402, -111.866], [40.6406, -111.8659], [40.6409, -111.8659], [40.6411, -111.8659], [40.6412, -111.8659], [40.6421, -111.8659], [40.6426, -111.8659], [40.6438, -111.8659], [40.644, -111.8659], [40.6443, -111.866], [40.645, -111.866], [40.6455, -111.866], [40.646, -111.8659], [40.6469, -111.8659], [40.6477, -111.8659], [40.6484, -111.8659], [40.6496, -111.8659], [40.6498, -111.8659], [40.6513, -111.8659], [40.6527, -111.8659], [40.6536, -111.8659], [40.6542, -111.8659], [40.6543, -111.8659], [40.6553, -111.8659], [40.6556, -111.8659], [40.657, -111.8659], [40.657, -111.8659], [40.6576, -111.8659], [40.6581, -111.8659], [40.6585, -111.8659], [40.6589, -111.866], [40.6591, -111.8659], [40.6594, -111.8659], [40.6599, -111.8658], [40.6599, -111.8658], [40.66, -111.8657], [40.6613, -111.8651], [40.6616, -111.865], [40.6621, -111.8648], [40.6624, -111.8647], [40.6627, -111.8646], [40.6628, -111.8646], [40.663, -111.8646], [40.6634, -111.8646], [40.6635, -111.8646], [40.6641, -111.8646], [40.6643, -111.8647], [40.6656, -111.8648], [40.6657, -111.8649], [40.666, -111.8665], [40.666, -111.8666], [40.6662, -111.8675], [40.6664, -111.8682], [40.6664, -111.8684]], [[40.6664, -111.8684], [40.6665, -111.8687], [40.6666, -111.8691], [40.6668, -111.8695], [40.667, -111.8698], [40.6672, -111.87], [40.6675, -111.8705], [40.6677, -111.8707], [40.668, -111.8709], [40.6683, -111.8712], [40.6683, -111.8712], [40.6687, -111.8713], [40.6689, -111.8714], [40.6695, -111.8715], [40.6698, -111.8715], [40.6698, -111.8715], [40.6702, -111.8715], [40.6709, -111.8715], [40.6712, -111.8715], [40.6714, -111.8715], [40.672, -111.8715], [40.6722, -111.8715], [40.6727, -111.8715], [40.6733, -111.8714], [40.6741, -111.8714], [40.6743, -111.8714], [40.6754, -111.8714], [40.6755, -111.8714], [40.6756, -111.8714], [40.6771, -111.8714], [40.6771, -111.8714], [40.6778, -111.8714], [40.6783, -111.8714], [40.6785, -111.8714], [40.679, -111.8714], [40.6795, -111.8714], [40.6799, -111.8714], [40.68, -111.8714], [40.6812, -111.8714], [40.6814, -111.8714], [40.6819, -111.8714], [40.6821, -111.8714], [40.6824, -111.8714], [40.6828, -111.8714], [40.6831, -111.8714], [40.6843, -111.8714], [40.6857, -111.8714], [40.6871, -111.8714], [40.6872, -111.8714], [40.6886, -111.8714], [40.6901, -111.8714], [40.6904, -111.8714], [40.6912, -111.8714], [40.6915, -111.8714], [40.6923, -111.8713], [40.6927, -111.8713], [40.6927, -111.8713], [40.693, -111.8713], [40.6931, -111.8713], [40.6934, -111.8713], [40.6944, -111.8713], [40.6946, -111.8713], [40.6951, -111.8714], [40.6954, -111.8714], [40.6959, -111.8714], [40.6964, -111.8713], [40.6969, -111.8713], [40.6973, -111.8713], [40.6975, -111.8713], [40.6978, -111.8713], [40.6988, -111.8713], [40.6999, -111.8713], [40.7002, -111.8713], [40.7007, -111.8713], [40.7013, -111.8713], [40.7015, -111.8713], [40.7017, -111.8713], [40.7023, -111.8713], [40.7031, -111.8713], [40.7031, -111.8713], [40.7035, -111.8713], [40.7039, -111.8713], [40.7044, -111.8713], [40.7046, -111.8713], [40.7055, -111.8713], [40.7059, -111.8713], [40.706, -111.8713], [40.7063, -111.8713], [40.7069, -111.8713], [40.7071, -111.8713], [40.7075, -111.8713], [40.7079, -111.8713], [40.7086, -111.8713], [40.7089, -111.8713], [40.709, -111.8713], [40.7094, -111.8713], [40.7099, -111.8713], [40.71, -111.8713], [40.7103, -111.8713], [40.7109, -111.8713], [40.7116, -111.8713], [40.7118, -111.8713], [40.712, -111.8712], [40.7127, -111.8712], [40.7133, -111.8712], [40.7144, -111.8712], [40.7147, -111.8712], [40.7152, -111.8711], [40.7161, -111.8711], [40.7161, -111.8711], [40.7162, -111.8711], [40.7166, -111.8711], [40.7173, -111.8712], [40.7173, -111.8712], [40.7176, -111.8712], [40.7182, -111.8712], [40.7186, -111.8713], [40.7187, -111.8713], [40.7189, -111.8712], [40.719, -111.8712], [40.7193, -111.8712], [40.7199, -111.8712], [40.7199, -111.8712], [40.7205, -111.8712], [40.7219, -111.8711], [40.7222, -111.8711], [40.7233, -111.8711], [40.7234, -111.8711], [40.7248, -111.8711], [40.7254, -111.8711], [40.7263, -111.8711], [40.7267, -111.8711], [40.7276, -111.8711], [40.7277, -111.8711], [40.7278, -111.8711], [40.7285, -111.8711], [40.7292, -111.8711], [40.7295, -111.8711], [40.7303, -111.8711], [40.7304, -111.8711], [40.7306, -111.8711], [40.7313, -111.8711], [40.7318, -111.8711], [40.7321, -111.8711], [40.7322, -111.8711], [40.7335, -111.8711], [40.7336, -111.8711], [40.7345, -111.8711], [40.7348, -111.8711], [40.735, -111.8711], [40.7356, -111.8711], [40.7364, -111.8711], [40.7364, -111.8711], [40.7368, -111.8711], [40.7372, -111.8711], [40.7379, -111.8711], [40.7379, -111.8711], [40.7388, -111.8711], [40.7393, -111.8711]], [[40.7393, -111.8711], [40.7396, -111.8711], [40.74, -111.8711], [40.7408, -111.8711], [40.7416, -111.8711], [40.7422, -111.8711], [40.7433, -111.8711], [40.7437, -111.8711], [40.7443, -111.8711], [40.7451, -111.8711], [40.7457, -111.8711], [40.7465, -111.8711], [40.748, -111.8711], [40.748, -111.8711], [40.7494, -111.8711], [40.7498, -111.8711], [40.7509, -111.8711], [40.752, -111.8711], [40.7524, -111.8711], [40.7538, -111.8711], [40.7541, -111.8711], [40.7552, -111.8711], [40.7553, -111.8711], [40.7563, -111.8711], [40.7567, -111.8711], [40.7582, -111.8711], [40.7585, -111.8711], [40.7596, -111.8711], [40.7597, -111.8711], [40.7607, -111.8711]], [[40.595, -111.8722], [40.5951, -111.8722], [40.5956, -111.8722], [40.5962, -111.8722], [40.5963, -111.8722], [40.5963, -111.8722], [40.5963, -111.8722]], [[40.5543, -111.8722], [40.5551, -111.8722], [40.5554, -111.8722], [40.5555, -111.8722], [40.5557, -111.8722], [40.5572, -111.8722], [40.5575, -111.8722], [40.5586, -111.8722], [40.5587, -111.8722], [40.5588, -111.8722], [40.5588, -111.8722], [40.5601, -111.8721], [40.5604, -111.8721], [40.5608, -111.8721], [40.5615, -111.8721], [40.5617, -111.8721], [40.562, -111.8721], [40.5624, -111.8721], [40.563, -111.8722], [40.5634, -111.8722], [40.5644, -111.8722], [40.5652, -111.8722], [40.5656, -111.8721], [40.5659, -111.8721], [40.566, -111.8721], [40.5673, -111.8721], [40.5679, -111.8721], [40.5687, -111.8721], [40.5687, -111.8721], [40.5688, -111.8721], [40.5691, -111.8721], [40.5692, -111.8721], [40.5701, -111.8722], [40.5702, -111.8722], [40.571, -111.8722], [40.5716, -111.8722], [40.5716, -111.8722], [40.5726, -111.8722], [40.5731, -111.8722], [40.5731, -111.8722], [40.5733, -111.8722], [40.5746, -111.8722], [40.5751, -111.8722], [40.5752, -111.8722], [40.5756, -111.8722], [40.576, -111.8722], [40.5761, -111.8722], [40.5765, -111.8722], [40.577, -111.8722], [40.5772, -111.8722], [40.5774, -111.8722], [40.5774, -111.8722], [40.5782, -111.8722], [40.5789, -111.8722], [40.5792, -111.8722], [40.5804, -111.8722], [40.5806, -111.8722], [40.5806, -111.8722], [40.5807, -111.8722], [40.5818, -111.8722], [40.5833, -111.8722], [40.584, -111.8722], [40.5847, -111.8722], [40.5854, -111.8722], [40.5856, -111.8722], [40.5862, -111.8722], [40.5865, -111.8722], [40.5873, -111.8721], [40.5876, -111.8721], [40.588, -111.8721], [40.5881, -111.8721], [40.5882, -111.8721], [40.5891, -111.8722], [40.5897, -111.8722], [40.5898, -111.8722], [40.5899, -111.8722], [40.5903, -111.8722], [40.5905, -111.8722], [40.5916, -111.8722], [40.5917, -111.8722], [40.5917, -111.8722], [40.592, -111.8722], [40.5934, -111.8722], [40.5937, -111.8722], [40.5938, -111.8722], [40.5938, -111.8722], [40.5942, -111.8722], [40.5949, -111.8722], [40.5949, -111.8722], [40.595, -111.8722]]]}, {"kind": "ped", "road": "UT-126", "loc": "Layton", "cty": "Davis", "lat": 41.0845, "lon": -111.9917, "n": 6, "e": [[41.1066, -112.0146], [41.0974, -112.0055], [41.0825, -111.9916], [41.0757, -111.9828], [41.0716, -111.9779], [41.0688, -111.9747]], "mi": 5.5, "permi": 1.1, "marks": [[41.07083, -111.97681], [41.0913, -112.00323], [41.06678, -111.97254], [41.12196, -112.02599], [41.07908, -111.98735], [41.07724, -111.98432]], "geom": [[[41.1062, -112.0183], [41.1072, -112.0194], [41.1073, -112.0196], [41.1079, -112.0203], [41.1082, -112.0206], [41.1084, -112.0208], [41.1088, -112.0212], [41.1096, -112.022], [41.1108, -112.0232], [41.1109, -112.0233], [41.1119, -112.0244], [41.1125, -112.0249], [41.1128, -112.0251], [41.113, -112.0253], [41.1131, -112.0254], [41.1132, -112.0254], [41.1134, -112.0255], [41.1138, -112.0257], [41.1142, -112.0259], [41.1145, -112.0259], [41.1146, -112.026], [41.1154, -112.026], [41.116, -112.026], [41.1171, -112.026], [41.1172, -112.026], [41.1175, -112.026], [41.1181, -112.026], [41.1189, -112.026], [41.1203, -112.026], [41.1204, -112.026], [41.1211, -112.026], [41.1218, -112.026], [41.1231, -112.026], [41.1233, -112.026], [41.1247, -112.026], [41.1249, -112.026], [41.1253, -112.026], [41.1258, -112.026], [41.1259, -112.026]], [[41.0901, -112.0021], [41.0907, -112.0026], [41.0913, -112.0032], [41.0914, -112.0033], [41.0921, -112.0041], [41.0924, -112.0043], [41.0928, -112.0047], [41.0936, -112.0054], [41.0947, -112.0066], [41.095, -112.0069], [41.0959, -112.0078], [41.097, -112.0089], [41.0971, -112.0089], [41.0971, -112.009], [41.0981, -112.0099], [41.0982, -112.0101], [41.0992, -112.0111], [41.0993, -112.0111], [41.0994, -112.0112], [41.0995, -112.0113], [41.1005, -112.0124], [41.1017, -112.0135], [41.1027, -112.0146], [41.1029, -112.0147], [41.1035, -112.0153], [41.1036, -112.0153], [41.104, -112.0158], [41.1042, -112.016], [41.1047, -112.0165], [41.1052, -112.017], [41.106, -112.018], [41.1062, -112.0183]], [[41.0889, -112.0009], [41.0892, -112.0012], [41.0901, -112.0021]], [[41.0877, -111.9997], [41.0889, -112.0009]], [[41.0866, -111.9985], [41.0877, -111.9997]], [[41.0815, -111.9914], [41.082, -111.9921], [41.0825, -111.993], [41.0833, -111.9944], [41.0834, -111.9945], [41.0838, -111.9952], [41.0842, -111.9958], [41.0843, -111.9959], [41.0844, -111.996], [41.0845, -111.9962], [41.0852, -111.997], [41.0854, -111.9973], [41.0855, -111.9974], [41.0865, -111.9985], [41.0866, -111.9985]], [[41.0752, -111.9814], [41.0753, -111.9816], [41.0757, -111.9821], [41.076, -111.9825], [41.0761, -111.9826], [41.0763, -111.9829], [41.0769, -111.9839], [41.0772, -111.9843], [41.0778, -111.9853], [41.0787, -111.9868], [41.0788, -111.9869], [41.0794, -111.9879], [41.0797, -111.9884], [41.0806, -111.9899], [41.0815, -111.9914]], [[41.0749, -111.9812], [41.0752, -111.9814]], [[41.0632, -111.969], [41.0635, -111.9693], [41.0638, -111.9696], [41.0644, -111.9701], [41.0647, -111.9704], [41.0649, -111.9706], [41.0657, -111.9714], [41.0659, -111.9716], [41.067, -111.9728], [41.0673, -111.9731], [41.068, -111.9738], [41.0682, -111.9741], [41.0686, -111.9745], [41.0687, -111.9746], [41.0693, -111.9753], [41.0701, -111.9761], [41.0705, -111.9765], [41.0716, -111.9777], [41.0717, -111.9777], [41.0727, -111.9789], [41.0738, -111.98], [41.0747, -111.9809], [41.0748, -111.9811], [41.0749, -111.9812]]]}, {"kind": "ped", "road": "UT-204", "loc": "Ogden", "cty": "Weber", "lat": 41.2381, "lon": -111.9784, "n": 5, "e": [[41.2176, -111.9789], [41.2255, -111.9788], [41.2355, -111.9785], [41.2517, -111.9781], [41.2569, -111.9779]], "mi": 4.1, "permi": 1.2, "marks": [[41.22075, -111.97886], [41.21448, -111.979], [41.24136, -111.9785], [41.26962, -111.97757], [41.24424, -111.97824]], "geom": [[[41.2651, -111.9778], [41.2665, -111.9777], [41.2668, -111.9777], [41.268, -111.9777], [41.2695, -111.9776], [41.2699, -111.9776], [41.271, -111.9776], [41.2713, -111.9777]], [[41.2607, -111.9779], [41.2609, -111.9778], [41.2622, -111.9778], [41.2625, -111.9778], [41.2636, -111.9778], [41.2642, -111.9778], [41.2647, -111.9778], [41.2651, -111.9778]], [[41.2564, -111.9779], [41.2564, -111.9779], [41.2578, -111.9779], [41.2593, -111.9779], [41.2593, -111.9779], [41.2607, -111.9779]], [[41.2549, -111.978], [41.2552, -111.978], [41.2564, -111.9779]], [[41.2448, -111.9782], [41.2451, -111.9782], [41.2462, -111.9782], [41.2463, -111.9782], [41.2466, -111.9782], [41.2477, -111.9781], [41.2487, -111.9781], [41.2492, -111.9781], [41.2506, -111.9781], [41.2518, -111.978], [41.252, -111.978], [41.2523, -111.978], [41.253, -111.978], [41.2535, -111.978], [41.2538, -111.978], [41.2549, -111.978]], [[41.2115, -111.9791], [41.2117, -111.9791], [41.2124, -111.9791], [41.213, -111.979], [41.2144, -111.979], [41.2145, -111.979], [41.2156, -111.979], [41.2157, -111.979], [41.2159, -111.979], [41.2166, -111.979], [41.2173, -111.9789], [41.2176, -111.9789], [41.2178, -111.9789], [41.2187, -111.9789], [41.2188, -111.9789], [41.2196, -111.9789], [41.2202, -111.9789], [41.2208, -111.9789], [41.2215, -111.9788], [41.2217, -111.9788], [41.2229, -111.9788], [41.2231, -111.9788], [41.2246, -111.9788], [41.225, -111.9788], [41.226, -111.9788], [41.227, -111.9787], [41.2274, -111.9787], [41.2289, -111.9787], [41.2291, -111.9787], [41.2303, -111.9787], [41.2304, -111.9787], [41.2312, -111.9786], [41.2318, -111.9786], [41.2332, -111.9786], [41.2338, -111.9786], [41.2341, -111.9786], [41.2345, -111.9785], [41.2347, -111.9785], [41.235, -111.9785], [41.2361, -111.9785], [41.2368, -111.9785], [41.2376, -111.9785], [41.2379, -111.9785], [41.239, -111.9784], [41.2405, -111.9784], [41.2414, -111.9784], [41.2419, -111.9784], [41.2425, -111.9784], [41.2433, -111.9783], [41.2436, -111.9783], [41.2442, -111.9782], [41.2448, -111.9782]]]}, {"kind": "ped", "road": "US-89", "loc": "Provo", "cty": "Utah", "lat": 40.2413, "lon": -111.6624, "n": 4, "e": [[40.2551, -111.6711], [40.248, -111.6698], [40.2363, -111.6591], [40.2276, -111.6538]], "mi": 4.3, "permi": 0.9, "marks": [[40.25367, -111.66971], [40.25649, -111.67241], [40.23398, -111.66739], [40.22123, -111.64022]], "geom": [[[40.2178, -111.6375], [40.2186, -111.6382], [40.2187, -111.6382], [40.219, -111.6384], [40.2191, -111.6385], [40.2197, -111.639], [40.2203, -111.6394], [40.2205, -111.6395], [40.2211, -111.64], [40.2215, -111.6403], [40.2215, -111.6403], [40.222, -111.6407], [40.2222, -111.6408], [40.2228, -111.6413], [40.2232, -111.6416], [40.2233, -111.6417], [40.224, -111.6422], [40.2251, -111.643], [40.2252, -111.6431], [40.2253, -111.6432], [40.2261, -111.6437], [40.2265, -111.6441], [40.227, -111.6445], [40.2278, -111.645], [40.2283, -111.6454], [40.2284, -111.6455], [40.229, -111.646], [40.2292, -111.6461], [40.2294, -111.6463], [40.2296, -111.6465], [40.2296, -111.6466], [40.2296, -111.6474], [40.2296, -111.6483], [40.2296, -111.6492], [40.2296, -111.65], [40.2297, -111.6511], [40.2297, -111.6517], [40.2297, -111.653], [40.2297, -111.6535], [40.2297, -111.6548], [40.2297, -111.6552], [40.2297, -111.6567], [40.2297, -111.6569], [40.2297, -111.6585], [40.2297, -111.6587], [40.2297, -111.6604], [40.2297, -111.6605], [40.2297, -111.6622], [40.2297, -111.6623], [40.2297, -111.664], [40.2297, -111.6642], [40.2297, -111.6657], [40.2297, -111.6661], [40.2297, -111.6675], [40.2297, -111.6675], [40.2301, -111.6675], [40.231, -111.6675], [40.2315, -111.6675], [40.2323, -111.6675], [40.233, -111.6675], [40.2338, -111.6675], [40.2344, -111.6675], [40.2351, -111.6675], [40.2358, -111.6675], [40.2364, -111.6675], [40.2373, -111.6675], [40.2378, -111.6675], [40.2387, -111.6674], [40.2391, -111.6674], [40.2401, -111.6674], [40.2404, -111.6674], [40.2416, -111.6674], [40.2417, -111.6674], [40.243, -111.6674], [40.243, -111.6674], [40.2443, -111.6674], [40.2443, -111.6674], [40.2444, -111.6674], [40.2459, -111.6674], [40.2464, -111.6674], [40.2473, -111.6674], [40.2488, -111.6674], [40.2493, -111.6674], [40.25, -111.6674], [40.2502, -111.6675], [40.2506, -111.6675]], [[40.2574, -111.6733], [40.2586, -111.6744], [40.259, -111.6748], [40.2597, -111.6755], [40.26, -111.6757]], [[40.2523, -111.6686], [40.2526, -111.6689], [40.2527, -111.669], [40.2535, -111.6697], [40.2539, -111.6701], [40.2551, -111.6712], [40.2562, -111.6723], [40.2565, -111.6725], [40.2574, -111.6733]], [[40.2506, -111.6675], [40.2509, -111.6676], [40.2509, -111.6676], [40.2511, -111.6677], [40.2512, -111.6678], [40.2515, -111.6679], [40.2516, -111.668], [40.2517, -111.6681], [40.2518, -111.6682], [40.2523, -111.6686]]]}, {"kind": "ped", "road": "UT-186", "loc": "Salt Lake City", "cty": "Salt Lake", "lat": 40.7549, "lon": -111.8543, "n": 4, "e": [[40.7729, -111.8868], [40.767, -111.8691], [40.7448, -111.8409], [40.7368, -111.8218]], "mi": 8.2, "permi": 0.5, "marks": [[40.78513, -111.8945], [40.7551, -111.83381], [40.76071, -111.87908], [40.71858, -111.80988]], "geom": [[[40.7606, -111.8798], [40.7606, -111.8796], [40.7607, -111.8782], [40.7607, -111.8779], [40.7606, -111.8768], [40.7606, -111.876], [40.7607, -111.874], [40.7607, -111.8739], [40.7607, -111.8722], [40.7607, -111.8711], [40.7607, -111.8702], [40.7607, -111.8684], [40.7607, -111.8682], [40.7607, -111.8666], [40.7607, -111.8664], [40.7607, -111.8653], [40.7607, -111.8645], [40.7607, -111.8636], [40.7606, -111.8632], [40.7606, -111.8629], [40.7605, -111.8627], [40.7605, -111.8627], [40.7604, -111.8626], [40.7602, -111.8626], [40.7599, -111.8625], [40.7596, -111.8625], [40.7592, -111.8624], [40.7591, -111.8623], [40.759, -111.8623], [40.7589, -111.8621], [40.7587, -111.8619], [40.7586, -111.8617], [40.7586, -111.8616], [40.7585, -111.8613], [40.7585, -111.861], [40.7585, -111.8607], [40.7585, -111.8604], [40.7585, -111.8596], [40.7585, -111.8588], [40.7585, -111.8569], [40.7585, -111.8567], [40.7585, -111.8553], [40.7585, -111.855], [40.7585, -111.854], [40.7585, -111.8539], [40.7585, -111.8531], [40.7585, -111.8528], [40.7585, -111.8525], [40.7585, -111.8524], [40.7585, -111.8512], [40.7585, -111.85], [40.7585, -111.8493], [40.7585, -111.8477], [40.7585, -111.8474], [40.7585, -111.8455], [40.7585, -111.8454], [40.7585, -111.844], [40.7585, -111.8436], [40.7585, -111.8417], [40.7585, -111.8414], [40.7585, -111.8414], [40.7585, -111.8408], [40.7585, -111.8398], [40.7585, -111.8397], [40.7584, -111.8393], [40.7584, -111.8388], [40.7583, -111.8385], [40.7582, -111.8381], [40.7581, -111.8378], [40.7581, -111.8377], [40.7579, -111.8373], [40.7578, -111.837], [40.7578, -111.8368], [40.7576, -111.8364], [40.7574, -111.8362], [40.7573, -111.836], [40.7571, -111.8357], [40.7569, -111.8354], [40.7567, -111.8351], [40.7565, -111.835], [40.7564, -111.8348], [40.7562, -111.8346], [40.7556, -111.8341], [40.7551, -111.8337], [40.7551, -111.8337], [40.7546, -111.8333], [40.7538, -111.8328], [40.7525, -111.8318], [40.7514, -111.8308], [40.7513, -111.8308], [40.7511, -111.8307], [40.7508, -111.8307], [40.7507, -111.8307], [40.7498, -111.8307], [40.7498, -111.8307], [40.7496, -111.8307], [40.7487, -111.8307], [40.7484, -111.8307], [40.7478, -111.8307], [40.7469, -111.8306], [40.7466, -111.8306], [40.7459, -111.8305], [40.7457, -111.8304], [40.7455, -111.8303], [40.7455, -111.8303], [40.7454, -111.8303], [40.7449, -111.83], [40.7442, -111.8294], [40.7432, -111.8286], [40.743, -111.8284], [40.7417, -111.8273], [40.7416, -111.8273], [40.7405, -111.8263], [40.7393, -111.8253], [40.739, -111.825], [40.7389, -111.8249], [40.7382, -111.8243], [40.7381, -111.8242], [40.7372, -111.8234], [40.7371, -111.8234], [40.7369, -111.8232], [40.7364, -111.8228], [40.7357, -111.8222], [40.7357, -111.8221], [40.7356, -111.8221], [40.7353, -111.8218], [40.7345, -111.8211], [40.7336, -111.8203], [40.7336, -111.8203], [40.7332, -111.82], [40.7327, -111.8196], [40.7323, -111.8192], [40.732, -111.819], [40.732, -111.819], [40.7312, -111.8184], [40.7308, -111.8182], [40.7307, -111.8181], [40.7304, -111.8179], [40.7302, -111.8178], [40.7301, -111.8177], [40.7294, -111.8173], [40.7283, -111.8165], [40.7281, -111.8164], [40.728, -111.8163], [40.7268, -111.8155], [40.7263, -111.8152], [40.7258, -111.8148], [40.7255, -111.8146], [40.7242, -111.8138], [40.7236, -111.8134], [40.7229, -111.8129]], [[40.7229, -111.8129], [40.7218, -111.812], [40.7217, -111.812], [40.7208, -111.8113], [40.7206, -111.8111], [40.7204, -111.811], [40.7201, -111.8108], [40.7197, -111.8105], [40.7195, -111.8103], [40.7193, -111.8102], [40.7192, -111.8101], [40.7191, -111.8101], [40.7189, -111.8099], [40.7186, -111.8098], [40.7185, -111.8098]], [[40.7606, -111.8817], [40.7606, -111.8812], [40.7606, -111.8798]], [[40.789, -111.898], [40.7887, -111.8977], [40.7884, -111.8975], [40.7882, -111.8973], [40.7874, -111.8966], [40.7871, -111.8964], [40.7865, -111.8958], [40.7862, -111.8956], [40.7859, -111.8953], [40.7858, -111.8953], [40.7855, -111.8949], [40.7852, -111.8945], [40.7848, -111.894], [40.7839, -111.8929], [40.7837, -111.8927], [40.7836, -111.8925], [40.7833, -111.8921], [40.7829, -111.8918], [40.7826, -111.8915], [40.7826, -111.8915], [40.7821, -111.8912], [40.7813, -111.8906], [40.7809, -111.8902], [40.7808, -111.8902], [40.7807, -111.8901], [40.7805, -111.89], [40.7805, -111.89], [40.7804, -111.8899], [40.7799, -111.8899], [40.7799, -111.8899], [40.7799, -111.8899], [40.7799, -111.8899], [40.7797, -111.89], [40.7796, -111.89], [40.7795, -111.89], [40.7794, -111.8901], [40.7793, -111.8902], [40.7792, -111.8902], [40.7791, -111.8903], [40.779, -111.8903], [40.7786, -111.8903], [40.7785, -111.8903], [40.7784, -111.8904], [40.7774, -111.8905], [40.7773, -111.8905], [40.7772, -111.8906], [40.777, -111.8906], [40.776, -111.8911], [40.776, -111.8906], [40.776, -111.8897], [40.776, -111.8886], [40.776, -111.8886], [40.776, -111.8882], [40.7747, -111.8882], [40.7747, -111.8882], [40.7736, -111.8882], [40.7732, -111.8882], [40.7717, -111.8882], [40.7715, -111.8882], [40.7715, -111.8882], [40.771, -111.8882], [40.7709, -111.8882], [40.7706, -111.8882], [40.7703, -111.8882], [40.7702, -111.8882], [40.7694, -111.8882], [40.7688, -111.8882], [40.7682, -111.8882], [40.768, -111.8882], [40.7673, -111.8882], [40.7672, -111.8882], [40.7664, -111.8882], [40.7659, -111.8882], [40.765, -111.8882], [40.7644, -111.8882], [40.7637, -111.8882], [40.7629, -111.8882], [40.7628, -111.8882], [40.762, -111.8882], [40.7615, -111.8882], [40.7614, -111.8882], [40.7606, -111.8882], [40.7606, -111.8874], [40.7606, -111.8865], [40.7606, -111.8855], [40.7606, -111.8854], [40.7606, -111.8846], [40.7606, -111.8838], [40.7606, -111.8836], [40.7607, -111.8825], [40.7606, -111.8817]]]}]}, CITIES=[["Salt Lake City", 40.7472, -111.902, 12], ["West Valley City", 40.6967, -111.9867, 12], ["Ogden", 41.2347, -111.9728, 12], ["Provo", 40.2509, -111.6595, 12], ["West Jordan", 40.6056, -111.9749, 12], ["Spanish Fork", 40.0531, -111.5458, 12], ["Logan", 41.7478, -111.7976, 12], ["South Salt Lake", 40.7028, -111.8999, 12], ["Taylorsville", 40.6607, -111.9497, 12], ["Murray", 40.6526, -111.8852, 12], ["Layton", 41.0834, -111.976, 12], ["Orem", 40.3014, -111.7072, 12], ["Draper", 40.5149, -111.8922, 12], ["Green River", 38.9689, -110.4136, 12], ["St. George", 37.1115, -113.584, 12], ["Cedar City", 37.6799, -113.0603, 12], ["Tooele", 40.5718, -112.3882, 12], ["Heber City", 40.4401, -111.3352, 12], ["Sandy City", 40.5765, -111.8561, 12], ["American Fork", 40.3795, -111.7939, 12], ["Lehi", 40.4109, -111.8722, 12], ["Roy", 41.1672, -112.0392, 12], ["Nephi", 39.687, -111.8818, 12], ["Moab", 38.6403, -109.6029, 12], ["Hurricane", 37.165, -113.3251, 12], ["Clearfield", 41.1069, -112.0173, 12], ["Kearns", 40.654, -112.0117, 12], ["Midvale", 40.6169, -111.8934, 12], ["West Haven", 41.215, -112.0324, 12], ["Washington", 37.1395, -113.5238, 12]];
+const NM_BOUNDS=[[36.998, -114.052], [42.001, -109.042]];
+const map=L.map('map',{attributionControl:true});
+// Fit the whole state. On phones the bottom panel covers the lower screen, so pad
+// the bottom by its height — the state then centers in the VISIBLE area above it.
+function fitState(){
+  const isM=window.matchMedia('(max-width:620px)').matches;
+  const c=document.getElementById('ctrl');
+  const pb=(isM && c && c.offsetParent!==null) ? c.offsetHeight+24 : 12;
+  // desktop: reserve room on the left for the wider legend so the state sits
+  // slightly right of center (not behind it)
+  const padL=isM?12:150;
+  map.fitBounds(NM_BOUNDS,{paddingTopLeft:[padL,12],paddingBottomRight:[12,pb]});
+}
+fitState();   // padded fit up front so the orientation matches the post-load re-fit (no jump)
+map.attributionControl.setPrefix(false);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OSM, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+const canvas=L.canvas({padding:.5});
+const segLayer=L.layerGroup().addTo(map), rhlLayer=L.layerGroup().addTo(map),
+      hlLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map),
+      markLayer=L.layerGroup().addTo(map);
+// the individual deaths that make up a hot spot — yellow ring, red center
+function drawMarks(marks){ markLayer.clearLayers();
+  (marks||[]).forEach(m=>L.circleMarker(m,{radius:5,color:'#ffd11a',weight:2.5,
+    fillColor:'#cb181d',fillOpacity:1,interactive:false}).addTo(markLayer)); }
+function msMsg(t){ const e=document.getElementById('msmsg'); if(e) e.textContent=t||''; }
+function mapSearch(q){
+  q=(q||'').trim().toLowerCase(); if(!q){ msMsg(''); return; }
+  // exact municipality -> center on it (its zoom depends on the place's size)
+  const exact=CITIES.find(c=>c[0].toLowerCase()===q);
+  if(exact){ rhlLayer.clearLayers(); map.setView([exact[1],exact[2]],exact[3]||12); msMsg(''); return; }
+  // otherwise treat as a road/place: highlight the matching segments' real geometry
+  const segs=SEG.filter(s=>((s.lab||'')+' '+(s.loc||'')).toLowerCase().includes(q));
+  if(segs.length){
+    rhlLayer.clearLayers();
+    const bnds=L.latLngBounds([]);
+    segs.forEach(s=>{ L.polyline(s.c,{color:'#1d6fd8',weight:hlWeight(),opacity:.55,interactive:false}).addTo(rhlLayer);
+      s.c.forEach(p=>bnds.extend(p)); });
+    map.fitBounds(bnds,{padding:[45,45],maxZoom:14}); msMsg(''); return;
+  }
+  const city=CITIES.find(c=>c[0].toLowerCase().includes(q));
+  if(city){ rhlLayer.clearLayers(); map.setView([city[1],city[2]],city[3]||12); msMsg(''); return; }
+  geocodeAddr(q);   // not a known road/town — try a street address (centers the map, selects nothing)
+}
+function geocodeAddr(q){
+  msMsg('Searching…');
+  const b=NM_BOUNDS, vb=[b[0][1],b[1][0],b[1][1],b[0][0]].join(',');   // west,north,east,south (viewbox bias)
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&viewbox=${vb}&q=${encodeURIComponent(q)}`)
+    .then(r=>r.json()).then(j=>{
+      if(j&&j.length){ rhlLayer.clearLayers(); map.setView([+j[0].lat,+j[0].lon],14); msMsg(''); }
+      else msMsg(`No match for “${q}”. Try a community, a major road, or a full street address.`);
+    }).catch(()=>msMsg(`Couldn’t look up “${q}”. Try a community or major road.`));
+}
+function hlWeight(){ return segWeight().hit*2.0 + 5; }   // translucent highlight, fatter than the route
+// light up THIS segment's own fatal crashes (yellow ring); on a share layer, only
+// the crashes of that type (e.g. just the alcohol-involved deaths on the stretch)
+function highlightSegCrashes(i){ markLayer.clearLayers();
+  const mt=MAPTYPES[maptype];
+  for(const c of CR){ if(c.sg!==i) continue;
+    if(c.y<y0||c.y>y1||!inCat(c.pc)) continue;
+    if(mt.share){ if(mt.since&&c.y<mt.since) continue; if(!c[mt.crkey]) continue; }
+    L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k)+3.5,color:'#ffd11a',
+      weight:2.5,fillColor:'#cb181d',fillOpacity:1,interactive:false}).addTo(markLayer);
+  }
+}
+function highlightSeg(i){ hlLayer.clearLayers();
+  if(SEG[i]) L.polyline(SEG[i].c,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
+    lineCap:'round',interactive:false}).addTo(hlLayer); }
+function highlightSpot(h){ hlLayer.clearLayers();
+  const lines = (h.geom && h.geom.length) ? h.geom : [h.e];   // real road geometry, else smoothed line
+  lines.forEach(ln=>L.polyline(ln,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
+    lineCap:'round',interactive:false}).addTo(hlLayer)); }
+const RATE_CUTS=[1.3, 2.5, 4.8, 10.4];   // per-state rate color thresholds (scaled to this state's data)
+function rateColor(r,n){ if(!n||r==null) return '#d4d4d4'; const c=RATE_CUTS;
+  return r<c[0]?'#1a9850':r<c[1]?'#a6d96a':r<c[2]?'#fee08b':r<c[3]?'#fdae61':'#d73027'; }
+const DOW=['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function crashPopup(c){
+  let cas=`${c.k} killed`;
+  if(c.inj) cas+=` · ${c.inj} injured`+(c.si?` (${c.si} serious)`:'');
+  let date=[c.dw?DOW[c.dw]:'', `${MON[c.m]||''} ${c.dy||''}, ${c.y}`.trim()].filter(Boolean).join(', ');
+  if(c.hr!=null){ const h=c.hr%12||12; date+=` · ${h} ${c.hr<12?'AM':'PM'}`; }
+  const details=[c.ev, c.d?'alcohol involved':''].filter(Boolean).join(' · ');
+  let html=`<div style="font:13.5px/1.6 -apple-system,Helvetica,Arial"><b>${cas}</b>`
+    +`<br><span style="color:#555">${date}</span>`;
+  if(details) html+=`<br>${details}`;
+  return html+'</div>';
+}
+
+let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all', ptsOff=false, maptype='risk';
+let segPolys=[], ptMarkers=[], curTab='map', syncing=false;
+let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
+
+const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
+const _rc=RATE_CUTS;
+const RATE_BUCKETS=[{lab:'<'+_rc[0],c:RAMP[0]},{lab:_rc[0]+'–'+_rc[1],c:RAMP[1]},{lab:_rc[1]+'–'+_rc[2],c:RAMP[2]},{lab:_rc[2]+'–'+_rc[3],c:RAMP[3]},{lab:_rc[3]+'+',c:RAMP[4]}];
+const COUNT_BUCKETS=[{lab:'1',c:RAMP[0]},{lab:'2–3',c:RAMP[1]},{lab:'4–6',c:RAMP[2]},{lab:'7–10',c:RAMP[3]},{lab:'11+',c:RAMP[4]}];
+function rateBucket(r){ const c=RATE_CUTS; return r<c[0]?0:r<c[1]?1:r<c[2]?2:r<c[3]?3:4; }
+function countBucket(n){ return n<=1?0:n<=3?1:n<=6?2:n<=10?3:4; }
+function curBuckets(){ return histMode==='rate'?RATE_BUCKETS:COUNT_BUCKETS; }
+// Trend of risk over the FULL period (2001–2024) in 5-year bands, category-filtered.
+// AADT is constant per segment, so rate-trend == crash-count-trend. Slope sign of
+// counts vs band index; needs >=4 crashes to call, else 'na'.
+function trendOf(s){
+  const b=[0,0,0,0,0];
+  s.cr.forEach(a=>{ if(!inCat(a[1])) return; const y=a[0];
+    b[y<=2005?0:y<=2010?1:y<=2015?2:y<=2020?3:4]++; });
+  if(b[0]+b[1]+b[2]+b[3]+b[4]<4) return 'na';
+  let slope=0; for(let x=0;x<5;x++) slope+=(x-2)*b[x]; slope/=10;
+  return slope>=0.25?'up':slope<=-0.25?'down':'flat';
+}
+function inCat(pc){ return cat==='all' ? true : (cat==='ped'? pc===1 : pc===0); }
+function sel(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&inCat(a[1])); }
+// Route COLORING uses all crashes in the window (overall risk) — independent of the
+// crash-type toggle, which only filters the dots. Routes never recolor on toggle.
+function selWin(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1); }
+function pedN(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&a[1]===1).length; }
+function rateOf(s,n,ny){ const vmt=s.a*365*ny*s.l; return vmt? n/vmt*1e8 : null; }
+function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehicle ':''; }
+
+// ---------- map types ----------
+// 'risk' = the fatal-crash rate (needs AADT). The others color each segment by the
+// SHARE of its crashes with a given trait (composition, AADT-independent).
+// cr per-crash array layout: [year, pc, alcohol, night, intersection, weather]
+const MAPTYPES={
+  risk:{lab:'Fatal crash risk'},
+  alc :{lab:'Alcohol involvement', share:1, fi:2, crkey:'d',  metric:'alcohol-involved', avg:'involving alcohol', dot:'alcohol-involved crashes',
+        note:'Recent-year alcohol involvement is under-counted.'},
+  nt  :{lab:'Nighttime crashes',   share:1, fi:3, crkey:'nt', metric:'at night', avg:'at night', dot:'nighttime crashes'},
+  ix  :{lab:'Deadly intersections',share:1, fi:4, crkey:'ix', since:2010, metric:'at an intersection', avg:'at intersections', dot:'intersection crashes',
+        note:'Based on 2010–2024 data only.'},
+  wx  :{lab:'Adverse weather',     share:1, fi:5, crkey:'wx', metric:'in adverse weather', avg:'in adverse weather', dot:'adverse-weather crashes'},
+};
+const SHARE_RAMP=['#f7fcfd','#bfd3e6','#8c96c6','#8856a7','#810f7c'];   // sequential (distinct from the rate ramp)
+const MINSHARE=4;   // need >=this many crashes in the window for a stable share
+function _hx(c){ return [parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)]; }
+function ramp(stops,t){ t=Math.max(0,Math.min(1,t||0)); const x=t*(stops.length-1),
+  i=Math.min(stops.length-2,Math.floor(x)), f=x-i, a=_hx(stops[i]), b=_hx(stops[i+1]);
+  return '#'+[0,1,2].map(j=>Math.round(a[j]+(b[j]-a[j])*f).toString(16).padStart(2,'0')).join(''); }
+function shareOf(s){ const mt=MAPTYPES[maptype], fi=mt.fi, since=mt.since||0; let num=0,den=0;
+  for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; if(since&&a[0]<since) continue; den++; if(a[fi]) num++; }
+  return den>=MINSHARE ? {share:num/den, n:den, k:num} : null; }
+function segHasData(s){ return MAPTYPES[maptype].share ? !!shareOf(s) : selWin(s).length>0; }
+function segColor(s,maxShare){
+  if(MAPTYPES[maptype].share){ const r=shareOf(s); return r? ramp(SHARE_RAMP, maxShare? r.share/maxShare:0) : '#dcdcdc'; }
+  const ny=y1-y0+1, n=selWin(s).length; return rateColor(rateOf(s,n,ny), n); }
+
+// ---------- map ----------
+function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
+  // Consistent regardless of the crash toggle — routes don't change when crashes hide.
+  return {hit:1.8+5.0*f, miss:0.6+1.0*f}; }   // higher floor so roads read at low (mobile) zoom
+// crash dots: tiny at statewide zoom (so they don't blob together), bigger as you zoom in
+function crashZ(){ return Math.max(0,Math.min(1,(map.getZoom()-6)/8)); }
+function crashR(k){ return 0.8+2.6*crashZ()+(k-1)*0.9; }
+function crashW(){ return 0.35+0.65*crashZ(); }
+function segTip(i){ const s=SEG[i], mt=MAPTYPES[maptype];
+  let body;
+  if(mt.share){ const r=shareOf(s);
+    body = r ? `<b>${Math.round(100*r.share)}%</b> of its ${r.n} fatal crashes were ${mt.metric}`
+             : `too few crashes to compare (under ${MINSHARE})`;
+  } else { const ny=y1-y0+1, n=selWin(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
+    body = `${s.l.toFixed(1)} miles with AADT ${s.a.toLocaleString()} · ${n} fatal crash${n===1?'':'es'}`
+      +(pc?` (${pc} ped/bike)`:'')+(rate!=null?` · ${rate.toFixed(1)} crashes per 100 million vehicle miles`:''); }
+  return `<div class="segpop"><b>${s.lab}</b>`
+    +`<br>${body}<br><button class="zbtn" onclick="toggleView()"></button></div>`; }
+const BIG_STATE=20000;   // above this many crashes, default the slider to recent years (lighter load)
+function drawCrashes(){
+  ptLayer.clearLayers(); ptMarkers=[];
+  const mt=MAPTYPES[maptype];
+  let nc=0,nk=0;
+  for(const c of CR){
+    if(c.y<y0||c.y>y1||!inCat(c.pc)) continue;
+    if(mt.share){ if(mt.since&&c.y<mt.since) continue; if(!c[mt.crkey]) continue; }
+    nc++; nk+=c.k;
+    if(ptsOff) continue;
+    const m=L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k),color:'#67000d',
+      weight:crashW(),fillColor:'#cb181d',fillOpacity:.85}).bindPopup(crashPopup(c)).addTo(ptLayer);
+    ptMarkers.push([m,c.k]);
+  }
+  document.getElementById('stat').innerHTML = ptsOff ? `Crash points hidden`
+    : mt.share ? `${nc.toLocaleString()} ${catWord()||''}fatal crashes ${mt.avg}`
+    : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
+}
+function drawMap(){
+  const zw=segWeight(), mt=MAPTYPES[maptype];
+  let maxShare=0;
+  if(mt.share) SEG.forEach(s=>{ const r=shareOf(s); if(r&&r.share>maxShare) maxShare=r.share; });
+  segLayer.clearLayers(); segPolys=[];
+  SEG.forEach((s,i)=>{
+    const has=segHasData(s);
+    const pl=L.polyline(s.c,{color:segColor(s,maxShare),weight:has?zw.hit:zw.miss,opacity:.85})
+      .bindPopup(segTip(i)).on('popupopen',()=>{ detail={t:'seg',i}; atState=(map.getZoom()<=8); highlightSeg(i); highlightSegCrashes(i); zbtnText(); });
+    pl.addTo(segLayer); segPolys[i]=pl;
+  });
+  document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
+  drawCrashes();
+  updateLegend(maxShare);
+}
+function riskLegendHtml(){
+  const c=RATE_CUTS;
+  return `<b class="lgttl">Fatal crashes per 100M vehicle-miles</b>`
+    +`<div class="lgscale"><span class="sw" style="background:#1a9850;margin-left:0"></span>&lt;${c[0]}`
+    +`<span class="sw" style="background:#a6d96a"></span>${c[0]}–${c[1]}`
+    +`<span class="sw" style="background:#fee08b"></span>${c[1]}–${c[2]}`
+    +`<span class="sw" style="background:#fdae61"></span>${c[2]}–${c[3]}`
+    +`<span class="sw" style="background:#d73027"></span>${c[3]}+`
+    +`<span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>`
+    +`<div class="muted lgfoot">Crash rate is calculated using 2017 AADT. Sources: crash data from `
+    +`<a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>; `
+    +`AADT from <a href="https://www.fhwa.dot.gov/policyinformation/hpms.cfm" target="_blank" rel="noopener">FHWA HPMS</a>. `
+    +`Address search <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</div>`;
+}
+// Statewide share for the current map type, over CR within the year window (and >=since).
+function statewideAvg(){ const mt=MAPTYPES[maptype]; if(!mt.share) return null;
+  const k=mt.crkey, since=mt.since||0; let num=0,den=0;
+  for(const c of CR){ if(c.y<y0||c.y>y1) continue; if(since&&c.y<since) continue; den++; if(c[k]) num++; }
+  return den? num/den : 0; }
+function updateLegend(maxShare){
+  const el=document.getElementById('legend'); if(!el) return;
+  const mt=MAPTYPES[maptype];
+  // The "what you're seeing" note (#risknote, above the legend) is relevant ONLY to
+  // Fatal crash risk — hidden in every other map type so the legend stays put.
+  const rn=document.getElementById('risknote'); if(rn) rn.style.display = (maptype==='risk') ? '' : 'none';
+  if(!mt.share){ el.innerHTML=riskLegendHtml(); return; }
+  const pct=Math.round(100*(maxShare||0))||100, avg=Math.round(100*statewideAvg());
+  el.innerHTML=`<b class="lgttl">Share of crashes ${mt.metric}</b>`
+    +`<div class="lgbar" style="background:linear-gradient(to right,${SHARE_RAMP.join(',')})"></div>`
+    +`<div class="lgbarlab"><span>0%</span><span>${pct}%</span></div>`
+    +`<div class="lgstat">Fatal crashes ${mt.avg} statewide: <b>${avg}%</b></div>`
+    +`<div class="lgna"><span class="sw" style="background:#dcdcdc;margin-left:0"></span>Insufficient crashes to assess</div>`
+    +(mt.note?`<div class="muted lgfoot">${mt.note}</div>`:'');
+}
+// zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
+map.on('zoomend',()=>{ const zw=segWeight(), cw=crashW();
+  segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:segHasData(SEG[i])?zw.hit:zw.miss}); });
+  ptMarkers.forEach(([m,k])=>{ m.setRadius(crashR(k)); m.setStyle({weight:cw}); });
+  hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); });
+  rhlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
+map.on('popupclose',()=>{ hlLayer.clearLayers(); markLayer.clearLayers(); });
+// Explicit view state so the toggle direction never depends on a zoom guess.
+let detail=null, atState=false, ready=false, hashLock=false;
+// Shareable URL: encodes the current tab and (on the map) center+zoom in the hash.
+function updateHash(){
+  if(!ready||hashLock) return;
+  let h=curTab;
+  if(curTab==='map'){ const c=map.getCenter(); h=`map=${c.lat.toFixed(4)},${c.lng.toFixed(4)},${map.getZoom()}`; }
+  history.replaceState(null,'','#'+h);
+}
+function applyHash(){
+  const h=decodeURIComponent((location.hash||'').replace(/^#/,'')); if(!h) return false;
+  const m=h.match(/^map=(-?\d+\.?\d*),(-?\d+\.?\d*),(\d+)/);
+  if(m){ hashLock=true; setTab('map'); map.setView([+m[1],+m[2]],+m[3]); hashLock=false; return true; }
+  if(h==='analysis'||h==='hotspots'||h==='map'){ setTab(h); return true; }
+  return false;
+}
+map.on('moveend',()=>{ if(curTab==='map') updateHash(); });
+function zbtnText(){ const b=document.querySelector('.leaflet-popup-content .zbtn');
+  if(b) b.textContent = atState ? '▴ Segment view' : '▾ Statewide view'; }
+map.on('popupopen',zbtnText);
+function toggleView(){
+  if(!atState){ atState=true; fitState(); }
+  else { atState=false;
+    if(detail&&detail.t==='seg') map.fitBounds(SEG[detail.i].c,{padding:[70,70],maxZoom:14});
+    else if(detail&&detail.t==='spot') map.fitBounds(detail.h.e,{padding:[80,80],maxZoom:14}); }
+  zbtnText();
+}
+function gotoSeg(i){
+  setTab('map');
+  map.fitBounds(SEG[i].c,{padding:[70,70],maxZoom:14});
+  setTimeout(()=>{ if(segPolys[i]) segPolys[i].openPopup(); }, 320);   // popupopen sets detail+highlight+label
+}
+function spotTip(h){
+  const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
+  return `<div class="segpop"><b>${h.road}</b> <span style="color:#555">— ${place}</span>`
+    +`<br><b>${h.n}</b> pedestrian / cyclist deaths over ${h.mi} mi · <b>${h.permi}/mile</b> (2001–2024)`
+    +`<br><button class="zbtn" onclick="toggleView()">▾ Statewide view</button></div>`;
+}
+function gotoSpot(h){
+  setTab('map');
+  if(h.seg!=null && SEG[h.seg]){ gotoSeg(h.seg); setTimeout(()=>drawMarks(h.marks),360); return; }
+  detail={t:'spot',h}; atState=false;
+  map.fitBounds(h.e,{padding:[80,80],maxZoom:14});
+  const mid=h.e[Math.floor(h.e.length/2)];
+  // open the popup FIRST (it fires popupclose on any prior popup, which clears
+  // the highlight layer), THEN draw the line + death markers so they survive.
+  setTimeout(()=>{ L.popup({maxWidth:260}).setLatLng(mid).setContent(spotTip(h)).openOn(map);
+                   highlightSpot(h); drawMarks(h.marks); }, 360);
+}
+let alcSpots=[], rateSpots=[], pedSpots=[];
+function renderHotspots(){
+  const NY=YMAX-YMIN+1;
+  let totCr=0,totVmt=0,totMi=0,totPed=0;
+  SEG.forEach(s=>{ totCr+=s.cr.length; totMi+=s.l; totVmt+=s.a*365*NY*s.l; for(const a of s.cr) if(a[1]) totPed++; });
+  let crAlc=0; for(const c of CR) if(c.d) crAlc++;
+  const avgRate=totVmt?totCr/totVmt*1e8:0, avgAlc=CR.length?crAlc/CR.length:0, avgPed=totMi?totPed/totMi:0;
+  const xLine=(v,avg)=> avg>0 ? `<b style="color:#c0392b">${(v/avg).toFixed(1)}×</b> statewide average` : '';
+  // Adaptive crash threshold: highest in [8,6,5,4] that still yields a usable pool
+  // (small states drop lower so the lists aren't near-empty).
+  const counts=SEG.map(s=>s.cr.length); let T=4;
+  for(const t of [8,6,5,4]){ if(counts.filter(n=>n>=t).length>=10){ T=t; break; } }
+  const rated = SEG.map((s,i)=>{ let alc=0,ped=0; for(const a of s.cr){ if(a[2])alc++; if(a[1])ped++; }
+      const vmt=s.a*365*NY*s.l, rate=vmt? s.cr.length/vmt*1e8 : 0;
+      return {road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length, ped, rate,
+              share:s.cr.length?alc/s.cr.length:0, len:s.l, aadt:s.a, segIndex:i}; }).filter(x=>x.n>=T);
+  // Only ABOVE-statewide-average areas — these tabs are the *worst*, top-down.
+  rateSpots = rated.filter(x=>x.rate>avgRate).sort((a,b)=>b.rate-a.rate);
+  alcSpots  = rated.filter(x=>x.share>avgAlc).sort((a,b)=>(b.share-a.share)||(b.n-a.n));
+  pedSpots  = (HOTSPOTS.ped||[]).filter(h=>h.permi>avgPed);
+  // Balance: equal count across shown categories (aim >=5); drop a too-thin one.
+  let cats=[{k:'rate',l:rateSpots},{k:'alc',l:alcSpots},{k:'ped',l:pedSpots}].filter(c=>c.l.length>=3);
+  let N=Math.min(12, ...cats.map(c=>c.l.length).concat([12]));
+  if(N<5 && cats.length>1){ cats=cats.slice().sort((a,b)=>a.l.length-b.l.length); cats.shift();
+    N=Math.min(12, ...cats.map(c=>c.l.length).concat([12])); }
+  const HEAD={
+    rate:['Highest death rate', `fatal crashes per 100M VMT, among segments with ≥${T} crashes · statewide average ${avgRate.toFixed(1)}`],
+    alc:['Most alcohol-involvement', `share of fatal crashes with alcohol involved (≥${T} crashes) · statewide average ${Math.round(100*avgAlc)}%`],
+    ped:['Pedestrian & cyclist death clusters', `most deaths on one road, regardless of traffic · statewide average ${avgPed.toFixed(2)}/mile`]};
+  const card=(h,k,i)=>{
+    const place=[h.loc, h.cty?`${h.cty} Co.`:''].filter(Boolean).join(' · ');
+    let lines;
+    if(k==='rate') lines=[`${h.len} mi · AADT ${h.aadt.toLocaleString()}`,
+        `${h.n} fatal crashes · <b>${h.rate.toFixed(1)}</b> per 100M VMT`, xLine(h.rate,avgRate)];
+    else if(k==='alc') lines=[`${h.n} fatal crashes`, `<b>${Math.round(100*h.share)}%</b> alcohol-involved`, xLine(h.share,avgAlc)];
+    else lines=[`${h.n} ped/cyclist deaths · ${h.mi} mi`, `<b>${h.permi}</b> per mile`, xLine(h.permi,avgPed)];
+    return `<div class="hscard" data-k="${k}" data-i="${i}"><div class="hsrank">${i+1}</div>`
+      +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${lines.filter(Boolean).join('<br>')}</div></div></div>`; };
+  document.getElementById('hslists').innerHTML = cats.map(c=>
+     `<div class="hsgrp"><h3 class="hsred">${HEAD[c.k][0]} <span class="muted">— ${HEAD[c.k][1]}</span></h3>`
+    +`<div class="hscards">`+c.l.slice(0,N).map((h,i)=>card(h,c.k,i)).join('')+`</div></div>`).join('')
+    || `<p class="sub">Not enough segments to rank for this state.</p>`;
+  document.querySelectorAll('.hscard').forEach(el=>el.onclick=()=>{
+    const k=el.dataset.k, i=+el.dataset.i;
+    if(k==='ped') gotoSpot(pedSpots[i]); else gotoSeg((k==='rate'?rateSpots:alcSpots)[i].segIndex); });
+}
+
+// ---------- analysis ----------
+// share of a segment's fatal crashes (in the year window) with a given flag (cr index)
+function shareWin(s,fi){ let num=0,den=0; for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; den++; if(a[fi]) num++; } return den? num/den : null; }
+function buildAnalysis(){
+  const ny=y1-y0+1;
+  document.getElementById('yrlabel2').textContent=y0===y1?y0:`${y0}–${y1}`;
+  const BK=curBuckets(), counts=BK.map(()=>0);
+  const rows=[]; let zero=0;
+  SEG.forEach((s,i)=>{
+    const c=sel(s), n=c.length;
+    if(n===0){ zero++;   // zero-crash segments are always listed (just sort to the bottom)
+      rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n:0,rate:rateOf(s,0,ny),ped:pedN(s),bkt:-1,trend:trendOf(s),
+        alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)}); return; }
+    const rate=rateOf(s,n,ny);
+    const bkt = histMode==='rate' ? rateBucket(rate) : countBucket(n);
+    counts[bkt]++;
+    rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n,rate,ped:pedN(s),bkt,trend:trendOf(s),
+      alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)});
+  });
+  renderHist(counts, BK);
+  let r = bucketFilter!=null ? rows.filter(x=>x.bkt===bucketFilter) : rows;
+  if(min3) r=r.filter(x=>x.n>=3);
+  if(search) r=r.filter(x=>((x.lab||'')+' '+(x.loc||'')).toLowerCase().includes(search));
+  const k=sort.key;
+  r.sort((A,B)=>{ if(k==='lab'||k==='loc') return sort.dir*String(A[k]||'').localeCompare(String(B[k]||''));
+    let va=A[k], vb=B[k]; va=(va==null?-1:va); vb=(vb==null?-1:vb); return sort.dir*(va-vb); });
+  renderTable(r);
+}
+function renderHist(counts, BK){
+  const max=Math.max(1,...counts), h=document.getElementById('hist');
+  h.innerHTML=BK.map((b,i)=>{
+    const cls='hbar'+(bucketFilter===i?' sel':'')+(bucketFilter!=null&&bucketFilter!==i?' dim':'');
+    return `<div class="${cls}" data-b="${i}"><div class="hn">${counts[i]}</div>`
+      +`<div class="bar" style="height:${Math.round(100*counts[i]/max)}%;background:${b.c}"></div>`
+      +`<div class="hl">${b.lab}</div></div>`; }).join('');
+  const axis = histMode==='rate'
+    ? 'crashes per 100 million vehicle miles traveled (VMT)'
+    : 'fatal crashes in the selected years';
+  const zn=document.getElementById('zeronote');
+  zn.innerHTML = `<span class="haxis">${axis}</span>`
+    + (bucketFilter!=null ? ` &nbsp;·&nbsp; <a href="#" id="hclear">show all segments</a>` : '');
+  const hc=document.getElementById('hclear');
+  if(hc) hc.onclick=(ev)=>{ ev.preventDefault(); bucketFilter=null; buildAnalysis(); };
+  h.querySelectorAll('.hbar').forEach(el=>el.onclick=()=>{
+    const b=+el.dataset.b; bucketFilter = (bucketFilter===b? null : b); buildAnalysis(); });
+}
+function renderCoverage(){
+  const off=STATS.crLocal+STATS.crUnmatched, pon=Math.round(100*STATS.crAssigned/STATS.crTotal);
+  const html=
+    `<b>What you're seeing — and what you're not:</b><br>`
+    +`Busy roads have more crashes on them in part because they have more traffic, so to assess `
+    +`<i>risk</i>, vehicle safety experts compare segments of road by the number of crashes per annual `
+    +`average daily traffic (AADT). FHWA HPMS publishes AADT for the highway network `
+    +`(${STATS.segTotal.toLocaleString()} segments) but not county and local roads.<br><br>`
+    +`Of ${STATS.crTotal.toLocaleString()} geocoded fatal crashes in Utah ${STATS.yMin}–${STATS.yMax}, `
+    +`<b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> occurred on a rated segment, and can be compared below `
+    +`according to their crashes per 100 million vehicle miles traveled (VMT). `
+    +`<b>${off.toLocaleString()} (${100-pon}%)</b> occurred on local/county roads or could not be matched to a `
+    +`segment — they appear as points on the map but can not be compared according to risk.`;
+  ['risknote','aboutbody'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+}
+const COLS=[['lab','Road'],['loc','Location'],['l','Length (miles)'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
+const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['Insufficient data','#aaa']};
+function renderTable(rows){
+  const SHARE_COLS=[['alcSh','% alcohol','Share of the segment’s fatal crashes that were alcohol-involved (in the selected years)'],
+                    ['ntSh','% night','Share of the segment’s fatal crashes that happened in the dark'],
+                    ['wxSh','% weather','Share of the segment’s fatal crashes in adverse weather']];
+  const head='<thead><tr>'+COLS.map(([k,t])=>
+      `<th data-k="${k}" class="${sort.key===k?'sorted':''}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
+    +`<th title="Direction of risk in 5-year bands across 2001–2024 (independent of the year slider). ↑ rising · ↓ falling · → little change · ‘Insufficient data’ = too few crashes to tell.">Trend (2001–24)</th>`
+    +SHARE_COLS.map(([k,t,ti])=>`<th class="shcol ${sort.key===k?'sorted':''}" data-k="${k}" title="${ti}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
+    +`</tr></thead>`;
+  const pctc=v=>v!=null?Math.round(100*v)+'%':'—';
+  const body='<tbody>'+rows.map(r=>{
+    const col=rateColor(r.rate,r.n), tr=TREND[r.trend];
+    return `<tr data-i="${r.i}"><td>${r.lab}</td><td>${r.loc||''}</td><td>${r.l.toFixed(2)}</td><td>${r.a.toLocaleString()}</td>`
+      +`<td>${r.n}</td><td>${r.ped||''}</td>`
+      +`<td><span class="dot" style="background:${col}"></span>${r.rate!=null?r.rate.toFixed(1):'—'}</td>`
+      +`<td style="color:${tr[1]};font-weight:600">${tr[0]}</td>`
+      +`<td class="shcol">${pctc(r.alcSh)}</td><td class="shcol">${pctc(r.ntSh)}</td><td class="shcol">${pctc(r.wxSh)}</td></tr>`; }).join('')+'</tbody>';
+  const t=document.getElementById('segtable');
+  t.innerHTML=head+body;
+  t.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sort.key===k) sort.dir*=-1; else { sort.key=k; sort.dir=(k==='lab'?1:-1); }
+    buildAnalysis(); });
+  t.querySelectorAll('tr[data-i]').forEach(tr=>tr.onclick=()=>gotoSeg(+tr.dataset.i));
+  const parts=[]; if(min3) parts.push('3+ crashes'); if(search) parts.push(`“${search}”`);
+  const filtered = bucketFilter!=null || parts.length>0;
+  document.getElementById('rowhint').textContent=
+    `${filtered?'Filtered to':'Showing'} ${rows.length.toLocaleString()} segments`
+    +(bucketFilter!=null?` “${curBuckets()[bucketFilter].lab}${histMode==='rate'?' crashes/100M VMT':' crashes'}”`:'')
+    +(parts.length?' · '+parts.join(' · '):'');
+}
+
+// ---------- shared filter state ----------
+function apply(){ drawMap(); if(curTab==='analysis') buildAnalysis(); }
+function setYears(a,b,from){ y0=a; y1=b; syncing=true;
+  if(from!=='map'&&sMap&&sMap.noUiSlider) sMap.noUiSlider.set([a,b]);
+  if(from!=='ana'&&sAna&&sAna.noUiSlider) sAna.noUiSlider.set([a,b]);
+  syncing=false; apply(); }
+function setCat(c){ cat=c; ptsOff=false;
+  document.querySelectorAll('.catsel button').forEach(b=>b.classList.toggle('on',b.dataset.cat===c));
+  apply(); }
+// map-only: hide all crash points but keep the risk-shaded roads
+function setPts(off){ ptsOff=off;
+  const row=document.querySelector('.catsel[data-which="map"]');
+  if(row) row.querySelectorAll('button').forEach(b=>
+    b.classList.toggle('on', off ? b.dataset.pts==='off' : b.dataset.cat===cat));
+  drawMap(); }
+function setTab(t){ curTab=t;
+  const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');   // dismiss intro on navigation
+  document.getElementById('map-view').classList.remove('introup');                // reveal the map controls
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  document.getElementById('map-view').classList.toggle('active',t==='map');
+  document.getElementById('analysis').classList.toggle('active',t==='analysis');
+  document.getElementById('hotspots').classList.toggle('active',t==='hotspots');
+  document.getElementById('info').classList.toggle('active',t==='info');
+  if(t==='map') setTimeout(()=>map.invalidateSize(),0);
+  else if(t==='analysis') buildAnalysis();
+  else if(t==='hotspots') renderHotspots();
+  updateHash();
+}
+
+const sMap=document.getElementById('slider'), sAna=document.getElementById('slider2');
+[[sMap,'map'],[sAna,'ana']].forEach(([el,which])=>{
+  noUiSlider.create(el,{start:[YMIN,YMAX],connect:true,step:1,margin:0,
+    range:{min:YMIN,max:YMAX},format:{to:v=>Math.round(v),from:v=>Number(v)}});
+  el.noUiSlider.on('update',v=>{ if(syncing) return; setYears(+v[0],+v[1],which); });
+});
+document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>{
+  if(b.dataset.pts==='off') setPts(true); else setCat(b.dataset.cat); }));
+updateLegend(0);   // populate the (risk) legend immediately, before data loads
+document.getElementById('maptype').addEventListener('change',e=>{
+  maptype=e.target.value;
+  hlLayer.clearLayers(); markLayer.clearLayers(); map.closePopup(); detail=null;   // clear any illuminated segment
+  drawMap();
+});
+document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
+document.getElementById('search').addEventListener('change',e=>logSearch(e.target.value,'analysis'));
+document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
+document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ mapSearch(e.target.value); logSearch(e.target.value,'map'); } });
+
+// ---- anonymous search logging: the term + coarse location/session, no raw IP.
+//      Inert until LOG_ENDPOINT (a Google Apps Script web-app URL) is filled in. ----
+const LOG_ENDPOINT='https://script.google.com/macros/s/AKfycbx-g-FIWOpyeJxaenE2WCt_zAHpoSONIcqEtXfi6exeTTVslo8BboxsnmfjUvkygKPb/exec';
+let _sid=null,_geo=null;
+function _sessId(){ if(_sid) return _sid;
+  try{ _sid=localStorage.getItem('nmsid'); if(!_sid){ _sid=Math.random().toString(36).slice(2,10); localStorage.setItem('nmsid',_sid); } }
+  catch(e){ _sid='nostore'; } return _sid; }
+async function _coarseGeo(){ if(_geo!==null) return _geo;
+  try{ const j=await (await fetch('https://ipapi.co/json/')).json();
+       _geo={country:j.country_name||'',region:j.region||'',city:j.city||''}; }
+  catch(e){ _geo={}; } return _geo; }
+async function logSearch(term,where){
+  term=(term||'').trim(); if(!term||!LOG_ENDPOINT) return;
+  const g=await _coarseGeo();
+  const body=JSON.stringify({term,where,sid:_sessId(),country:g.country,region:g.region,
+    city:g.city,ref:document.referrer||'',lang:navigator.language||'',
+    screen:`${screen.width}x${screen.height}`,ua:navigator.userAgent});
+  try{ fetch(LOG_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body}); }catch(e){}
+}
+function dismissIntro(){
+  const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');
+  document.getElementById('map-view').classList.remove('introup');   // reveal controls
+  if(curTab==='map'){ map.invalidateSize(); fitState(); }            // re-center NM in the now-visible area
+}
+['aboutx','aboutgo'].forEach(id=>document.getElementById(id).addEventListener('click',dismissIntro));
+document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('click',()=>{
+  histMode=b.dataset.m; bucketFilter=null;
+  document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
+  buildAnalysis(); }));
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+document.getElementById('statesel').addEventListener('change',e=>{ location.assign("../"+e.target.value+"/"+location.hash); });
+// clicking the wordmark returns to this state's home with the intro blurb showing
+document.getElementById('brand').addEventListener('click',()=>{ if(location.hash) location.href=location.pathname; else location.reload(); });
+renderCoverage();   // fills the About tab
+// phones: fold the legend into the bottom control panel so the map gets more room
+if(window.matchMedia('(max-width:620px)').matches){
+  const ctrl=document.getElementById('ctrl'), lg=document.getElementById('legend');
+  if(ctrl&&lg) ctrl.appendChild(lg);
+}
+
+// crashes.json is positional arrays (smaller download) — rehydrate to objects so the
+// rest of the code keeps using c.la/c.lo/etc. Order must match the build's CR writer.
+const CR_FIELDS=['la','lo','y','m','dy','dw','hr','k','inj','si','ev','d','pc','nt','ix','wx','sg'];
+function rehydrate(rows){ return rows.map(r=>{ const o={}; for(let i=0;i<CR_FIELDS.length;i++) o[CR_FIELDS[i]]=r[i]; return o; }); }
+Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
+  .then(([s,c])=>{ SEG=s; CR=rehydrate(c);
+    if(CR.length>BIG_STATE){            // big state: start on the last 5 years so it loads light; expandable
+      y0=Math.max(YMIN,YMAX-4);
+      if(sMap&&sMap.noUiSlider) sMap.noUiSlider.set([y0,y1]);
+      if(sAna&&sAna.noUiSlider) sAna.noUiSlider.set([y0,y1]);
+    }
+    drawMap();
+    ready=true; setTimeout(()=>{ map.invalidateSize(); fitState(); },0); });
+</script>
+</body></html>

@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Deadliest Mile — fatal crash risk on Wisconsin roads</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{display:flex;flex-direction:column;font:13px/1.45 -apple-system,Helvetica,Arial;color:#222}
+  /* tab bar */
+  #tabbar{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:2px;background:#1f2d3d;padding:0 10px}
+  #brand{font:800 16px/1 -apple-system,Helvetica,Arial;letter-spacing:.5px;color:#fff;
+    white-space:nowrap;padding:12px 18px 12px 6px;margin-right:4px}
+  #brand{cursor:pointer}
+  #brand b{color:#e3120b}
+  #statesel{margin-left:auto;align-self:center;background:#2a3a4d;color:#fff;border:1px solid #3a4d63;
+    border-radius:5px;font:600 12.5px inherit;padding:6px 8px;cursor:pointer}
+  #tabbar .tab{appearance:none;border:none;background:transparent;color:#5fc9bb;
+    font:600 14.5px/1 -apple-system,Helvetica,Arial;padding:13px 18px;cursor:pointer;border-bottom:3px solid transparent}
+  #tabbar .tab:hover{color:#9fe5da}
+  #tabbar .tab.active{color:#fff;border-bottom-color:#2ec4b6}
+  #content{flex:1 1 auto;position:relative;min-height:0}
+  .view{display:none;position:absolute;inset:0}
+  .view.active{display:block}
+  #map{height:100%}
+  #analysis,#info{overflow:auto;background:#f4f6f8}
+  /* floating panels on the map */
+  .panel{position:absolute;z-index:1000;background:rgba(255,255,255,.96);border:1px solid #ccc;
+    border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.2);font:13.5px/1.5 -apple-system,Helvetica,Arial}
+  #ctrl{bottom:18px;right:14px;padding:12px 15px;width:270px}
+  #ctrl .mslab{font-weight:600;margin-bottom:4px}
+  #mapsearch{width:100%;font:13.5px inherit;padding:6px 9px;border:1px solid #c3c3c3;border-radius:5px}
+  #msmsg{color:#b00;font-size:12.5px;line-height:1.35;margin-top:3px;min-height:0}
+  #maptype{width:100%;font:13px inherit;padding:6px 8px;border:1px solid #c3c3c3;border-radius:5px;background:#fff;margin-top:3px}
+  #legend .lgbar{height:11px;border-radius:2px;margin:4px 0 2px}
+  #legend .lgbarlab{display:flex;justify-content:space-between;font-size:11px;color:#555}
+  #legend .lgstat{margin-top:5px;font-size:12px;color:#333;white-space:nowrap}
+  #legend .lgna{margin-top:4px;font-size:11.5px;color:#555;white-space:nowrap}
+  #legend .lgna .sw{width:13px;height:8px}
+  #ctrl .yr{font-weight:600;margin-bottom:9px}
+  #slider,#slider2{margin:2px 7px 4px}
+  #stat{margin-top:8px;color:#444}
+  #legend{bottom:18px;left:14px;padding:8px 11px;color:#333}
+  /* fixed min-height so the legend never resizes when switching map types; width
+     comes from #leftstack so it always matches the "what you're seeing" note (desktop) */
+  @media(min-width:621px){ #legend{min-height:152px} }
+  #legend .lgttl{display:block;margin-bottom:4px;font-weight:700;white-space:nowrap}
+  #legend .lgscale{white-space:nowrap;font-size:11.5px}
+  #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
+  #legend .lgfoot a{color:#1559a3;text-decoration:underline}
+  #legend .sw{display:inline-block;width:13px;height:9px;margin:0 2px 0 5px;vertical-align:1px}
+  #legend .lgshort{display:none}
+  /* desktop: the methodology note sits in a stack beneath the legend */
+  #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
+    flex-direction:column;gap:10px;width:506px}   /* fixed width → legend matches the note; wide enough for the rate scale on one line */
+  #leftstack .panel{position:static;max-width:none}
+  #risknote{padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
+  #risknote b{color:#1a2433}
+  /* the 'About' tab is mobile-only; desktop keeps the note under the legend */
+  @media(min-width:621px){ .tab[data-tab="info"]{display:none} }
+  @media(max-width:620px){
+    #leftstack{display:none}                       /* the note lives in the About tab on mobile */
+    #map-view.introup #ctrl{display:none}          /* intro card shows alone on phones */
+    /* one compact panel at the bottom: search + toggles + legend */
+    #ctrl{left:8px;right:8px;width:auto;bottom:10px;padding:11px 13px;max-height:52vh;overflow:auto}
+    #ctrl .yr,#slider,#stat{display:none}           /* drop the year slider and the crash/killed count */
+    #ctrl #legend{position:static;background:none;border:none;box-shadow:none;
+      padding:9px 0 0;margin-top:9px;border-top:1px solid #e6e9ec;color:#333}
+    #legend .lgttl{font-size:12.5px;margin-bottom:3px}
+    #legend .lgscale{white-space:nowrap;font-size:11.5px}
+    #legend .sw{margin:0 2px 0 5px;width:13px;height:8px}
+    #legend .lgfoot{display:none}                    /* drop the note under the legend */
+    #legend .lgfull{display:none} #legend .lgshort{display:inline}
+    .leaflet-control-zoom{display:none}
+  }
+  .muted{color:#888;font-size:12px}
+  #about{top:50%;left:50%;transform:translate(-50%,-50%);width:420px;max-width:calc(100vw - 32px);
+    padding:30px 32px;z-index:1200;text-align:center}
+  #about .atitle{font:800 34px/1.05 -apple-system,Helvetica,Arial;letter-spacing:.5px;margin:0 0 4px;color:#1a2433}
+  #about .atitle b{color:#e3120b}
+  #about .asub{font-size:16px;font-weight:600;color:#555;margin:0 0 14px}
+  #about .adesc{font-size:15.5px;line-height:1.55;color:#333}
+  #about #aboutx{position:absolute;top:7px;right:11px;border:none;background:none;font-size:21px;
+    color:#999;cursor:pointer;line-height:1;padding:0}
+  #about #aboutx:hover{color:#444}
+  #about #aboutgo{margin-top:15px;font:13px/1 inherit;background:#2171b5;color:#fff;border:none;
+    border-radius:5px;padding:8px 14px;cursor:pointer}
+  #about #aboutgo:hover{background:#1559a3}
+  #about.hidden{display:none}
+  @media(max-width:620px){ #about{left:12px;right:12px;width:auto;top:54px;transform:none;max-height:84vh;overflow:auto}
+    #about .atitle{font-size:27px} }
+  #aboutbody{background:#fff;border:1px solid #e2e6ea;border-radius:8px;padding:16px 18px;
+    font-size:14.5px;line-height:1.6;color:#333;max-width:680px}
+  #aboutbody b{color:#1a2433}
+  /* category segmented control */
+  .catsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden}
+  .catsel button{appearance:none;border:none;background:#fff;color:#444;font:12.5px/1 inherit;padding:7px 11px;cursor:pointer}
+  .histsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden;vertical-align:middle;margin:0 3px}
+  .histsel button{appearance:none;border:none;background:#fff;color:#444;font:12px/1 inherit;padding:5px 9px;cursor:pointer}
+  .histsel button+button{border-left:1px solid #d5d5d5}
+  .histsel button.on{background:#2171b5;color:#fff}
+  .catsel button+button{border-left:1px solid #d5d5d5}
+  .catsel button.on{background:#2171b5;color:#fff}
+  /* thin slider with small vertical-line handles */
+  .noUi-target{height:3px;border:none;background:#dcdcdc;box-shadow:none}
+  .noUi-connect{background:#2171b5}
+  .noUi-horizontal .noUi-handle{width:4px;height:17px;right:-2px;top:-7px;border:none;
+    border-radius:1px;background:#1f5fa8;box-shadow:none;cursor:ew-resize}
+  .noUi-handle:after,.noUi-handle:before{display:none}
+  /* analysis tab */
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 20px 70px}
+  .wrap h2{font-size:16px;margin:0 0 2px}
+  .sub{color:#666;margin:0 0 12px}
+  .coverage{background:#fff;border:1px solid #e2e6ea;border-left:4px solid #f0ad4e;border-radius:6px;
+    padding:11px 14px;margin:0 0 18px;color:#444;font-size:12.5px;line-height:1.55}
+  .coverage b{color:#1a1a1a}
+  .actl{display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin:0 0 18px;
+    background:#fff;border:1px solid #e2e6ea;border-radius:6px;padding:12px 14px}
+  .actl .yr{font-weight:600;margin-bottom:5px}
+  #slider2{width:240px;margin:0}
+  .actl label.zc{font-size:12px;color:#555}
+  .card{background:#fff;border:1px solid #e2e6ea;border-radius:6px;padding:12px 14px;margin:0 0 18px}
+  .card .ttl{font-weight:600;margin-bottom:9px;font-size:12.5px}
+  .hist{display:flex;align-items:flex-end;gap:12px;height:158px}
+  .hbar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;cursor:pointer}
+  .hbar .hn{font-size:11px;color:#333;margin-bottom:3px;font-variant-numeric:tabular-nums}
+  .hbar .bar{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:opacity .12s}
+  .hbar:hover .bar{opacity:.8}
+  .hbar .hl{font-size:11px;color:#666;margin-top:5px}
+  .hbar.sel .hl{font-weight:700;color:#111}
+  .hbar.dim .bar{opacity:.28}
+  .zeronote{color:#777;font-size:11.5px;margin-top:9px;text-align:center}
+  .zeronote .haxis{font-weight:600;color:#555;font-size:12.5px}
+  .zeronote #hclear{color:#1559a3;font-weight:600;text-decoration:none}
+  .zeronote #hclear:hover{text-decoration:underline}
+  table.seg{width:100%;border-collapse:collapse;background:#fff;font-size:12.5px;
+    border:1px solid #e2e6ea;border-radius:6px;overflow:hidden}
+  table.seg th,table.seg td{padding:6px 10px;text-align:right;border-bottom:1px solid #eee;
+    white-space:nowrap;font-variant-numeric:tabular-nums}
+  table.seg th{position:sticky;top:0;background:#eaeef2;cursor:pointer;font-weight:600;color:#333;
+    border-bottom:2px solid #d3dae0;z-index:1}
+  table.seg th:first-child,table.seg td:first-child{text-align:left}
+  table.seg th.sorted{color:#1559a3}
+  table.seg tbody tr{cursor:pointer}
+  table.seg tbody tr:hover{background:#eaf3fb}
+  /* mobile: keep Road · Location · Crashes · Rate, fit to screen (no side-scroll) */
+  @media(max-width:620px){
+    .wrap{padding:14px 10px 70px}
+    table.seg{table-layout:fixed;width:100%}
+    table.seg th,table.seg td{padding:7px 6px;white-space:normal;font-size:12px}
+    table.seg td{word-break:break-word}
+    table.seg th{font-size:11px;vertical-align:bottom;line-height:1.2}
+    table.seg th:nth-child(3),table.seg td:nth-child(3),
+    table.seg th:nth-child(4),table.seg td:nth-child(4),
+    table.seg th:nth-child(6),table.seg td:nth-child(6),
+    table.seg th:nth-child(8),table.seg td:nth-child(8),
+    table.seg th:nth-child(9),table.seg td:nth-child(9),
+    table.seg th:nth-child(10),table.seg td:nth-child(10),
+    table.seg th:nth-child(11),table.seg td:nth-child(11){display:none}
+    table.seg th:nth-child(1),table.seg td:nth-child(1){width:22%}
+    table.seg th:nth-child(2),table.seg td:nth-child(2){width:46%}
+    table.seg th:nth-child(5),table.seg td:nth-child(5){width:15%}
+    table.seg th:nth-child(7),table.seg td:nth-child(7){width:17%}
+    /* controls: search across the top, slider full width, toggles + 3+ on one line */
+    .actl{gap:12px 14px}
+    .actl #search{order:1;width:100%}
+    .actl > div:first-child{order:2;width:100%}
+    .actl #slider2{width:100%}
+    .actl .catsel[data-which="ana"]{order:3}
+    .actl label.zc{order:4}
+  }
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
+  .rec{display:inline-flex;height:9px;width:46px;border-radius:2px;overflow:hidden;
+    vertical-align:-1px;margin-left:7px;border:1px solid #dcdcdc}
+  .rec i{display:block;height:100%}
+  .tablohint{color:#888;font-size:11.5px;margin:7px 2px 0}
+  #search{font:12px inherit;padding:5px 9px;border:1px solid #c3c3c3;border-radius:5px;width:190px}
+  .zbtn{margin-top:6px;font:11px/1 inherit;color:#1559a3;background:#eef4fb;border:1px solid #cfe0f2;
+    border-radius:4px;padding:4px 8px;cursor:pointer}
+  .zbtn:hover{background:#dceaf8}
+  .segpop{font:13.5px/1.55 -apple-system,Helvetica,Arial}
+  #hslists{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start}
+  @media(max-width:620px){ #hslists{grid-template-columns:1fr} }
+  .hsgrp{margin:0}
+  .hsgrp h3{font-size:13.5px;margin:0 0 10px;border-bottom:2px solid #e2e6ea;padding-bottom:5px}
+  .hsred{color:#c0392b}
+  .hsred .muted{color:#888;font-weight:400}
+  .hscards{display:flex;flex-direction:column;gap:7px}
+  .hscard{display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid #e2e6ea;
+    border-radius:6px;padding:9px 12px;cursor:pointer}
+  .hscard:hover{background:#eaf3fb;border-color:#bcd6ef}
+  .hsrank{flex:0 0 24px;height:24px;border-radius:50%;background:#1f2d3d;color:#fff;font-weight:700;
+    font-size:12px;display:flex;align-items:center;justify-content:center}
+  .hsttl{font-weight:600;font-size:13px}
+  .hsstat{color:#555;font-size:12px;margin-top:3px;line-height:1.5}
+</style></head>
+<body>
+<div id="tabbar">
+  <span id="brand" title="Back to the intro">THE <b>DEADLIEST</b> MILE</span>
+  <button class="tab active" data-tab="map">Map</button>
+  <button class="tab" data-tab="analysis">Risk analysis</button>
+  <button class="tab" data-tab="hotspots">Most dangerous areas</button>
+  <button class="tab" data-tab="info">About</button>
+  <select id="statesel" aria-label="Change state" title="Change state"><option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option><option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI" selected>Wisconsin</option><option value="WY">Wyoming</option></select>
+</div>
+<div id="content">
+  <!-- MAP -->
+  <div id="map-view" class="view active introup">
+    <div id="map"></div>
+    <div id="ctrl" class="panel">
+      <div class="mslab">Search roads or communities:</div>
+      <input id="mapsearch" placeholder="Search communities, roads, or an address" autocomplete="off">
+      <div id="msmsg"></div>
+      <div class="yr" style="margin-top:9px">Years: <span id="yrlabel"></span></div>
+      <div id="slider"></div>
+      <div class="mslab" style="margin-top:9px">Map type:</div>
+      <select id="maptype">
+        <option value="risk">Fatal crash risk</option>
+        <option value="alc">Alcohol involvement</option>
+        <option value="nt">Nighttime crashes</option>
+        <option value="ix">Deadly intersections</option>
+        <option value="wx">Adverse weather</option>
+      </select>
+      <div class="mslab" style="margin-top:9px">Crashes shown:</div>
+      <div class="catsel" data-which="map" style="margin-top:3px">
+        <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button><button data-pts="off">None</button>
+      </div>
+      <div id="stat"></div>
+    </div>
+    <div id="leftstack">
+    <div id="risknote" class="panel"></div>
+    <div id="legend" class="panel"></div>
+    </div>
+    <div id="about" class="panel">
+      <button id="aboutx" aria-label="Close">×</button>
+      <div class="atitle">THE <b>DEADLIEST</b> MILE</div>
+      <div class="asub">Fatal crash risk on Wisconsin roads</div>
+      <div class="adesc">The federal government documents every fatal vehicle crash. This map plots
+        more than two decades of that data — by road segment, adjusted for traffic — to show where
+        driving in Wisconsin is most dangerous.</div>
+      <button id="aboutgo">Explore the map →</button>
+    </div>
+  </div>
+  <!-- ANALYSIS -->
+  <div id="analysis" class="view">
+    <div class="wrap">
+      <h2>Risk by road segment</h2>
+      <div class="actl">
+        <div><div class="yr">Years: <span id="yrlabel2"></span></div><div id="slider2"></div></div>
+        <div class="catsel" data-which="ana">
+          <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button>
+        </div>
+        <label class="zc"><input type="checkbox" id="min3" checked> show only segments with 3+ crashes</label>
+        <input id="search" placeholder="search road or place…" autocomplete="off">
+      </div>
+      <div class="card">
+        <div class="ttl">Distribution of segments by
+          <span class="histsel">
+            <button data-m="rate" class="on">rate /100M</button><button data-m="count">crash count</button>
+          </span></div>
+        <div id="hist" class="hist"></div>
+        <div id="zeronote" class="zeronote"></div>
+      </div>
+      <table class="seg" id="segtable"></table>
+      <div class="tablohint" id="rowhint"></div>
+      <div class="tablohint">Trend is computed on 5-year bands across 2001–2024, where sufficient data exists to show a pattern.</div>
+    </div>
+  </div>
+  <!-- HOT SPOTS -->
+  <div id="hotspots" class="view">
+    <div class="wrap">
+      <h2>Most dangerous areas</h2>
+      <div id="hslists"></div>
+    </div>
+  </div>
+  <!-- ABOUT -->
+  <div id="info" class="view">
+    <div class="wrap">
+      <h2>About this map</h2>
+      <div id="aboutbody"></div>
+    </div>
+  </div>
+</div>
+<script>
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 11257, "crTotal": 14013, "crAssigned": 5894, "crLocal": 7180, "crUnmatched": 939, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 1763, "road": "WI-35", "loc": "59 mi W of Eau Claire", "cty": "Pierce", "lat": 44.7133, "lon": -92.6693, "n": 8, "ped": 0, "aadt": 2535, "len": 5.0, "rate": 7.2, "marks": [[44.70502, -92.64582], [44.72781, -92.7004], [44.70799, -92.6613], [44.71146, -92.66695], [44.71338, -92.66901], [44.72881, -92.70301], [44.70757, -92.66071], [44.69826, -92.64413]]}, {"kind": "rate", "seg": 10051, "road": "WI-17", "loc": "89 mi NW of Appleton", "cty": "Lincoln", "lat": 45.2272, "lon": -89.5922, "n": 9, "ped": 1, "aadt": 2761, "len": 5.7, "rate": 6.5, "marks": [[45.21581, -89.61179], [45.2055, -89.6338], [45.24985, -89.57505], [45.20039, -89.64106], [45.23554, -89.58651], [45.20212, -89.64035], [45.20434, -89.63609], [45.22266, -89.59667], [45.20219, -89.64029]]}, {"kind": "rate", "seg": 5418, "road": "WI-57", "loc": "Milwaukee (3 mi S)", "cty": "Milwaukee", "lat": 43.0279, "lon": -87.9478, "n": 8, "ped": 1, "aadt": 21948, "len": 0.7, "rate": 6.1, "marks": [[43.02211, -87.9479], [43.03256, -87.94782], [43.03495, -87.94778], [43.02207, -87.94773], [43.0346, -87.94762], [43.03476, -87.94775], [43.03479, -87.94776], [43.03471, -87.94773]]}, {"kind": "rate", "seg": 3494, "road": "US-51", "loc": "Windsor", "cty": "Dane", "lat": 43.2704, "lon": -89.3248, "n": 8, "ped": 0, "aadt": 9509, "len": 1.8, "rate": 5.5, "marks": [[43.27315, -89.32467], [43.27408, -89.3247], [43.28094, -89.32479], [43.2956, -89.32479], [43.28096, -89.32468], [43.29557, -89.32466], [43.28094, -89.32469], [43.27905, -89.32466]]}, {"kind": "rate", "seg": 3709, "road": "WI-145", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 43.0718, "lon": -87.953, "n": 32, "ped": 9, "aadt": 25951, "len": 3.3, "rate": 4.2, "marks": [[43.06051, -87.93884], [43.08473, -87.96958], [43.06737, -87.94739], [43.06423, -87.94348], [43.0665, -87.94615], [43.06619, -87.94453], [43.09268, -87.9798], [43.07145, -87.95253], [43.08508, -87.97012], [43.08975, -87.97613], [43.0684, -87.94863], [43.06346, -87.94249], [43.05045, -87.9264], [43.06252, -87.94135], [43.08637, -87.97181], [43.06013, -87.93836], [43.08675, -87.9723], [43.07153, -87.9527], [43.07912, -87.96253], [43.06476, -87.94412], [43.07991, -87.96318], [43.06913, -87.94979], [43.07161, -87.95276], [43.07272, -87.95413], [43.07179, -87.953], [43.07393, -87.95573], [43.08445, -87.96915], [43.08304, -87.96742], [43.08829, -87.97437], [43.07634, -87.95902], [43.06344, -87.94257], [43.05386, -87.92952]]}, {"kind": "rate", "seg": 133, "road": "US-14", "loc": "13 mi W of Madison", "cty": "Dane", "lat": 43.0979, "lon": -89.6228, "n": 8, "ped": 2, "aadt": 12915, "len": 1.7, "rate": 4.1, "marks": [[43.09755, -89.62047], [43.09666, -89.61711], [43.09489, -89.60942], [43.09826, -89.62449], [43.09341, -89.60281], [43.09542, -89.61181], [43.10204, -89.63336], [43.09519, -89.611]]}, {"kind": "rate", "seg": 4722, "road": "WI-69", "loc": "26 mi SW of Madison", "cty": "Green", "lat": 42.7471, "lon": -89.5996, "n": 11, "ped": 0, "aadt": 6336, "len": 5.0, "rate": 4.0, "marks": [[42.74858, -89.60007], [42.71166, -89.60405], [42.72857, -89.59868], [42.7514, -89.60341], [42.7473, -89.59938], [42.74221, -89.59907], [42.7522, -89.60515], [42.76696, -89.6227], [42.74221, -89.59915], [42.71173, -89.60319], [42.75669, -89.6113]]}, {"kind": "rate", "seg": 10354, "road": "WI-181", "loc": "Milwaukee (6 mi NW)", "cty": "Milwaukee", "lat": 43.1431, "lon": -88.0055, "n": 8, "ped": 1, "aadt": 29618, "len": 0.8, "rate": 4.0, "marks": [[43.1378, -88.00577], [43.14879, -88.00546], [43.14879, -88.00557], [43.14548, -88.0053], [43.1515, -88.00514], [43.14389, -88.00569], [43.14332, -88.00546], [43.15075, -88.00515]]}, {"kind": "rate", "seg": 3584, "road": "US-51", "loc": "Madison (4 mi NE)", "cty": "Dane", "lat": 43.1255, "lon": -89.3252, "n": 9, "ped": 1, "aadt": 19411, "len": 1.4, "rate": 3.8, "marks": [[43.1324, -89.32384], [43.13319, -89.32357], [43.11705, -89.32471], [43.13552, -89.32216], [43.1168, -89.32438], [43.11673, -89.32462], [43.11677, -89.32459], [43.1315, -89.32452], [43.13437, -89.32241]]}, {"kind": "rate", "seg": 132, "road": "US-14", "loc": "15 mi S of Madison", "cty": "Dane", "lat": 42.8631, "lon": -89.3495, "n": 8, "ped": 0, "aadt": 12740, "len": 2.1, "rate": 3.4, "marks": [[42.88004, -89.35105], [42.86233, -89.34929], [42.85627, -89.34344], [42.87239, -89.34981], [42.85626, -89.34334], [42.85592, -89.34301], [42.85713, -89.34389], [42.88004, -89.35088]]}, {"kind": "rate", "seg": 163, "road": "US-14", "loc": "14 mi E of Janesville", "cty": "Walworth", "lat": 42.6385, "lon": -88.7425, "n": 9, "ped": 0, "aadt": 10487, "len": 3.0, "rate": 3.3, "marks": [[42.65302, -88.74621], [42.64716, -88.74273], [42.61716, -88.73683], [42.65214, -88.75691], [42.63123, -88.74236], [42.61937, -88.74099], [42.63213, -88.74247], [42.64863, -88.74272], [42.65285, -88.75073]]}, {"kind": "rate", "seg": 7958, "road": "US-41", "loc": "39 mi N of Green Bay", "cty": "Marinette", "lat": 45.0519, "lon": -87.7812, "n": 9, "ped": 0, "aadt": 11948, "len": 2.7, "rate": 3.2, "marks": [[45.05157, -87.80216], [45.05234, -87.76672], [45.05164, -87.8021], [45.0523, -87.79999], [45.052, -87.80076], [45.05071, -87.79964], [45.05094, -87.79976], [45.0507, -87.79967], [45.05093, -87.79978]]}], "ped": [{"kind": "ped", "road": "WI-145", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 43.0777, "lon": -87.9606, "n": 14, "e": [[43.1007, -87.9899], [43.0992, -87.988], [43.0971, -87.9853], [43.0931, -87.9802], [43.0887, -87.9746], [43.0837, -87.9683], [43.0798, -87.9632], [43.076, -87.9584], [43.071, -87.952], [43.0667, -87.9466], [43.0636, -87.9427], [43.062, -87.9408], [43.0562, -87.9328], [43.053, -87.9286]], "mi": 5.9, "permi": 2.4, "marks": [[43.06252, -87.94135], [43.06013, -87.93836], [43.09626, -87.98414], [43.06476, -87.94412], [43.07991, -87.96318], [43.07179, -87.953], [43.10043, -87.9895], [43.04583, -87.9188], [43.08304, -87.96742], [43.10103, -87.99029], [43.09463, -87.98214], [43.08829, -87.97437], [43.07634, -87.95902], [43.06344, -87.94257]], "geom": [[[43.0974, -87.9855], [43.0974, -87.9855], [43.0975, -87.9856], [43.0983, -87.9868], [43.0983, -87.9868], [43.0985, -87.9871], [43.0996, -87.9884], [43.1002, -87.9892], [43.1007, -87.9898], [43.1018, -87.9912], [43.1021, -87.9916], [43.1021, -87.9916], [43.1031, -87.9929], [43.1039, -87.9938], [43.104, -87.994], [43.1041, -87.9941], [43.1042, -87.9942]], [[43.0549, -87.9311], [43.055, -87.9314], [43.0552, -87.9317], [43.0553, -87.9318], [43.0555, -87.9321], [43.0561, -87.9329], [43.0562, -87.9331], [43.0565, -87.9335], [43.0568, -87.9339], [43.0569, -87.9341], [43.0578, -87.9353], [43.0578, -87.9353], [43.0586, -87.9364], [43.0586, -87.9365], [43.0591, -87.9371], [43.0591, -87.9372], [43.0594, -87.9377], [43.06, -87.9384], [43.0603, -87.9388], [43.0604, -87.9389], [43.0604, -87.9389], [43.0605, -87.9391], [43.0606, -87.9392], [43.0617, -87.9403], [43.0618, -87.9404], [43.062, -87.9408], [43.0622, -87.9411], [43.0625, -87.9414], [43.0627, -87.9416], [43.0636, -87.9427], [43.0639, -87.9429], [43.0642, -87.9432], [43.0645, -87.9438], [43.0649, -87.9443], [43.0655, -87.9451], [43.066, -87.9456], [43.0665, -87.9462], [43.0671, -87.947], [43.0674, -87.9476], [43.0675, -87.9476], [43.0678, -87.948], [43.0679, -87.9481], [43.0685, -87.9488], [43.0686, -87.9489], [43.0693, -87.95], [43.0696, -87.9503], [43.0697, -87.9504], [43.0704, -87.9512], [43.0707, -87.9516], [43.071, -87.9519], [43.0717, -87.9528], [43.0718, -87.953], [43.072, -87.9533], [43.0726, -87.954], [43.0729, -87.9543], [43.074, -87.9557], [43.0744, -87.9562], [43.0747, -87.9566], [43.0748, -87.9567], [43.075, -87.957], [43.0751, -87.9571], [43.0751, -87.9571], [43.0753, -87.9574], [43.076, -87.9583], [43.0761, -87.9584], [43.0762, -87.9586], [43.0769, -87.9595], [43.0771, -87.9597], [43.0772, -87.9597], [43.078, -87.9609], [43.0782, -87.9612], [43.0789, -87.962], [43.0791, -87.9622], [43.0791, -87.9623], [43.0793, -87.9625], [43.0797, -87.9633], [43.0803, -87.9639], [43.0806, -87.9642], [43.0807, -87.9643], [43.0809, -87.9645], [43.0811, -87.9647], [43.0814, -87.9652], [43.0818, -87.9657], [43.0825, -87.9665], [43.0826, -87.9665], [43.0829, -87.9671], [43.0831, -87.9673], [43.0836, -87.9679], [43.0843, -87.9689], [43.0846, -87.9693], [43.0847, -87.9694], [43.0847, -87.9694], [43.0857, -87.9707], [43.0861, -87.9712], [43.0867, -87.9721], [43.0875, -87.973], [43.0878, -87.9735], [43.0886, -87.9745], [43.0889, -87.9748], [43.0894, -87.9755], [43.0897, -87.9759], [43.09, -87.9762], [43.0899, -87.9762]], [[43.0953, -87.983], [43.0959, -87.9838], [43.0961, -87.984], [43.0961, -87.9841], [43.0964, -87.9843], [43.0969, -87.985], [43.0972, -87.9854], [43.0974, -87.9855]], [[43.0455, -87.9191], [43.0456, -87.9191], [43.0457, -87.9191], [43.0458, -87.9191], [43.0463, -87.919], [43.0464, -87.919], [43.0465, -87.919], [43.0468, -87.919], [43.047, -87.919], [43.0469, -87.9196], [43.0469, -87.9199], [43.0469, -87.9199], [43.0469, -87.9202], [43.0468, -87.9203], [43.0468, -87.9204], [43.0468, -87.921], [43.0468, -87.9213], [43.0468, -87.9214], [43.0469, -87.9216], [43.0469, -87.9218], [43.047, -87.9222], [43.0474, -87.9231], [43.0476, -87.9234], [43.0478, -87.9237], [43.048, -87.9241], [43.0482, -87.9244], [43.0484, -87.9247], [43.0486, -87.9249]], [[43.0449, -87.9191], [43.0455, -87.9191]], [[43.0952, -87.9828], [43.0953, -87.983]], [[43.0421, -87.9192], [43.0423, -87.9192], [43.0429, -87.9191]], [[43.0946, -87.982], [43.0946, -87.9821], [43.0949, -87.9826], [43.0952, -87.9828]], [[43.0942, -87.9816], [43.0945, -87.9819], [43.0946, -87.982]], [[43.0444, -87.9191], [43.0449, -87.9191]], [[43.0938, -87.9811], [43.0942, -87.9816]], [[43.09, -87.9763], [43.0906, -87.9771], [43.091, -87.9776], [43.091, -87.9776], [43.0913, -87.9778], [43.0917, -87.9784], [43.0918, -87.9786], [43.092, -87.9788], [43.0921, -87.9789], [43.0923, -87.9792], [43.0926, -87.9797], [43.0927, -87.9798], [43.0932, -87.9803], [43.0935, -87.9807], [43.0936, -87.9808], [43.0936, -87.981], [43.0936, -87.981], [43.0937, -87.9811], [43.0938, -87.9811]], [[43.0443, -87.9191], [43.0444, -87.9191]], [[43.0442, -87.9191], [43.0443, -87.9191]], [[43.0523, -87.9285], [43.0523, -87.9285], [43.0525, -87.9287], [43.0526, -87.9288], [43.0526, -87.9288], [43.0526, -87.9288], [43.0529, -87.9291], [43.053, -87.9291], [43.0534, -87.9295], [43.0538, -87.9298], [43.0538, -87.9299], [43.054, -87.93], [43.0542, -87.9302], [43.0545, -87.9305], [43.0547, -87.9308], [43.0549, -87.9311]], [[43.0486, -87.9249], [43.0491, -87.9256], [43.0496, -87.9261], [43.0497, -87.9263], [43.0498, -87.9264], [43.0502, -87.9267], [43.0504, -87.9269], [43.0505, -87.927], [43.0507, -87.9271]], [[43.0517, -87.9279], [43.0519, -87.9282], [43.0522, -87.9284], [43.0522, -87.9284], [43.0523, -87.9285]], [[43.0507, -87.9271], [43.0514, -87.9277], [43.0517, -87.9279]], [[43.047, -87.919], [43.047, -87.919], [43.047, -87.919]], [[43.09, -87.9762], [43.09, -87.9763]]]}, {"kind": "ped", "road": "US-151", "loc": "Madison", "cty": "Dane", "lat": 43.1099, "lon": -89.3325, "n": 11, "e": [[43.0645, -89.3837], [43.072, -89.378], [43.0906, -89.3622], [43.0995, -89.3496], [43.108, -89.3379], [43.1135, -89.3296], [43.1179, -89.3232], [43.1225, -89.3161], [43.1273, -89.3094], [43.1425, -89.2905], [43.1504, -89.2807]], "mi": 12.1, "permi": 0.9, "marks": [[43.04662, -89.39396], [43.10913, -89.33579], [43.08707, -89.3667], [43.13304, -89.30144], [43.11883, -89.32144], [43.11251, -89.3315], [43.08231, -89.37348], [43.10229, -89.34643], [43.12227, -89.31664], [43.12649, -89.31018], [43.16782, -89.25988]], "geom": [[[43.1656, -89.2624], [43.166, -89.262], [43.1666, -89.2612], [43.1677, -89.2598], [43.1687, -89.2586], [43.1688, -89.2585], [43.1691, -89.2581], [43.1696, -89.2574], [43.1698, -89.2572]], [[43.163, -89.2656], [43.1633, -89.2652], [43.1636, -89.2649], [43.1636, -89.2649], [43.1641, -89.2643], [43.1644, -89.2639], [43.165, -89.2632], [43.1655, -89.2625], [43.1656, -89.2624]], [[43.043, -89.3941], [43.0431, -89.3941], [43.0434, -89.3941], [43.0437, -89.3941], [43.0439, -89.3941], [43.0441, -89.3941], [43.0449, -89.3941], [43.0449, -89.3941], [43.0461, -89.3941], [43.0464, -89.3941], [43.0471, -89.3941], [43.0474, -89.3941], [43.0478, -89.3941], [43.0481, -89.3941], [43.0491, -89.3942]], [[43.1367, -89.2964], [43.1368, -89.2963], [43.1369, -89.2961], [43.1371, -89.2959], [43.1372, -89.2958], [43.1376, -89.2953], [43.1383, -89.2944], [43.1387, -89.294], [43.139, -89.2936], [43.1391, -89.2935], [43.1397, -89.2929], [43.1397, -89.2929], [43.1397, -89.2928], [43.1398, -89.2927], [43.1402, -89.2922], [43.1407, -89.2916], [43.1413, -89.2909], [43.1424, -89.2895], [43.1425, -89.2895], [43.1435, -89.2882], [43.1438, -89.2878], [43.1439, -89.2878], [43.1443, -89.2872], [43.1443, -89.2872], [43.1453, -89.286], [43.1454, -89.2859], [43.1454, -89.2858], [43.1457, -89.2856], [43.1463, -89.2848], [43.1463, -89.2847], [43.1465, -89.2846], [43.1466, -89.2845], [43.147, -89.2839], [43.1472, -89.2836], [43.1475, -89.2832], [43.1476, -89.2831], [43.1477, -89.2831], [43.1484, -89.2822], [43.1487, -89.2819], [43.1487, -89.2818], [43.1489, -89.2816], [43.1492, -89.2813], [43.1501, -89.2803], [43.1511, -89.2791], [43.1522, -89.2779], [43.1526, -89.2775], [43.1532, -89.2767], [43.1533, -89.2766], [43.1537, -89.2762], [43.1544, -89.2754], [43.1549, -89.2749], [43.1554, -89.2742], [43.1555, -89.2741], [43.1566, -89.2729], [43.1577, -89.2716], [43.1579, -89.2714], [43.1583, -89.271], [43.1587, -89.2706], [43.1588, -89.2704], [43.1589, -89.2703], [43.159, -89.2702], [43.1601, -89.2689], [43.1612, -89.2676], [43.1613, -89.2675], [43.1624, -89.2664], [43.1626, -89.2661], [43.163, -89.2656]], [[43.088, -89.3651], [43.0881, -89.3649], [43.0882, -89.3648], [43.0883, -89.3645], [43.0884, -89.3645], [43.0891, -89.3634], [43.0896, -89.3626], [43.0898, -89.3624], [43.0899, -89.3623], [43.0901, -89.362], [43.0909, -89.3609], [43.0911, -89.3607], [43.0913, -89.3604], [43.092, -89.3594], [43.093, -89.358], [43.0937, -89.3571], [43.0941, -89.3566], [43.0946, -89.3559], [43.0951, -89.3553], [43.0956, -89.3547], [43.0959, -89.3543], [43.096, -89.3542], [43.0969, -89.353], [43.097, -89.3528], [43.0972, -89.3526], [43.0972, -89.3526], [43.0976, -89.352], [43.098, -89.3516], [43.0982, -89.3513], [43.0983, -89.3512], [43.0984, -89.3511], [43.0994, -89.3497], [43.0994, -89.3497], [43.0995, -89.3496], [43.0998, -89.3493], [43.0998, -89.3493], [43.1003, -89.3489]], [[43.1089, -89.3362], [43.1091, -89.3359], [43.1091, -89.3359], [43.1092, -89.3357], [43.1101, -89.3345], [43.1102, -89.3344], [43.1105, -89.3339], [43.1111, -89.3333], [43.112, -89.332], [43.1121, -89.3319], [43.1126, -89.3311], [43.113, -89.3306], [43.113, -89.3305], [43.1131, -89.3304], [43.1139, -89.3291], [43.1143, -89.3286], [43.1144, -89.3284], [43.1146, -89.3281], [43.1148, -89.3277], [43.1151, -89.3273], [43.1153, -89.327], [43.1153, -89.3269], [43.1156, -89.3264], [43.116, -89.3258], [43.1161, -89.3257], [43.1164, -89.3253], [43.1165, -89.3251], [43.1167, -89.3246], [43.1172, -89.3238], [43.1177, -89.3231], [43.1184, -89.322], [43.1186, -89.3217], [43.1187, -89.3215], [43.1188, -89.3214], [43.1196, -89.3202], [43.1203, -89.3191], [43.1205, -89.3187], [43.1206, -89.3185], [43.1208, -89.3182], [43.1209, -89.3181], [43.1211, -89.3178], [43.1215, -89.3174], [43.1215, -89.3173], [43.1226, -89.3159], [43.1226, -89.3158], [43.1227, -89.3158], [43.1231, -89.315], [43.1234, -89.3145], [43.1235, -89.3144], [43.124, -89.3136], [43.124, -89.3135], [43.1249, -89.3121], [43.125, -89.312], [43.1259, -89.3107], [43.1261, -89.3104], [43.1262, -89.3103], [43.1271, -89.3089], [43.1277, -89.3081], [43.1287, -89.3066], [43.1294, -89.3055], [43.1297, -89.3052], [43.1307, -89.3039], [43.1315, -89.3029], [43.1318, -89.3025], [43.1324, -89.3017], [43.1324, -89.3017], [43.1325, -89.3016], [43.1328, -89.3012], [43.1331, -89.3009], [43.1338, -89.3], [43.1342, -89.2994], [43.1342, -89.2994], [43.1346, -89.299], [43.1354, -89.298], [43.1356, -89.2977], [43.1357, -89.2976], [43.1358, -89.2974], [43.1362, -89.297], [43.1363, -89.2969], [43.1366, -89.2965], [43.1367, -89.2964], [43.1367, -89.2964]], [[43.0859, -89.368], [43.086, -89.3679], [43.0864, -89.3674], [43.0868, -89.3668], [43.0872, -89.3662], [43.0872, -89.3662], [43.088, -89.3651]], [[43.0796, -89.377], [43.0796, -89.3769], [43.0802, -89.3759], [43.0803, -89.3758], [43.0807, -89.3751], [43.0809, -89.375], [43.0812, -89.3745], [43.0813, -89.3744], [43.0817, -89.3738], [43.0821, -89.3734], [43.0821, -89.3733], [43.0824, -89.373], [43.0831, -89.372], [43.0833, -89.3717], [43.0834, -89.3716], [43.0841, -89.3706], [43.0843, -89.3703], [43.0844, -89.3702], [43.0846, -89.3699], [43.0847, -89.3698], [43.0848, -89.3697], [43.0854, -89.3688], [43.0859, -89.368]], [[43.1034, -89.3436], [43.1035, -89.3432], [43.1038, -89.3428], [43.1041, -89.3422], [43.1042, -89.3421], [43.1052, -89.3409], [43.1053, -89.3407], [43.1056, -89.3404], [43.1064, -89.3397], [43.1065, -89.3395]], [[43.1032, -89.344], [43.1034, -89.3436]], [[43.1019, -89.347], [43.102, -89.3468], [43.102, -89.3467], [43.1025, -89.3457], [43.1026, -89.3453], [43.1028, -89.3448], [43.1031, -89.3442], [43.1032, -89.344]], [[43.077, -89.377], [43.0775, -89.3777], [43.0776, -89.3778], [43.078, -89.3783], [43.0781, -89.3784], [43.0783, -89.3786], [43.0788, -89.3779], [43.0793, -89.3774], [43.0794, -89.3773], [43.0796, -89.377]], [[43.076, -89.3758], [43.0765, -89.3766], [43.077, -89.377], [43.077, -89.377]], [[43.1067, -89.3394], [43.1071, -89.3388], [43.1072, -89.3388], [43.1074, -89.3384], [43.1076, -89.3382], [43.1079, -89.3376], [43.1084, -89.3368], [43.1089, -89.3362]], [[43.0673, -89.3853], [43.0681, -89.3847], [43.0681, -89.3847], [43.0682, -89.3846], [43.0683, -89.3845], [43.0685, -89.3842], [43.0693, -89.3832], [43.0703, -89.3818], [43.0707, -89.3814], [43.0714, -89.3804], [43.0716, -89.3802], [43.0726, -89.3788], [43.0728, -89.3786], [43.0735, -89.3776], [43.0738, -89.3773], [43.0746, -89.3764], [43.0748, -89.3761], [43.0754, -89.3758], [43.076, -89.3758], [43.076, -89.3758]], [[43.1167, -89.3246], [43.1167, -89.3246], [43.1167, -89.3246]], [[43.0651, -89.3979], [43.0661, -89.3963], [43.0669, -89.3951], [43.067, -89.3951], [43.0669, -89.395], [43.0668, -89.3948], [43.0667, -89.3947], [43.0662, -89.3939], [43.0661, -89.3938], [43.066, -89.3936], [43.0648, -89.3922], [43.0642, -89.3914], [43.0641, -89.3912], [43.064, -89.3909], [43.064, -89.3902], [43.0642, -89.3897], [43.0643, -89.3897], [43.0652, -89.389], [43.0655, -89.3887], [43.0657, -89.3886], [43.0658, -89.3885], [43.0662, -89.3879], [43.0665, -89.3873], [43.0667, -89.3868], [43.0669, -89.3858], [43.0669, -89.3857], [43.0669, -89.3857], [43.0671, -89.3855], [43.0671, -89.3854], [43.0673, -89.3853]], [[43.0433, -89.3941], [43.0431, -89.3941], [43.043, -89.3941], [43.0428, -89.3941]], [[43.0506, -89.3944], [43.0506, -89.3944], [43.0518, -89.3949], [43.0519, -89.395], [43.0529, -89.3958], [43.0529, -89.3958], [43.0532, -89.3961], [43.0536, -89.3966], [43.0539, -89.397], [43.0539, -89.3971], [43.0541, -89.3972], [43.0543, -89.3973], [43.0551, -89.3976]], [[43.0477, -89.3941], [43.0472, -89.3941], [43.0471, -89.3941], [43.0462, -89.3941], [43.0451, -89.3941], [43.0449, -89.3941], [43.0448, -89.3941], [43.0441, -89.3941], [43.0439, -89.3941], [43.0433, -89.3941]], [[43.0487, -89.3941], [43.0477, -89.3941]], [[43.0492, -89.3942], [43.0487, -89.3941]], [[43.1003, -89.3489], [43.1008, -89.3485], [43.1013, -89.3478], [43.1014, -89.3478], [43.1019, -89.347]], [[43.1066, -89.3395], [43.1067, -89.3394]], [[43.0492, -89.3942], [43.05, -89.3943], [43.0506, -89.3944]]]}, {"kind": "ped", "road": "WI-190", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 43.0899, "lon": -88.0159, "n": 10, "e": [[43.0901, -88.1252], [43.09, -88.0936], [43.0898, -88.0584], [43.0898, -88.0168], [43.0899, -88.004], [43.09, -87.9884], [43.0899, -87.9783], [43.0898, -87.9697], [43.0898, -87.9635], [43.0899, -87.9617]], "mi": 9.1, "permi": 1.1, "marks": [[43.08981, -87.96702], [43.08993, -87.99199], [43.09002, -87.99719], [43.08973, -87.96626], [43.08998, -88.12194], [43.08993, -87.97595], [43.08976, -88.03049], [43.09029, -88.12843], [43.08973, -88.02274], [43.09, -87.95708]], "geom": [[[43.0904, -88.1323], [43.0904, -88.1321], [43.0903, -88.1311], [43.0903, -88.1307], [43.0903, -88.1293], [43.0902, -88.1287], [43.0902, -88.1276], [43.0902, -88.1274], [43.0902, -88.1268], [43.0901, -88.126], [43.0901, -88.126], [43.0901, -88.1251], [43.0901, -88.124], [43.0901, -88.1236], [43.0901, -88.123], [43.0901, -88.1226], [43.0901, -88.1226], [43.0901, -88.122], [43.09, -88.12], [43.09, -88.1192], [43.09, -88.1183], [43.09, -88.1182], [43.09, -88.118], [43.09, -88.1162], [43.09, -88.116], [43.09, -88.1159], [43.09, -88.1158], [43.09, -88.1144], [43.09, -88.114], [43.09, -88.1136], [43.09, -88.1136], [43.09, -88.1134], [43.0899, -88.112], [43.0899, -88.111], [43.0898, -88.1102], [43.0898, -88.11], [43.0898, -88.1088]], [[43.0898, -88.1088], [43.0898, -88.1082], [43.0898, -88.108], [43.0898, -88.1078], [43.0897, -88.107], [43.0897, -88.107], [43.0897, -88.107]], [[43.09, -87.9762], [43.09, -87.9762], [43.09, -87.9762]], [[43.0897, -88.0478], [43.0897, -88.0478], [43.0897, -88.0478]], [[43.0899, -87.9748], [43.0899, -87.9747], [43.0899, -87.9742], [43.0899, -87.974], [43.0899, -87.9736], [43.0899, -87.9728], [43.0899, -87.9725], [43.0899, -87.9723], [43.0899, -87.9712], [43.0899, -87.9703], [43.0899, -87.9701], [43.0899, -87.97], [43.0899, -87.9685], [43.0899, -87.9683], [43.0899, -87.9679], [43.0899, -87.9672], [43.0899, -87.9669], [43.0899, -87.9664], [43.0899, -87.9658], [43.0899, -87.9656], [43.0899, -87.9655], [43.0899, -87.9646], [43.0899, -87.9644], [43.0899, -87.9642], [43.0899, -87.9631], [43.0899, -87.963], [43.0899, -87.9624], [43.0899, -87.9622], [43.0899, -87.9621], [43.0899, -87.9613], [43.0899, -87.9609], [43.0899, -87.9608], [43.0899, -87.9605], [43.0899, -87.9601], [43.0899, -87.9597], [43.0899, -87.9596], [43.0898, -87.9589], [43.0898, -87.9587], [43.0898, -87.9585], [43.0898, -87.9584], [43.0898, -87.9581], [43.0898, -87.9579], [43.0898, -87.9577], [43.0898, -87.9571], [43.0898, -87.9571], [43.0898, -87.9561], [43.0898, -87.9557], [43.0898, -87.9557], [43.0898, -87.9551], [43.0898, -87.9551], [43.0898, -87.9541], [43.0898, -87.9536], [43.0898, -87.9532]], [[43.09, -87.9979], [43.09, -87.9973], [43.09, -87.9972], [43.09, -87.9962], [43.09, -87.9959], [43.09, -87.9952], [43.09, -87.9947], [43.09, -87.9946], [43.09, -87.9942], [43.09, -87.9934], [43.09, -87.9925], [43.09, -87.9922], [43.09, -87.9921], [43.09, -87.9919], [43.09, -87.9908], [43.09, -87.9901], [43.09, -87.9895], [43.09, -87.9883], [43.09, -87.9881], [43.09, -87.9874], [43.09, -87.9872], [43.09, -87.987], [43.09, -87.987], [43.09, -87.9861], [43.09, -87.9858], [43.09, -87.9857], [43.09, -87.9852], [43.09, -87.9846], [43.09, -87.9835], [43.09, -87.9833], [43.09, -87.9832], [43.09, -87.9829], [43.0899, -87.9824], [43.0899, -87.9819], [43.0899, -87.9814], [43.0899, -87.981], [43.0899, -87.9808], [43.09, -87.9796], [43.09, -87.9795], [43.0899, -87.979], [43.0899, -87.9786], [43.0899, -87.9784], [43.0899, -87.9782], [43.0899, -87.9777], [43.0899, -87.9771], [43.09, -87.9762], [43.0899, -87.9759], [43.0899, -87.9758], [43.0899, -87.9752], [43.0899, -87.9748]], [[43.0897, -88.038], [43.0897, -88.0368], [43.0897, -88.0366], [43.0897, -88.0361], [43.0897, -88.0358], [43.0898, -88.0355], [43.0898, -88.0341], [43.0898, -88.0321], [43.0898, -88.0307], [43.0898, -88.0302], [43.0898, -88.0294], [43.0898, -88.029], [43.0898, -88.0284], [43.0898, -88.0282], [43.0898, -88.028], [43.0898, -88.028], [43.0898, -88.0268], [43.0898, -88.026], [43.0898, -88.0255], [43.0898, -88.0242], [43.0898, -88.024], [43.0898, -88.023], [43.0898, -88.022], [43.0899, -88.0217], [43.0899, -88.0205], [43.0899, -88.0201], [43.0899, -88.0192], [43.0899, -88.0185], [43.0899, -88.0181], [43.0899, -88.018], [43.0899, -88.0177], [43.0899, -88.0173], [43.0899, -88.0167], [43.0899, -88.0161], [43.0899, -88.0155], [43.0899, -88.0143], [43.0899, -88.0141], [43.0899, -88.0129], [43.0899, -88.0128], [43.0899, -88.0123], [43.0899, -88.0121], [43.0899, -88.0113], [43.0899, -88.0103], [43.0899, -88.0101], [43.0899, -88.0101], [43.09, -88.0097], [43.09, -88.0089], [43.09, -88.0089], [43.09, -88.0085], [43.09, -88.0081], [43.09, -88.0079], [43.09, -88.0075], [43.09, -88.0075], [43.09, -88.0075], [43.09, -88.0062], [43.09, -88.0054], [43.09, -88.0052], [43.09, -88.005], [43.09, -88.0048], [43.09, -88.0044], [43.09, -88.0044], [43.09, -88.0034], [43.09, -88.0024], [43.09, -88.0023], [43.09, -88.0011], [43.09, -88.0003], [43.09, -88.0001], [43.09, -87.9995], [43.09, -87.9984], [43.09, -87.9983], [43.09, -87.9979]], [[43.0897, -88.0892], [43.0897, -88.0889], [43.0897, -88.0872], [43.0897, -88.087], [43.0897, -88.087], [43.0897, -88.085], [43.0897, -88.0846], [43.0897, -88.0838], [43.0897, -88.0836], [43.0896, -88.083], [43.0896, -88.0817], [43.0896, -88.0816], [43.0896, -88.0811], [43.0895, -88.0807], [43.0895, -88.0807], [43.0895, -88.0791], [43.0895, -88.0782], [43.0894, -88.0772], [43.0894, -88.077], [43.0894, -88.0752], [43.0894, -88.0748], [43.0893, -88.0742], [43.0893, -88.0732], [43.0893, -88.0726], [43.0892, -88.0717], [43.0892, -88.0716], [43.0892, -88.0713], [43.0892, -88.0699], [43.0891, -88.0695], [43.0891, -88.0695], [43.0891, -88.0693], [43.0891, -88.069], [43.0891, -88.0687], [43.0891, -88.0683], [43.0891, -88.0679], [43.0891, -88.0673], [43.0891, -88.0667], [43.0891, -88.0667], [43.089, -88.0647], [43.089, -88.0646], [43.089, -88.0636], [43.089, -88.0635], [43.0891, -88.0626], [43.0891, -88.0624], [43.0891, -88.062], [43.0891, -88.0617], [43.0891, -88.0617], [43.0891, -88.0611], [43.0891, -88.0609], [43.089, -88.0601], [43.089, -88.0597], [43.089, -88.0593], [43.089, -88.0593], [43.089, -88.0591], [43.089, -88.0589], [43.089, -88.0586], [43.089, -88.0579], [43.089, -88.0577], [43.0891, -88.0576], [43.0891, -88.0573], [43.0891, -88.0571], [43.0891, -88.057], [43.0893, -88.0552], [43.0893, -88.055], [43.0894, -88.0548], [43.0894, -88.0545], [43.0894, -88.0543], [43.0894, -88.0542], [43.0894, -88.0537], [43.0894, -88.0533], [43.0895, -88.0526], [43.0895, -88.0522], [43.0896, -88.0516], [43.0896, -88.0514], [43.0896, -88.0514], [43.0896, -88.0509], [43.0897, -88.0499], [43.0897, -88.0495], [43.0897, -88.048], [43.0897, -88.0478], [43.0897, -88.0476], [43.0897, -88.0463], [43.0897, -88.0459], [43.0897, -88.0441], [43.0897, -88.044], [43.0897, -88.0439], [43.0897, -88.0435], [43.0897, -88.0431], [43.0897, -88.0429], [43.0897, -88.0426], [43.0898, -88.0419], [43.0897, -88.0408], [43.0897, -88.04], [43.0897, -88.0397], [43.0897, -88.0388], [43.0897, -88.0384], [43.0897, -88.0381], [43.0897, -88.038]], [[43.0897, -88.0971], [43.0897, -88.0969], [43.0896, -88.0951], [43.0896, -88.0949], [43.0896, -88.0945], [43.0896, -88.0935], [43.0896, -88.0931], [43.0896, -88.0929], [43.0896, -88.0926], [43.0896, -88.0911], [43.0896, -88.0905], [43.0897, -88.0903], [43.0897, -88.0892]], [[43.0897, -88.103], [43.0897, -88.1026], [43.0897, -88.1024], [43.0897, -88.1011], [43.0897, -88.1007], [43.0897, -88.0997], [43.0897, -88.0991], [43.0897, -88.0981], [43.0897, -88.0971]], [[43.0897, -88.107], [43.0897, -88.1068], [43.0897, -88.1064], [43.0897, -88.1062], [43.0897, -88.1057], [43.0897, -88.1054], [43.0897, -88.105], [43.0897, -88.103]]]}, {"kind": "ped", "road": "WI-32", "loc": "Mount Pleasant", "cty": "Racine", "lat": 42.6926, "lon": -87.8056, "n": 8, "e": [[42.6045, -87.8225], [42.6292, -87.8165], [42.6642, -87.8092], [42.6862, -87.8009], [42.702, -87.7936], [42.7247, -87.7935], [42.7577, -87.799], [42.7735, -87.8072]], "mi": 15.6, "permi": 0.5, "marks": [[42.68782, -87.80007], [42.7913, -87.81479], [42.62627, -87.82311], [42.67848, -87.80444], [42.75579, -87.79954], [42.69231, -87.79822], [42.72597, -87.78262], [42.5828, -87.8218]], "geom": [[[42.6915, -87.7985], [42.6921, -87.7983], [42.6929, -87.7979], [42.693, -87.7978], [42.6932, -87.7977], [42.6934, -87.7977], [42.6941, -87.7974], [42.6947, -87.7971], [42.6947, -87.7971], [42.6948, -87.7971], [42.6959, -87.7966], [42.6962, -87.7965], [42.697, -87.7962]], [[42.6212, -87.8254], [42.6215, -87.8254], [42.6217, -87.8253], [42.6218, -87.8253], [42.622, -87.8252], [42.6226, -87.825], [42.6234, -87.8246], [42.6238, -87.8245], [42.624, -87.8244], [42.6245, -87.8242], [42.6249, -87.824]], [[42.7194, -87.794], [42.7196, -87.7941], [42.7196, -87.7941], [42.7197, -87.7941], [42.7198, -87.7943], [42.7199, -87.7944]], [[42.6676, -87.8092], [42.6678, -87.8091]], [[42.675, -87.8059], [42.6761, -87.8054], [42.6764, -87.8053], [42.6767, -87.8052], [42.6775, -87.8048], [42.6789, -87.8042], [42.6789, -87.8042], [42.6793, -87.804], [42.6795, -87.8039], [42.6795, -87.8039], [42.6796, -87.8038], [42.6803, -87.8035], [42.6807, -87.8033], [42.6808, -87.8033], [42.6808, -87.8033], [42.6814, -87.8031], [42.6817, -87.803], [42.6825, -87.8026], [42.6825, -87.8026], [42.6839, -87.802], [42.6848, -87.8016], [42.6851, -87.8014], [42.6852, -87.8014], [42.6866, -87.8007], [42.688, -87.8001], [42.6893, -87.7995], [42.6896, -87.7994], [42.6907, -87.7989], [42.6915, -87.7985]], [[42.7743, -87.8043], [42.7745, -87.8044], [42.7752, -87.8046], [42.7757, -87.8049], [42.776, -87.8051], [42.7762, -87.805], [42.7766, -87.8053], [42.7768, -87.8054], [42.7769, -87.8055], [42.7771, -87.8055], [42.7779, -87.8058], [42.7779, -87.8059], [42.7785, -87.8062], [42.7792, -87.8065], [42.7799, -87.8068], [42.7802, -87.807], [42.7806, -87.8072], [42.7809, -87.8073], [42.7811, -87.8074], [42.7812, -87.8075], [42.7814, -87.8075], [42.7818, -87.8077], [42.7825, -87.808], [42.7825, -87.8081], [42.7826, -87.8081], [42.7834, -87.8084], [42.7836, -87.8086], [42.7839, -87.8087], [42.784, -87.8088], [42.7845, -87.809], [42.7847, -87.8091], [42.786, -87.8097], [42.7874, -87.8104], [42.7875, -87.8105], [42.7875, -87.8105], [42.7879, -87.8107], [42.7885, -87.8114], [42.7886, -87.8115], [42.7888, -87.8118], [42.7897, -87.8128], [42.7908, -87.814], [42.7915, -87.8148], [42.7918, -87.8151], [42.7918, -87.8152], [42.7919, -87.8153], [42.7919, -87.8154], [42.792, -87.8155], [42.7921, -87.8158], [42.7927, -87.8165], [42.7929, -87.8167], [42.7931, -87.817], [42.7932, -87.817], [42.7936, -87.8174], [42.7936, -87.8174], [42.7938, -87.8175], [42.7941, -87.8179], [42.7951, -87.8191], [42.7952, -87.8192]], [[42.7737, -87.804], [42.7739, -87.8041], [42.7739, -87.8042], [42.7743, -87.8042], [42.7743, -87.8043]], [[42.7393, -87.7917], [42.7404, -87.7929], [42.7416, -87.7941], [42.7423, -87.7948], [42.7425, -87.7953], [42.7429, -87.7957], [42.743, -87.7957], [42.7433, -87.7958], [42.7443, -87.7966], [42.7444, -87.7966], [42.7447, -87.7968], [42.7449, -87.7969], [42.7456, -87.7975], [42.7457, -87.7976], [42.7458, -87.7976], [42.7465, -87.798], [42.7472, -87.7981], [42.7475, -87.7982], [42.7478, -87.7983], [42.748, -87.7984], [42.7487, -87.7985], [42.7492, -87.7985], [42.7501, -87.7985], [42.7501, -87.7985], [42.7505, -87.7984], [42.7506, -87.7984], [42.7513, -87.7984], [42.752, -87.7984], [42.7523, -87.7983], [42.7531, -87.7985], [42.7535, -87.7986], [42.7539, -87.7988], [42.7547, -87.7991], [42.7548, -87.7992], [42.7555, -87.7994], [42.7562, -87.7997], [42.7568, -87.8], [42.7569, -87.8001], [42.7577, -87.8004], [42.7579, -87.8006], [42.7583, -87.8007], [42.7584, -87.8007], [42.7588, -87.801], [42.7592, -87.8012], [42.7596, -87.8013], [42.7606, -87.8016], [42.761, -87.8017], [42.761, -87.8017], [42.7612, -87.8018], [42.7619, -87.8018], [42.762, -87.8019], [42.7625, -87.8019], [42.7627, -87.802], [42.7639, -87.8021], [42.7653, -87.8023], [42.766, -87.8024], [42.7668, -87.8025], [42.7682, -87.8028], [42.7688, -87.8028], [42.7689, -87.8028], [42.7692, -87.8029], [42.7697, -87.8029], [42.7699, -87.803], [42.7701, -87.803], [42.7713, -87.8032], [42.7715, -87.8033], [42.772, -87.8034], [42.7721, -87.8035], [42.7724, -87.8035], [42.7728, -87.8037], [42.773, -87.8037], [42.7732, -87.8038], [42.7737, -87.804]], [[42.7006, -87.7938], [42.7013, -87.7938], [42.7013, -87.7938], [42.7021, -87.7938], [42.7028, -87.7938], [42.7035, -87.7938], [42.7042, -87.7938], [42.7043, -87.7938], [42.7044, -87.7938], [42.7049, -87.7938], [42.706, -87.7938], [42.7064, -87.7938], [42.7076, -87.7939], [42.7077, -87.7939], [42.7078, -87.7939], [42.7091, -87.7939], [42.7093, -87.7939], [42.7107, -87.7939], [42.7108, -87.7939], [42.7121, -87.7939], [42.7125, -87.7939], [42.7126, -87.7939], [42.7129, -87.7939], [42.7131, -87.7939], [42.7136, -87.7939], [42.714, -87.7939], [42.715, -87.7939], [42.7152, -87.7939], [42.7154, -87.794], [42.7154, -87.794], [42.7161, -87.794], [42.7168, -87.794], [42.7169, -87.794], [42.7182, -87.794], [42.7183, -87.794], [42.7184, -87.794], [42.7191, -87.794], [42.7194, -87.794]], [[42.5792, -87.8218], [42.5795, -87.8218], [42.5799, -87.8218], [42.5803, -87.8218], [42.5808, -87.8218], [42.5819, -87.822], [42.5822, -87.822], [42.5825, -87.822], [42.5827, -87.8221], [42.5831, -87.8221], [42.5837, -87.8223], [42.5843, -87.8224], [42.5845, -87.8224], [42.5846, -87.8224], [42.5851, -87.8226], [42.5855, -87.8227], [42.5862, -87.8228], [42.5864, -87.8229], [42.5864, -87.8229], [42.5866, -87.8229], [42.5867, -87.823], [42.5872, -87.8231], [42.5875, -87.8231], [42.5881, -87.8232], [42.5895, -87.8232], [42.5901, -87.8232], [42.5904, -87.8232], [42.5908, -87.8232], [42.5908, -87.8232], [42.5909, -87.8232], [42.5909, -87.8232], [42.591, -87.8232], [42.5915, -87.8232], [42.5917, -87.8232], [42.5925, -87.8232], [42.5926, -87.8232], [42.5935, -87.8232], [42.594, -87.8232], [42.5945, -87.8232], [42.5953, -87.8233], [42.5955, -87.8233], [42.5962, -87.8233], [42.597, -87.8233], [42.5971, -87.8233], [42.5979, -87.8233], [42.5985, -87.8233], [42.5989, -87.8233], [42.6004, -87.8233], [42.6007, -87.8233], [42.6019, -87.8233], [42.6025, -87.8233], [42.6033, -87.8233], [42.6048, -87.8232], [42.6063, -87.8232], [42.6065, -87.823], [42.6071, -87.8226], [42.6072, -87.8226], [42.6076, -87.8222], [42.6077, -87.8221], [42.6079, -87.8219], [42.6081, -87.8218], [42.6083, -87.8216], [42.6084, -87.8214], [42.6087, -87.8212], [42.6088, -87.8211], [42.6092, -87.821], [42.6106, -87.821], [42.6118, -87.821], [42.6121, -87.821], [42.6122, -87.821], [42.6135, -87.8211], [42.615, -87.8212], [42.6156, -87.8212], [42.6157, -87.8212], [42.6165, -87.8214]], [[42.6165, -87.8214], [42.6165, -87.8214], [42.6166, -87.8215], [42.6169, -87.8216], [42.6173, -87.822], [42.6176, -87.8224], [42.6184, -87.8235], [42.6186, -87.8238], [42.6189, -87.8243], [42.6195, -87.8248], [42.6198, -87.825], [42.62, -87.8252], [42.6205, -87.8254], [42.6209, -87.8254], [42.621, -87.8254], [42.6211, -87.8254], [42.6212, -87.8254]], [[42.7342, -87.7849], [42.7343, -87.7849], [42.7345, -87.785], [42.7345, -87.785]], [[42.7334, -87.7847], [42.7334, -87.7847], [42.7342, -87.7849]], [[42.7349, -87.785], [42.7355, -87.785], [42.7355, -87.785], [42.7355, -87.785], [42.7356, -87.786], [42.7356, -87.787], [42.7356, -87.787], [42.7355, -87.788], [42.7355, -87.7883], [42.7355, -87.7885], [42.7355, -87.7886], [42.7355, -87.7886], [42.7368, -87.7895], [42.7368, -87.7896], [42.7376, -87.7903], [42.7378, -87.7905], [42.738, -87.7907], [42.739, -87.7914], [42.7393, -87.7916], [42.7393, -87.7917], [42.7393, -87.7917]], [[42.6576, -87.8121], [42.6589, -87.8116], [42.6604, -87.8111], [42.6606, -87.811], [42.6617, -87.8106], [42.6631, -87.8101], [42.6634, -87.81], [42.6645, -87.8096], [42.6646, -87.8096], [42.665, -87.8096], [42.6655, -87.8095], [42.6655, -87.8095], [42.6656, -87.8095], [42.6657, -87.8095], [42.666, -87.8095], [42.6668, -87.8093], [42.6674, -87.8092], [42.6676, -87.8092]], [[42.6992, -87.7939], [42.7, -87.7938], [42.7006, -87.7938]], [[42.7345, -87.785], [42.7345, -87.785], [42.7346, -87.785], [42.7349, -87.785], [42.7349, -87.785]], [[42.6415, -87.8177], [42.6429, -87.8172], [42.6443, -87.8167], [42.6452, -87.8164], [42.6454, -87.8163], [42.6457, -87.8162], [42.6471, -87.8157], [42.6486, -87.8152], [42.65, -87.8147], [42.6501, -87.8147], [42.6514, -87.8143], [42.6522, -87.814], [42.6528, -87.8137], [42.6529, -87.8137], [42.6532, -87.8136], [42.6534, -87.8136], [42.6538, -87.8135], [42.6548, -87.8131], [42.6555, -87.8129], [42.6562, -87.8126], [42.6576, -87.8121]], [[42.672, -87.8072], [42.6731, -87.8068], [42.6734, -87.8066], [42.6748, -87.806], [42.675, -87.8059]], [[42.7334, -87.7847], [42.7334, -87.7847]], [[42.732, -87.7841], [42.7324, -87.7842], [42.7328, -87.7844], [42.7328, -87.7844], [42.7331, -87.7846], [42.7334, -87.7847]], [[42.6401, -87.8182], [42.6415, -87.8177]], [[42.6391, -87.8186], [42.6401, -87.8182]], [[42.6331, -87.8206], [42.6345, -87.8202], [42.6359, -87.8197], [42.6373, -87.8192], [42.6381, -87.8189], [42.6385, -87.8188], [42.6387, -87.8188], [42.6388, -87.8187], [42.6391, -87.8186]], [[42.6317, -87.8211], [42.6331, -87.8206]], [[42.7259, -87.7827], [42.7262, -87.7828], [42.7268, -87.7829]], [[42.6718, -87.8073], [42.672, -87.8072]], [[42.6716, -87.8074], [42.6718, -87.8073]], [[42.6304, -87.8216], [42.6308, -87.8214], [42.6313, -87.8213], [42.6317, -87.8211]], [[42.6302, -87.8217], [42.6304, -87.8216]], [[42.6983, -87.7951], [42.6985, -87.7944], [42.6991, -87.7939], [42.6992, -87.7939]], [[42.6287, -87.8222], [42.629, -87.8221], [42.63, -87.8217], [42.6302, -87.8217]], [[42.697, -87.7962], [42.6979, -87.7958], [42.6981, -87.7954], [42.6982, -87.7952], [42.6983, -87.7951]], [[42.6276, -87.8226], [42.6287, -87.8222]], [[42.7311, -87.7839], [42.7312, -87.7839], [42.7316, -87.784]], [[42.6259, -87.8236], [42.6263, -87.8234], [42.6268, -87.8231], [42.6269, -87.823], [42.6269, -87.823], [42.6272, -87.8229], [42.6273, -87.8228], [42.6276, -87.8227], [42.6276, -87.8226]], [[42.7316, -87.784], [42.732, -87.7841]], [[42.7297, -87.7836], [42.7306, -87.7837], [42.7311, -87.7839]], [[42.6696, -87.8082], [42.6699, -87.8081], [42.6706, -87.8079], [42.6708, -87.8078], [42.6715, -87.8075], [42.6716, -87.8074]], [[42.6252, -87.8239], [42.6255, -87.8238], [42.6256, -87.8237], [42.6259, -87.8236], [42.6259, -87.8236]], [[42.6249, -87.824], [42.6252, -87.8239]], [[42.7283, -87.7833], [42.7292, -87.7835], [42.7297, -87.7836]], [[42.7269, -87.7829], [42.728, -87.7832], [42.7283, -87.7833]], [[42.6679, -87.8091], [42.6692, -87.8084], [42.6694, -87.8083], [42.6696, -87.8082]], [[42.588, -87.8232], [42.5881, -87.8232], [42.5881, -87.8232]]]}, {"kind": "ped", "road": "US-12", "loc": "Madison", "cty": "Dane", "lat": 43.0421, "lon": -89.3548, "n": 8, "e": [[43.0498, -89.483], [43.0449, -89.4604], [43.0388, -89.4333], [43.0379, -89.3874], [43.0421, -89.347], [43.0456, -89.299], [43.0412, -89.2367], [43.038, -89.2082]], "mi": 18.4, "permi": 0.4, "marks": [[43.03082, -89.15003], [43.05303, -89.49177], [43.04399, -89.33676], [43.04509, -89.26643], [43.04764, -89.29377], [43.04665, -89.47432], [43.03473, -89.41041], [43.03512, -89.41506]], "geom": [[[43.0531, -89.4957], [43.0531, -89.4951], [43.0531, -89.4937], [43.0531, -89.4935], [43.0531, -89.4933], [43.0531, -89.4929], [43.0531, -89.4925], [43.053, -89.4917], [43.053, -89.4913], [43.0527, -89.4898], [43.0523, -89.488], [43.0523, -89.4879], [43.0518, -89.4861], [43.0518, -89.4859], [43.0511, -89.4843], [43.0509, -89.4838], [43.0506, -89.483], [43.0504, -89.4827], [43.0496, -89.481], [43.0488, -89.4793], [43.0483, -89.4782], [43.0481, -89.4777], [43.0478, -89.4772], [43.0477, -89.4768], [43.0476, -89.4766], [43.0476, -89.4766], [43.0474, -89.4763], [43.0474, -89.4762], [43.0473, -89.476], [43.0472, -89.4757], [43.0466, -89.4744], [43.0464, -89.4737], [43.0463, -89.4736], [43.0462, -89.4734], [43.0459, -89.4728], [43.0451, -89.4711], [43.045, -89.4707], [43.045, -89.4707], [43.0449, -89.4706], [43.0446, -89.4699], [43.0445, -89.4698], [43.0441, -89.469], [43.0433, -89.4675], [43.0433, -89.4673], [43.043, -89.4668], [43.0428, -89.4663], [43.0421, -89.4649], [43.0419, -89.4644], [43.0411, -89.4627], [43.0403, -89.4611], [43.0396, -89.4595], [43.0395, -89.4594], [43.0392, -89.4587], [43.0392, -89.4586], [43.039, -89.4582], [43.0386, -89.4573], [43.0385, -89.4569], [43.0381, -89.4561]], [[43.0345, -89.2221], [43.0345, -89.2219], [43.0344, -89.2215], [43.0341, -89.2202], [43.0338, -89.2186], [43.0337, -89.2183], [43.0337, -89.2182], [43.0334, -89.2163], [43.0334, -89.2161], [43.0334, -89.2161], [43.0332, -89.2145], [43.0332, -89.2144], [43.0331, -89.2124], [43.0329, -89.2107], [43.0329, -89.2107], [43.0329, -89.2106], [43.0329, -89.2104], [43.0328, -89.2085], [43.0326, -89.2065], [43.0326, -89.206], [43.0324, -89.2048], [43.0324, -89.2048], [43.0324, -89.2048], [43.0323, -89.2046], [43.0323, -89.2045], [43.032, -89.2026], [43.0318, -89.2014], [43.0317, -89.2007], [43.0315, -89.2], [43.0313, -89.1988], [43.0309, -89.1969], [43.0307, -89.1958], [43.0306, -89.1954], [43.0305, -89.1951], [43.0302, -89.1936], [43.0298, -89.1917], [43.0295, -89.1899], [43.0293, -89.189], [43.0289, -89.1871], [43.0288, -89.1866], [43.0286, -89.1852], [43.0284, -89.1843], [43.0284, -89.1835], [43.0284, -89.1835], [43.0284, -89.1832], [43.0284, -89.183], [43.0284, -89.182], [43.0285, -89.1813], [43.0286, -89.1796], [43.0287, -89.1793], [43.0287, -89.1792], [43.0288, -89.1784], [43.0289, -89.1774], [43.029, -89.1768], [43.029, -89.1754], [43.029, -89.1753], [43.0288, -89.1737], [43.0288, -89.1735], [43.0287, -89.1727], [43.0285, -89.1716], [43.0284, -89.171], [43.0284, -89.1696], [43.0284, -89.1693], [43.0285, -89.1676], [43.0285, -89.1676], [43.0287, -89.1657], [43.0289, -89.1637], [43.0291, -89.1618], [43.0292, -89.1599], [43.0294, -89.1579], [43.0295, -89.1571], [43.0297, -89.156], [43.03, -89.154], [43.0303, -89.1521], [43.0303, -89.1519], [43.0305, -89.1502], [43.0308, -89.1482], [43.031, -89.1463]], [[43.0346, -89.4069], [43.0346, -89.4068], [43.0346, -89.4062], [43.0346, -89.4061], [43.0345, -89.4059], [43.0345, -89.4052], [43.0345, -89.4039], [43.0344, -89.4038], [43.0344, -89.4033], [43.0344, -89.4026], [43.0344, -89.4019], [43.0344, -89.4013], [43.0346, -89.4001], [43.0346, -89.4], [43.0348, -89.3988], [43.035, -89.398], [43.035, -89.3977], [43.0352, -89.397], [43.0354, -89.3961], [43.0355, -89.3958], [43.0356, -89.3956], [43.0358, -89.3946], [43.0359, -89.3942], [43.036, -89.3939], [43.036, -89.3939], [43.036, -89.3939], [43.0361, -89.3935], [43.0363, -89.3927], [43.0367, -89.3911], [43.0367, -89.391], [43.0368, -89.3906], [43.0369, -89.39], [43.0371, -89.3896], [43.0372, -89.389], [43.0373, -89.3886], [43.0377, -89.387], [43.0378, -89.3866], [43.0382, -89.385], [43.0386, -89.3838], [43.0387, -89.3833], [43.0388, -89.3831], [43.0391, -89.3819], [43.0392, -89.3816], [43.0393, -89.3811], [43.0395, -89.3805], [43.0396, -89.3804], [43.0396, -89.3802], [43.0396, -89.3802], [43.0402, -89.3784], [43.0403, -89.3782], [43.0404, -89.3776], [43.0408, -89.3765], [43.0409, -89.3764], [43.0409, -89.3762], [43.0409, -89.3762], [43.0409, -89.3762], [43.0411, -89.3756], [43.0415, -89.3744], [43.0421, -89.3726], [43.0422, -89.3722], [43.0423, -89.3721], [43.0423, -89.3721], [43.0427, -89.3708], [43.0428, -89.3702], [43.0429, -89.3701], [43.0429, -89.3698], [43.043, -89.3695], [43.0431, -89.3689], [43.0431, -89.3687], [43.0432, -89.3685], [43.0432, -89.3683], [43.0432, -89.3681], [43.0432, -89.3679], [43.0432, -89.3676], [43.0432, -89.3671], [43.0433, -89.3668], [43.0433, -89.3658], [43.0433, -89.3656], [43.0434, -89.3649], [43.0434, -89.3648], [43.0435, -89.3637], [43.0435, -89.363], [43.0436, -89.3617], [43.0436, -89.3611], [43.0437, -89.3595], [43.0437, -89.3592], [43.0437, -89.3591], [43.0437, -89.3591], [43.0437, -89.3585], [43.0437, -89.3581], [43.0437, -89.3577], [43.0437, -89.3573], [43.0437, -89.3557], [43.0437, -89.3543], [43.0437, -89.3537], [43.0437, -89.3532], [43.0437, -89.352], [43.0437, -89.3517], [43.0437, -89.3516], [43.0437, -89.3507], [43.0437, -89.3507], [43.0437, -89.3498], [43.0437, -89.3493], [43.0437, -89.348], [43.0437, -89.3462], [43.0437, -89.3457], [43.0437, -89.3444], [43.0437, -89.3426], [43.0437, -89.3415], [43.0437, -89.3408], [43.0437, -89.3398], [43.0438, -89.3391], [43.0438, -89.3385], [43.0438, -89.3381], [43.0438, -89.3373], [43.0439, -89.3371], [43.044, -89.3355], [43.0441, -89.3337], [43.0442, -89.3319], [43.0442, -89.3311], [43.0443, -89.3302], [43.0443, -89.3298], [43.0443, -89.3298], [43.0444, -89.3289], [43.0444, -89.3287], [43.0445, -89.3268], [43.0445, -89.3264], [43.0445, -89.3258], [43.0446, -89.3248], [43.0446, -89.3242], [43.0446, -89.3239], [43.0447, -89.323], [43.0447, -89.323], [43.0447, -89.3223], [43.0447, -89.3221], [43.0448, -89.3219], [43.0448, -89.3207], [43.0448, -89.3203], [43.0448, -89.3199], [43.0448, -89.3199], [43.0448, -89.3196], [43.0448, -89.3196], [43.0449, -89.3184], [43.045, -89.3161], [43.0451, -89.3138], [43.0451, -89.3128], [43.0451, -89.3126], [43.0451, -89.3124], [43.0451, -89.3124], [43.0451, -89.3117], [43.0452, -89.3115], [43.0452, -89.3112], [43.0452, -89.311]], [[43.0452, -89.311], [43.0453, -89.31], [43.0453, -89.3097], [43.0454, -89.3091], [43.0455, -89.3083], [43.0457, -89.3074], [43.0458, -89.3072], [43.0458, -89.307], [43.0459, -89.3066], [43.0462, -89.3053], [43.0464, -89.3044], [43.0466, -89.3036], [43.047, -89.3016], [43.0471, -89.3014], [43.0472, -89.3006], [43.0474, -89.2996], [43.0474, -89.2993], [43.0475, -89.2976], [43.0475, -89.2974], [43.0475, -89.2971], [43.0474, -89.2964], [43.0474, -89.2956], [43.0474, -89.2935], [43.0473, -89.2915], [43.0472, -89.2895], [43.0472, -89.2887], [43.0472, -89.2876], [43.0472, -89.2874], [43.0472, -89.2867], [43.0472, -89.2866], [43.0471, -89.2864], [43.0471, -89.2864], [43.0471, -89.2864], [43.0471, -89.2858], [43.0471, -89.2856], [43.0471, -89.2854], [43.0471, -89.2853], [43.047, -89.2847], [43.047, -89.2841], [43.047, -89.284], [43.0469, -89.2838], [43.0467, -89.2832], [43.0465, -89.2824], [43.0463, -89.2821], [43.0462, -89.2819], [43.0462, -89.2818], [43.0461, -89.2814], [43.0461, -89.2812], [43.0458, -89.2805], [43.0458, -89.2804], [43.0457, -89.2795], [43.0456, -89.2791], [43.0456, -89.2789], [43.0456, -89.2787], [43.0456, -89.2786], [43.0456, -89.2785], [43.0456, -89.2779], [43.0456, -89.2774], [43.0456, -89.2769], [43.0456, -89.2767], [43.0455, -89.2759], [43.0455, -89.2753], [43.0455, -89.2751], [43.0455, -89.2736], [43.0454, -89.273], [43.0454, -89.2729], [43.0455, -89.2727], [43.0455, -89.2717], [43.0455, -89.2711], [43.0454, -89.2705], [43.0454, -89.2698], [43.0454, -89.2697], [43.0453, -89.2677], [43.0452, -89.2669], [43.0451, -89.266], [43.0451, -89.2658], [43.0449, -89.2646], [43.0448, -89.2644], [43.0447, -89.2641], [43.0447, -89.2639], [43.0446, -89.2635], [43.0442, -89.2622], [43.0442, -89.2621], [43.0441, -89.2616], [43.0441, -89.2616], [43.044, -89.2615], [43.0437, -89.2602], [43.0433, -89.2583], [43.0428, -89.2564], [43.0427, -89.2559], [43.0425, -89.2553], [43.0423, -89.2545], [43.0419, -89.2527], [43.0414, -89.2508], [43.041, -89.2489], [43.0409, -89.2484], [43.0406, -89.2471], [43.0405, -89.2469], [43.0401, -89.2452], [43.0401, -89.245], [43.0396, -89.2431], [43.0391, -89.2412], [43.0389, -89.2401], [43.0387, -89.2394], [43.0382, -89.2375], [43.0378, -89.2356], [43.0373, -89.2337], [43.0373, -89.2335], [43.0369, -89.2318], [43.0364, -89.23], [43.036, -89.2281], [43.0356, -89.2266], [43.0355, -89.2262], [43.0354, -89.2258], [43.035, -89.224], [43.0345, -89.2221]], [[43.0379, -89.4556], [43.0375, -89.4547], [43.0371, -89.4541], [43.0371, -89.4539], [43.0367, -89.4532], [43.0367, -89.4532], [43.0366, -89.453], [43.0366, -89.453], [43.0365, -89.4529], [43.0365, -89.4527], [43.0361, -89.4519], [43.0356, -89.4511], [43.0354, -89.4506], [43.0354, -89.4505], [43.0353, -89.4503], [43.0352, -89.4499], [43.035, -89.4495]], [[43.0354, -89.4318], [43.0354, -89.4313], [43.0354, -89.4306], [43.0353, -89.43], [43.0353, -89.4296], [43.0354, -89.4286], [43.0353, -89.428], [43.0353, -89.4275], [43.0352, -89.4266], [43.0352, -89.4261], [43.0352, -89.4247], [43.0352, -89.4245], [43.0352, -89.4243], [43.0351, -89.4232], [43.0351, -89.4229], [43.0351, -89.4228], [43.0351, -89.4221], [43.0351, -89.4201], [43.035, -89.4183], [43.035, -89.4182], [43.0349, -89.4163], [43.0349, -89.416], [43.0349, -89.4159]], [[43.0354, -89.4324], [43.0354, -89.4318], [43.0354, -89.4318]], [[43.0353, -89.434], [43.0354, -89.4324]], [[43.0346, -89.4437], [43.0346, -89.4437], [43.0346, -89.4436], [43.0348, -89.4417], [43.0349, -89.4407], [43.0349, -89.4402], [43.0349, -89.4399], [43.035, -89.4397], [43.035, -89.4394], [43.035, -89.4394], [43.035, -89.4382], [43.035, -89.4379], [43.0351, -89.4367], [43.0352, -89.4359], [43.0352, -89.4349], [43.0353, -89.434]], [[43.038, -89.4558], [43.0379, -89.4556]], [[43.0346, -89.4075], [43.0346, -89.4069]], [[43.0347, -89.4089], [43.0346, -89.4087], [43.0346, -89.4076], [43.0346, -89.4075]], [[43.035, -89.4495], [43.0349, -89.4491], [43.0349, -89.449], [43.0348, -89.4487], [43.0347, -89.4483], [43.0346, -89.4478], [43.0346, -89.4475], [43.0346, -89.4473], [43.0346, -89.4469], [43.0346, -89.4467], [43.0345, -89.4464], [43.0345, -89.4459], [43.0346, -89.4455], [43.0346, -89.4451], [43.0346, -89.4437]], [[43.0348, -89.4129], [43.0348, -89.4117], [43.0347, -89.4108], [43.0347, -89.4099], [43.0347, -89.4097], [43.0347, -89.4097], [43.0347, -89.4091], [43.0347, -89.4089]], [[43.0381, -89.4561], [43.038, -89.4559], [43.038, -89.4558]], [[43.0349, -89.4158], [43.0349, -89.4149], [43.0348, -89.4138], [43.0348, -89.4129]]]}, {"kind": "ped", "road": "US-18", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 43.0376, "lon": -87.9952, "n": 7, "e": [[43.0355, -88.0701], [43.0353, -88.0594], [43.0362, -88.0117], [43.0375, -87.985], [43.039, -87.9583], [43.0395, -87.9428], [43.0398, -87.9354]], "mi": 9.1, "permi": 0.8, "marks": [[43.03875, -87.95945], [43.03487, -88.03792], [43.03886, -87.95767], [43.03607, -88.10238], [43.03488, -88.03781], [43.04017, -87.91318], [43.0394, -87.95764]], "geom": [[[43.0362, -87.9917], [43.0362, -87.9913], [43.0362, -87.9911], [43.0363, -87.99], [43.0363, -87.9893], [43.0363, -87.9887], [43.0363, -87.9878], [43.0364, -87.9875], [43.0364, -87.9875], [43.0364, -87.9874], [43.0364, -87.9864], [43.0364, -87.9862], [43.0364, -87.9861], [43.0364, -87.9856], [43.0364, -87.9854], [43.0365, -87.9846], [43.0365, -87.9846], [43.0365, -87.9838], [43.0365, -87.9828], [43.0365, -87.9826], [43.0366, -87.981], [43.0366, -87.9806], [43.0366, -87.9799], [43.0367, -87.9793], [43.0367, -87.9787], [43.0367, -87.9787], [43.0367, -87.9776], [43.0367, -87.9767], [43.0367, -87.9763], [43.0367, -87.9748], [43.0367, -87.9747], [43.0368, -87.9735], [43.0368, -87.9732], [43.0368, -87.9732], [43.037, -87.973], [43.037, -87.9728], [43.0372, -87.9721], [43.0374, -87.9711], [43.0374, -87.9709], [43.0374, -87.9708], [43.0375, -87.9705], [43.0376, -87.97], [43.0377, -87.9698], [43.0382, -87.9695], [43.0387, -87.9693], [43.0387, -87.9691], [43.0387, -87.9689], [43.0387, -87.9687], [43.0387, -87.9687], [43.0388, -87.9685], [43.0388, -87.9682], [43.0388, -87.9681], [43.0388, -87.968], [43.0388, -87.9674], [43.0388, -87.9666], [43.0388, -87.966], [43.0388, -87.9657], [43.0388, -87.9647], [43.0388, -87.964], [43.0388, -87.963], [43.0388, -87.9628], [43.0388, -87.9628], [43.0388, -87.962], [43.0388, -87.9612], [43.0388, -87.9606], [43.0388, -87.9599], [43.0388, -87.9598], [43.0388, -87.9591], [43.0388, -87.9588], [43.0388, -87.9586], [43.0388, -87.9578], [43.0402, -87.9576], [43.0404, -87.9576], [43.0415, -87.9576], [43.0432, -87.9577], [43.0435, -87.9577], [43.0437, -87.9577]], [[43.0351, -88.0469], [43.0351, -88.0469], [43.0351, -88.0469]], [[43.0357, -88.002], [43.0358, -88.0012], [43.0358, -88.0012], [43.0358, -88.0], [43.0359, -87.9998], [43.0359, -87.9993], [43.0359, -87.9985], [43.0359, -87.9985], [43.0359, -87.9977], [43.036, -87.9974], [43.036, -87.9973], [43.036, -87.9971], [43.036, -87.9957], [43.036, -87.9953], [43.036, -87.9947], [43.036, -87.9946], [43.0361, -87.9934], [43.0361, -87.9933], [43.0361, -87.9927], [43.0362, -87.9922], [43.0362, -87.9917]], [[43.0361, -88.1058], [43.0361, -88.1051], [43.0361, -88.1039], [43.0361, -88.1033], [43.0361, -88.1031], [43.036, -88.1023], [43.0361, -88.1021], [43.0361, -88.1011], [43.0361, -88.1009], [43.0361, -88.1003], [43.0362, -88.0996], [43.0363, -88.0994], [43.0363, -88.0992], [43.0364, -88.0984], [43.0366, -88.0972], [43.0366, -88.0971], [43.0367, -88.0969], [43.0368, -88.096], [43.0368, -88.0956], [43.0368, -88.0953], [43.0368, -88.0947], [43.0368, -88.0942], [43.0367, -88.0934], [43.0367, -88.0933], [43.0367, -88.0929], [43.0367, -88.0926], [43.0366, -88.0924], [43.0366, -88.092], [43.0366, -88.0914], [43.0364, -88.0894], [43.0363, -88.0882], [43.0363, -88.088], [43.0363, -88.0879], [43.0363, -88.0875], [43.0362, -88.0871], [43.0362, -88.0871], [43.0361, -88.0852], [43.036, -88.0846], [43.036, -88.0845], [43.0359, -88.0833], [43.0359, -88.0827], [43.0359, -88.082], [43.0359, -88.0814], [43.0359, -88.0805], [43.0359, -88.0797], [43.0359, -88.0795], [43.0359, -88.079], [43.0359, -88.0776], [43.0359, -88.0775], [43.0359, -88.0773], [43.036, -88.0757], [43.036, -88.0753], [43.036, -88.0747], [43.036, -88.0746], [43.0361, -88.074], [43.0361, -88.0738], [43.0361, -88.0733], [43.0361, -88.0727], [43.0362, -88.0719], [43.0362, -88.0714], [43.0363, -88.0709], [43.0363, -88.0708], [43.0363, -88.07], [43.0364, -88.0689], [43.0365, -88.0687], [43.0365, -88.0682], [43.0365, -88.068], [43.0365, -88.0676], [43.0365, -88.0676], [43.0365, -88.0672], [43.0365, -88.067], [43.0365, -88.0666], [43.0365, -88.0664], [43.0365, -88.0663], [43.0365, -88.066], [43.0365, -88.0656], [43.0365, -88.0651], [43.0364, -88.064], [43.0364, -88.0636], [43.0364, -88.0632], [43.0363, -88.063], [43.0363, -88.0615], [43.0362, -88.0609], [43.0362, -88.0607], [43.0361, -88.0596], [43.0361, -88.0593], [43.036, -88.0587], [43.036, -88.0584], [43.0359, -88.0577], [43.0359, -88.0576], [43.0359, -88.0571], [43.0359, -88.0565], [43.0359, -88.0564], [43.0358, -88.0561], [43.0358, -88.0555], [43.0358, -88.0554], [43.0358, -88.0551], [43.0357, -88.0543], [43.0356, -88.0539], [43.0356, -88.0535], [43.0356, -88.0534], [43.0356, -88.0533], [43.0356, -88.0529], [43.0355, -88.0521], [43.0355, -88.0517], [43.0355, -88.0515], [43.0354, -88.0507], [43.0354, -88.0503], [43.0354, -88.0503], [43.0354, -88.0497], [43.0353, -88.0495], [43.0353, -88.0494], [43.0353, -88.0491], [43.0353, -88.0487], [43.0353, -88.0486], [43.0353, -88.0485], [43.0352, -88.0481], [43.0352, -88.0479], [43.0352, -88.0477], [43.0352, -88.0475], [43.0351, -88.0471], [43.0351, -88.0469], [43.0351, -88.0468], [43.0351, -88.0463], [43.035, -88.045], [43.035, -88.0448], [43.035, -88.0446], [43.0349, -88.0442], [43.0349, -88.0431], [43.0349, -88.0431], [43.0348, -88.0425], [43.0348, -88.0412], [43.0348, -88.0412], [43.0349, -88.0398], [43.0349, -88.0392], [43.035, -88.0383], [43.035, -88.0375], [43.035, -88.0373], [43.035, -88.0371], [43.035, -88.0369], [43.0351, -88.0356], [43.0351, -88.0354], [43.0351, -88.035], [43.0352, -88.0345], [43.0352, -88.0343], [43.0352, -88.0343], [43.0352, -88.0341], [43.0353, -88.0333], [43.0353, -88.0333], [43.0354, -88.0325], [43.0354, -88.0323], [43.0355, -88.0317], [43.0355, -88.0317], [43.0357, -88.0304], [43.0357, -88.0303], [43.0358, -88.0292], [43.0359, -88.0284], [43.0359, -88.0281], [43.0359, -88.0276], [43.0359, -88.0276], [43.0359, -88.0274], [43.036, -88.0264], [43.036, -88.0255], [43.036, -88.025], [43.036, -88.0244], [43.036, -88.0244], [43.036, -88.0239], [43.036, -88.0234], [43.036, -88.0228], [43.0359, -88.0224], [43.0359, -88.0222], [43.036, -88.0204], [43.036, -88.0202], [43.036, -88.0194], [43.036, -88.019], [43.036, -88.0189], [43.036, -88.0186], [43.036, -88.0184], [43.036, -88.0178], [43.036, -88.0176], [43.036, -88.0174], [43.036, -88.0172], [43.036, -88.0166], [43.036, -88.0164], [43.036, -88.0162]], [[43.0355, -88.0047], [43.0356, -88.0039], [43.0356, -88.0037], [43.0357, -88.0028], [43.0357, -88.0027], [43.0357, -88.002]], [[43.0353, -88.0066], [43.0354, -88.0064], [43.0355, -88.0052], [43.0355, -88.0047]], [[43.0429, -87.916], [43.0429, -87.9161], [43.043, -87.9176], [43.0429, -87.9191], [43.0417, -87.9192], [43.0414, -87.9192]], [[43.0429, -87.9144], [43.0429, -87.9146], [43.0429, -87.9148], [43.0429, -87.916]], [[43.0408, -87.9105], [43.0409, -87.9099], [43.0409, -87.9098], [43.041, -87.9096]], [[43.0401, -87.9191], [43.0402, -87.9177], [43.0401, -87.9161], [43.0401, -87.916], [43.0401, -87.9147], [43.0401, -87.9145], [43.0401, -87.9131], [43.0402, -87.9129], [43.0403, -87.9125], [43.0404, -87.9122], [43.0407, -87.9109], [43.0407, -87.9109], [43.0408, -87.9105]], [[43.0359, -88.0143], [43.0357, -88.0132], [43.0356, -88.013], [43.0355, -88.0124], [43.0353, -88.0117], [43.0352, -88.0111], [43.0351, -88.0108], [43.0351, -88.0105], [43.0351, -88.0092], [43.0351, -88.009], [43.0351, -88.0086], [43.0352, -88.008], [43.0352, -88.0075], [43.0352, -88.0074], [43.0353, -88.007], [43.0353, -88.0066]], [[43.0359, -88.0146], [43.0359, -88.0146], [43.0359, -88.0146], [43.0359, -88.0143]], [[43.0414, -87.9192], [43.0414, -87.9192], [43.0414, -87.9192], [43.0414, -87.9192]], [[43.036, -88.0162], [43.0359, -88.0146]], [[43.0402, -87.9191], [43.0401, -87.9191], [43.0401, -87.9191], [43.0401, -87.9191]], [[43.0433, -87.9099], [43.0433, -87.9099], [43.0433, -87.9107], [43.0433, -87.9109], [43.0431, -87.9122], [43.0431, -87.9122], [43.0429, -87.914], [43.0429, -87.9144]], [[43.0412, -87.9192], [43.0406, -87.9192], [43.0401, -87.9191]], [[43.0414, -87.9192], [43.0412, -87.9192]]]}, {"kind": "ped", "road": "WI-241", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 42.9434, "lon": -87.9492, "n": 7, "e": [[42.9033, -87.9503], [42.9118, -87.95], [42.9322, -87.9494], [42.9412, -87.9491], [42.9598, -87.9488], [42.9752, -87.9485], [42.9867, -87.9483]], "mi": 4.8, "permi": 1.5, "marks": [[42.88143, -87.95103], [42.92868, -87.94933], [42.95204, -87.94869], [42.98475, -87.94838], [42.92515, -87.9495], [42.98871, -87.94829], [42.94275, -87.94923]], "geom": [[[42.9381, -87.9494], [42.9386, -87.9494], [42.9387, -87.9494], [42.939, -87.9494], [42.9395, -87.9494], [42.9399, -87.9494], [42.9403, -87.9494], [42.9405, -87.9493], [42.9411, -87.9493], [42.9412, -87.9493], [42.9419, -87.9493], [42.9422, -87.9493], [42.9425, -87.9493], [42.9431, -87.9493], [42.9434, -87.9493], [42.9435, -87.9493]], [[42.8958, -87.9508], [42.8961, -87.9507], [42.8973, -87.9507], [42.8979, -87.9507], [42.898, -87.9507], [42.8986, -87.9507]], [[42.9623, -87.9487], [42.9624, -87.9487], [42.9633, -87.9487], [42.9635, -87.9487], [42.9636, -87.9487]], [[42.8857, -87.9511], [42.8864, -87.9511], [42.8871, -87.9511]], [[42.8848, -87.9511], [42.8857, -87.9511]], [[42.8828, -87.9512], [42.8831, -87.9512], [42.8832, -87.9512]], [[42.9006, -87.9506], [42.9016, -87.9506], [42.9018, -87.9506], [42.9018, -87.9506], [42.9032, -87.9505], [42.9042, -87.9504], [42.9042, -87.9504]], [[42.9584, -87.9489], [42.9585, -87.9489], [42.9592, -87.9489], [42.9594, -87.9489]], [[42.9656, -87.9486], [42.9666, -87.9486], [42.9667, -87.9486], [42.9682, -87.9486], [42.9684, -87.9486], [42.9687, -87.9486], [42.9696, -87.9486], [42.9702, -87.9486], [42.9706, -87.9486], [42.971, -87.9486], [42.9715, -87.9486], [42.9719, -87.9486], [42.9723, -87.9486], [42.9725, -87.9486], [42.9729, -87.9486], [42.9731, -87.9486], [42.9732, -87.9486], [42.9735, -87.9486], [42.9739, -87.9486], [42.9753, -87.9486], [42.9768, -87.9485], [42.9769, -87.9485], [42.9773, -87.9485]], [[42.9551, -87.949], [42.9556, -87.9489], [42.9558, -87.9489], [42.9564, -87.9489], [42.9571, -87.9489]], [[42.8957, -87.9508], [42.8958, -87.9508]], [[42.9325, -87.9496], [42.9326, -87.9496], [42.9332, -87.9496], [42.9333, -87.9496], [42.9338, -87.9496]], [[42.9438, -87.9493], [42.9449, -87.9493], [42.9449, -87.9493], [42.9463, -87.9493], [42.9467, -87.9493], [42.9467, -87.9493]], [[42.9875, -87.9483], [42.9878, -87.9483], [42.9884, -87.9482], [42.9885, -87.9482]], [[42.929, -87.9497], [42.9292, -87.9497], [42.9294, -87.9497], [42.9295, -87.9497]], [[42.9322, -87.9496], [42.9325, -87.9496]], [[42.9342, -87.9496], [42.9344, -87.9496], [42.9346, -87.9496], [42.9348, -87.9496]], [[42.9541, -87.949], [42.9542, -87.949], [42.9549, -87.949], [42.9551, -87.949]], [[42.9074, -87.9503], [42.9076, -87.9503], [42.9087, -87.9503]], [[42.9535, -87.949], [42.9536, -87.949]], [[42.9849, -87.9483], [42.985, -87.9483], [42.9855, -87.9483], [42.9862, -87.9483]], [[42.9251, -87.9498], [42.9265, -87.9497], [42.9268, -87.9497], [42.9274, -87.9497], [42.9279, -87.9497], [42.9279, -87.9497], [42.9282, -87.9497], [42.9288, -87.9497], [42.929, -87.9497]], [[42.9243, -87.9498], [42.9251, -87.9498]], [[42.992, -87.9484], [42.9923, -87.9484], [42.9923, -87.9484]], [[42.9317, -87.9496], [42.9322, -87.9496]], [[42.9313, -87.9496], [42.9317, -87.9496]], [[42.9621, -87.9487], [42.9622, -87.9487], [42.9623, -87.9487]], [[42.9191, -87.95], [42.9193, -87.95], [42.9203, -87.9499]], [[42.9183, -87.95], [42.9191, -87.95]], [[42.8814, -87.9512], [42.8815, -87.9512]], [[42.8811, -87.9512], [42.8814, -87.9512]], [[42.8827, -87.9512], [42.8828, -87.9512]], [[42.9148, -87.9501], [42.9149, -87.9501], [42.9154, -87.9501]], [[42.9146, -87.9501], [42.9148, -87.9501]], [[42.9646, -87.9486], [42.9653, -87.9486], [42.9656, -87.9486]], [[42.9594, -87.9489], [42.9609, -87.9488], [42.9619, -87.9487], [42.9621, -87.9487]], [[42.952, -87.949], [42.9522, -87.949], [42.9535, -87.949]], [[42.9638, -87.9486], [42.9646, -87.9486]], [[42.9117, -87.9502], [42.9119, -87.9502], [42.9125, -87.9502], [42.9129, -87.9501]], [[42.9812, -87.9485], [42.9812, -87.9485], [42.9822, -87.9485]], [[42.9497, -87.9491], [42.9502, -87.9491]], [[42.923, -87.9498], [42.9232, -87.9498]], [[42.9222, -87.9499], [42.9227, -87.9498]], [[42.8903, -87.951], [42.8906, -87.951]], [[42.8902, -87.951], [42.8903, -87.951]], [[42.8886, -87.951], [42.889, -87.951], [42.89, -87.951], [42.8902, -87.951]], [[42.9797, -87.9485], [42.9802, -87.9485]], [[42.9909, -87.9483], [42.9912, -87.9483], [42.9913, -87.9483]], [[42.9906, -87.9483], [42.9909, -87.9483]], [[42.9636, -87.9487], [42.9638, -87.9486]], [[42.88, -87.9512], [42.8801, -87.9512], [42.8804, -87.9512]], [[42.9574, -87.9489], [42.9576, -87.9489], [42.9578, -87.9489], [42.9584, -87.9489]], [[42.8937, -87.9508], [42.8944, -87.9508]], [[42.9213, -87.9499], [42.9222, -87.9499]], [[42.9047, -87.9504], [42.9061, -87.9504], [42.9066, -87.9504], [42.9074, -87.9503]], [[42.8777, -87.9513], [42.8784, -87.9512]], [[42.8777, -87.9513], [42.8777, -87.9513]]]}, {"kind": "ped", "road": "Atkinson Ave", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 43.0889, "lon": -87.9328, "n": 7, "e": [[43.0973, -87.9471], [43.0936, -87.9409], [43.0897, -87.9345], [43.086, -87.9282], [43.0856, -87.9274], [43.0851, -87.9262], [43.0847, -87.9253]], "mi": 1.4, "permi": 5.0, "marks": [[43.08611, -87.92838], [43.08612, -87.92847], [43.0845, -87.92474], [43.09694, -87.94663], [43.085, -87.92591], [43.09768, -87.94759], [43.08582, -87.92786]]}, {"kind": "ped", "road": "Teutonia Ave", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 43.1094, "lon": -87.9472, "n": 7, "e": [[43.1286, -87.9526], [43.123, -87.9517], [43.1124, -87.95], [43.1076, -87.9479], [43.1021, -87.9452], [43.0949, -87.9417], [43.0929, -87.9406]], "mi": 2.6, "permi": 2.7, "marks": [[43.11199, -87.94997], [43.09555, -87.94201], [43.09901, -87.94381], [43.09021, -87.93914], [43.11337, -87.95007], [43.11178, -87.94993], [43.14379, -87.95521]]}, {"kind": "ped", "road": "WI-175", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 43.1001, "lon": -88.0136, "n": 5, "e": [[43.1125, -88.0258], [43.1102, -88.0229], [43.1047, -88.0172], [43.0919, -88.0054], [43.0849, -87.9996]], "mi": 3.4, "permi": 1.5, "marks": [[43.10576, -88.01697], [43.11259, -88.0259], [43.11233, -88.02576], [43.07372, -87.99037], [43.0961, -88.00892]], "geom": [[[43.1082, -88.0204], [43.1093, -88.0217], [43.1093, -88.0218], [43.1101, -88.0227], [43.1104, -88.0231], [43.1114, -88.0245], [43.1117, -88.0248], [43.1124, -88.0257]], [[43.0751, -87.9921], [43.0752, -87.9922]], [[43.0705, -87.9871], [43.0708, -87.9873], [43.0709, -87.9874], [43.071, -87.9875], [43.0716, -87.9879], [43.0722, -87.9885], [43.0723, -87.9887], [43.0725, -87.989], [43.0731, -87.9897], [43.0732, -87.9899], [43.0735, -87.9902], [43.0741, -87.9909], [43.0742, -87.991], [43.0743, -87.9912], [43.0751, -87.9921]], [[43.0949, -88.0083], [43.0956, -88.0088], [43.0958, -88.0091], [43.096, -88.0093], [43.0962, -88.0094], [43.0969, -88.01], [43.0972, -88.0102], [43.0975, -88.0104], [43.0985, -88.0113], [43.0987, -88.0115], [43.099, -88.0117], [43.0992, -88.0117], [43.0997, -88.0122], [43.1, -88.0124], [43.1004, -88.0127], [43.1013, -88.0134], [43.1026, -88.0145], [43.1039, -88.0155], [43.104, -88.0155], [43.1043, -88.0158]], [[43.1139, -88.0275], [43.1149, -88.0289], [43.1155, -88.0297], [43.1157, -88.0299]], [[43.0789, -87.9952], [43.0802, -87.9963], [43.0815, -87.9973], [43.0817, -87.9975], [43.0818, -87.9975], [43.0819, -87.9977], [43.0819, -87.9977], [43.082, -87.9978], [43.0833, -87.9988], [43.0842, -87.9995], [43.0846, -88.0], [43.0846, -88.0], [43.0848, -88.0002], [43.0852, -88.0005], [43.0852, -88.0005], [43.0865, -88.0015], [43.0868, -88.0018], [43.0878, -88.0026], [43.0886, -88.0032], [43.0888, -88.0034]], [[43.09, -88.0044], [43.09, -88.0044], [43.0909, -88.0051]], [[43.0697, -87.9866], [43.07, -87.9868], [43.0703, -87.987], [43.0705, -87.9871]], [[43.1063, -88.0178], [43.1071, -88.019], [43.1077, -88.0198], [43.1082, -88.0204]], [[43.0897, -88.0042], [43.0898, -88.0043], [43.09, -88.0044]], [[43.1058, -88.0173], [43.1061, -88.0176], [43.1062, -88.0178], [43.1063, -88.0178]], [[43.1137, -88.0273], [43.1139, -88.0275]], [[43.092, -88.0061], [43.0924, -88.0065], [43.0931, -88.007], [43.0936, -88.0074]], [[43.0778, -87.9944], [43.0789, -87.9952]], [[43.0765, -87.9933], [43.0778, -87.9944]], [[43.0753, -87.9922], [43.0765, -87.9933]]]}, {"kind": "ped", "road": "Burleigh St", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 43.0752, "lon": -87.9608, "n": 5, "e": [[43.0753, -87.9821], [43.0753, -87.9732], [43.0752, -87.9581], [43.0752, -87.9466], [43.0752, -87.9421]], "mi": 2.0, "permi": 2.5, "marks": [[43.07523, -87.94694], [43.07536, -87.99238], [43.07523, -87.97173], [43.07508, -87.93736], [43.07521, -87.95563]]}, {"kind": "ped", "road": "60Th St", "loc": "Milwaukee", "cty": "Milwaukee", "lat": 43.0863, "lon": -87.9866, "n": 5, "e": [[43.0341, -87.9874], [43.0579, -87.9871], [43.1049, -87.9865], [43.121, -87.9861], [43.1289, -87.9859]], "mi": 6.6, "permi": 0.8, "marks": [[42.9721, -87.98805], [43.10529, -87.98641], [43.11311, -87.98618], [43.14462, -87.98559], [43.09616, -87.98679]]}]}, CITIES=[["Milwaukee", 43.0684, -87.9596, 12], ["Madison", 43.083, -89.3733, 12], ["Racine", 42.7292, -87.8017, 12], ["West Allis", 43.0066, -88.0232, 12], ["Green Bay", 44.5077, -87.9973, 12], ["Janesville", 42.6879, -89.0078, 12], ["Kenosha", 42.5882, -87.8544, 12], ["Beloit", 42.523, -89.0254, 12], ["Waukesha", 43.0104, -88.2273, 12], ["Eau Claire", 44.8088, -91.4836, 12], ["Caledonia", 42.796, -87.8667, 12], ["Oshkosh", 44.0173, -88.5583, 12], ["Mount Pleasant", 42.7065, -87.8765, 12], ["South Milwaukee", 42.9001, -87.9102, 12], ["Pleasant Prairie", 42.5366, -87.883, 12], ["Greenfield", 42.9648, -87.988, 12], ["Brookfield", 43.0603, -88.1242, 12], ["Pewaukee", 43.0704, -88.2499, 12], ["Menomonee Falls", 43.1473, -88.1242, 12], ["La Crosse", 43.8236, -91.2376, 12], ["Wauwatosa", 43.056, -88.033, 12], ["Sheboygan", 43.7463, -87.7259, 12], ["Fond Du Lac", 43.7727, -88.4511, 12], ["New Berlin", 42.9565, -88.132, 12], ["Germantown", 43.2185, -88.143, 12], ["Superior", 46.7012, -92.0682, 12], ["Onalaska", 43.8784, -91.2038, 12], ["Franklin", 42.8976, -88.0203, 12], ["Bristol", 42.5343, -87.9966, 12], ["Appleton", 44.2722, -88.3834, 12]];
+const NM_BOUNDS=[[42.493, -92.806], [46.899, -86.978]];
+const map=L.map('map',{attributionControl:true});
+// Fit the whole state. On phones the bottom panel covers the lower screen, so pad
+// the bottom by its height — the state then centers in the VISIBLE area above it.
+function fitState(){
+  const isM=window.matchMedia('(max-width:620px)').matches;
+  const c=document.getElementById('ctrl');
+  const pb=(isM && c && c.offsetParent!==null) ? c.offsetHeight+24 : 12;
+  // desktop: reserve room on the left for the wider legend so the state sits
+  // slightly right of center (not behind it)
+  const padL=isM?12:150;
+  map.fitBounds(NM_BOUNDS,{paddingTopLeft:[padL,12],paddingBottomRight:[12,pb]});
+}
+fitState();   // padded fit up front so the orientation matches the post-load re-fit (no jump)
+map.attributionControl.setPrefix(false);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OSM, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+const canvas=L.canvas({padding:.5});
+const segLayer=L.layerGroup().addTo(map), rhlLayer=L.layerGroup().addTo(map),
+      hlLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map),
+      markLayer=L.layerGroup().addTo(map);
+// the individual deaths that make up a hot spot — yellow ring, red center
+function drawMarks(marks){ markLayer.clearLayers();
+  (marks||[]).forEach(m=>L.circleMarker(m,{radius:5,color:'#ffd11a',weight:2.5,
+    fillColor:'#cb181d',fillOpacity:1,interactive:false}).addTo(markLayer)); }
+function msMsg(t){ const e=document.getElementById('msmsg'); if(e) e.textContent=t||''; }
+function mapSearch(q){
+  q=(q||'').trim().toLowerCase(); if(!q){ msMsg(''); return; }
+  // exact municipality -> center on it (its zoom depends on the place's size)
+  const exact=CITIES.find(c=>c[0].toLowerCase()===q);
+  if(exact){ rhlLayer.clearLayers(); map.setView([exact[1],exact[2]],exact[3]||12); msMsg(''); return; }
+  // otherwise treat as a road/place: highlight the matching segments' real geometry
+  const segs=SEG.filter(s=>((s.lab||'')+' '+(s.loc||'')).toLowerCase().includes(q));
+  if(segs.length){
+    rhlLayer.clearLayers();
+    const bnds=L.latLngBounds([]);
+    segs.forEach(s=>{ L.polyline(s.c,{color:'#1d6fd8',weight:hlWeight(),opacity:.55,interactive:false}).addTo(rhlLayer);
+      s.c.forEach(p=>bnds.extend(p)); });
+    map.fitBounds(bnds,{padding:[45,45],maxZoom:14}); msMsg(''); return;
+  }
+  const city=CITIES.find(c=>c[0].toLowerCase().includes(q));
+  if(city){ rhlLayer.clearLayers(); map.setView([city[1],city[2]],city[3]||12); msMsg(''); return; }
+  geocodeAddr(q);   // not a known road/town — try a street address (centers the map, selects nothing)
+}
+function geocodeAddr(q){
+  msMsg('Searching…');
+  const b=NM_BOUNDS, vb=[b[0][1],b[1][0],b[1][1],b[0][0]].join(',');   // west,north,east,south (viewbox bias)
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&viewbox=${vb}&q=${encodeURIComponent(q)}`)
+    .then(r=>r.json()).then(j=>{
+      if(j&&j.length){ rhlLayer.clearLayers(); map.setView([+j[0].lat,+j[0].lon],14); msMsg(''); }
+      else msMsg(`No match for “${q}”. Try a community, a major road, or a full street address.`);
+    }).catch(()=>msMsg(`Couldn’t look up “${q}”. Try a community or major road.`));
+}
+function hlWeight(){ return segWeight().hit*2.0 + 5; }   // translucent highlight, fatter than the route
+// light up THIS segment's own fatal crashes (yellow ring); on a share layer, only
+// the crashes of that type (e.g. just the alcohol-involved deaths on the stretch)
+function highlightSegCrashes(i){ markLayer.clearLayers();
+  const mt=MAPTYPES[maptype];
+  for(const c of CR){ if(c.sg!==i) continue;
+    if(c.y<y0||c.y>y1||!inCat(c.pc)) continue;
+    if(mt.share){ if(mt.since&&c.y<mt.since) continue; if(!c[mt.crkey]) continue; }
+    L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k)+3.5,color:'#ffd11a',
+      weight:2.5,fillColor:'#cb181d',fillOpacity:1,interactive:false}).addTo(markLayer);
+  }
+}
+function highlightSeg(i){ hlLayer.clearLayers();
+  if(SEG[i]) L.polyline(SEG[i].c,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
+    lineCap:'round',interactive:false}).addTo(hlLayer); }
+function highlightSpot(h){ hlLayer.clearLayers();
+  const lines = (h.geom && h.geom.length) ? h.geom : [h.e];   // real road geometry, else smoothed line
+  lines.forEach(ln=>L.polyline(ln,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
+    lineCap:'round',interactive:false}).addTo(hlLayer)); }
+const RATE_CUTS=[1.7, 2.8, 4.4, 7.9];   // per-state rate color thresholds (scaled to this state's data)
+function rateColor(r,n){ if(!n||r==null) return '#d4d4d4'; const c=RATE_CUTS;
+  return r<c[0]?'#1a9850':r<c[1]?'#a6d96a':r<c[2]?'#fee08b':r<c[3]?'#fdae61':'#d73027'; }
+const DOW=['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function crashPopup(c){
+  let cas=`${c.k} killed`;
+  if(c.inj) cas+=` · ${c.inj} injured`+(c.si?` (${c.si} serious)`:'');
+  let date=[c.dw?DOW[c.dw]:'', `${MON[c.m]||''} ${c.dy||''}, ${c.y}`.trim()].filter(Boolean).join(', ');
+  if(c.hr!=null){ const h=c.hr%12||12; date+=` · ${h} ${c.hr<12?'AM':'PM'}`; }
+  const details=[c.ev, c.d?'alcohol involved':''].filter(Boolean).join(' · ');
+  let html=`<div style="font:13.5px/1.6 -apple-system,Helvetica,Arial"><b>${cas}</b>`
+    +`<br><span style="color:#555">${date}</span>`;
+  if(details) html+=`<br>${details}`;
+  return html+'</div>';
+}
+
+let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all', ptsOff=false, maptype='risk';
+let segPolys=[], ptMarkers=[], curTab='map', syncing=false;
+let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
+
+const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
+const _rc=RATE_CUTS;
+const RATE_BUCKETS=[{lab:'<'+_rc[0],c:RAMP[0]},{lab:_rc[0]+'–'+_rc[1],c:RAMP[1]},{lab:_rc[1]+'–'+_rc[2],c:RAMP[2]},{lab:_rc[2]+'–'+_rc[3],c:RAMP[3]},{lab:_rc[3]+'+',c:RAMP[4]}];
+const COUNT_BUCKETS=[{lab:'1',c:RAMP[0]},{lab:'2–3',c:RAMP[1]},{lab:'4–6',c:RAMP[2]},{lab:'7–10',c:RAMP[3]},{lab:'11+',c:RAMP[4]}];
+function rateBucket(r){ const c=RATE_CUTS; return r<c[0]?0:r<c[1]?1:r<c[2]?2:r<c[3]?3:4; }
+function countBucket(n){ return n<=1?0:n<=3?1:n<=6?2:n<=10?3:4; }
+function curBuckets(){ return histMode==='rate'?RATE_BUCKETS:COUNT_BUCKETS; }
+// Trend of risk over the FULL period (2001–2024) in 5-year bands, category-filtered.
+// AADT is constant per segment, so rate-trend == crash-count-trend. Slope sign of
+// counts vs band index; needs >=4 crashes to call, else 'na'.
+function trendOf(s){
+  const b=[0,0,0,0,0];
+  s.cr.forEach(a=>{ if(!inCat(a[1])) return; const y=a[0];
+    b[y<=2005?0:y<=2010?1:y<=2015?2:y<=2020?3:4]++; });
+  if(b[0]+b[1]+b[2]+b[3]+b[4]<4) return 'na';
+  let slope=0; for(let x=0;x<5;x++) slope+=(x-2)*b[x]; slope/=10;
+  return slope>=0.25?'up':slope<=-0.25?'down':'flat';
+}
+function inCat(pc){ return cat==='all' ? true : (cat==='ped'? pc===1 : pc===0); }
+function sel(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&inCat(a[1])); }
+// Route COLORING uses all crashes in the window (overall risk) — independent of the
+// crash-type toggle, which only filters the dots. Routes never recolor on toggle.
+function selWin(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1); }
+function pedN(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&a[1]===1).length; }
+function rateOf(s,n,ny){ const vmt=s.a*365*ny*s.l; return vmt? n/vmt*1e8 : null; }
+function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehicle ':''; }
+
+// ---------- map types ----------
+// 'risk' = the fatal-crash rate (needs AADT). The others color each segment by the
+// SHARE of its crashes with a given trait (composition, AADT-independent).
+// cr per-crash array layout: [year, pc, alcohol, night, intersection, weather]
+const MAPTYPES={
+  risk:{lab:'Fatal crash risk'},
+  alc :{lab:'Alcohol involvement', share:1, fi:2, crkey:'d',  metric:'alcohol-involved', avg:'involving alcohol', dot:'alcohol-involved crashes',
+        note:'Recent-year alcohol involvement is under-counted.'},
+  nt  :{lab:'Nighttime crashes',   share:1, fi:3, crkey:'nt', metric:'at night', avg:'at night', dot:'nighttime crashes'},
+  ix  :{lab:'Deadly intersections',share:1, fi:4, crkey:'ix', since:2010, metric:'at an intersection', avg:'at intersections', dot:'intersection crashes',
+        note:'Based on 2010–2024 data only.'},
+  wx  :{lab:'Adverse weather',     share:1, fi:5, crkey:'wx', metric:'in adverse weather', avg:'in adverse weather', dot:'adverse-weather crashes'},
+};
+const SHARE_RAMP=['#f7fcfd','#bfd3e6','#8c96c6','#8856a7','#810f7c'];   // sequential (distinct from the rate ramp)
+const MINSHARE=4;   // need >=this many crashes in the window for a stable share
+function _hx(c){ return [parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)]; }
+function ramp(stops,t){ t=Math.max(0,Math.min(1,t||0)); const x=t*(stops.length-1),
+  i=Math.min(stops.length-2,Math.floor(x)), f=x-i, a=_hx(stops[i]), b=_hx(stops[i+1]);
+  return '#'+[0,1,2].map(j=>Math.round(a[j]+(b[j]-a[j])*f).toString(16).padStart(2,'0')).join(''); }
+function shareOf(s){ const mt=MAPTYPES[maptype], fi=mt.fi, since=mt.since||0; let num=0,den=0;
+  for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; if(since&&a[0]<since) continue; den++; if(a[fi]) num++; }
+  return den>=MINSHARE ? {share:num/den, n:den, k:num} : null; }
+function segHasData(s){ return MAPTYPES[maptype].share ? !!shareOf(s) : selWin(s).length>0; }
+function segColor(s,maxShare){
+  if(MAPTYPES[maptype].share){ const r=shareOf(s); return r? ramp(SHARE_RAMP, maxShare? r.share/maxShare:0) : '#dcdcdc'; }
+  const ny=y1-y0+1, n=selWin(s).length; return rateColor(rateOf(s,n,ny), n); }
+
+// ---------- map ----------
+function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
+  // Consistent regardless of the crash toggle — routes don't change when crashes hide.
+  return {hit:1.8+5.0*f, miss:0.6+1.0*f}; }   // higher floor so roads read at low (mobile) zoom
+// crash dots: tiny at statewide zoom (so they don't blob together), bigger as you zoom in
+function crashZ(){ return Math.max(0,Math.min(1,(map.getZoom()-6)/8)); }
+function crashR(k){ return 0.8+2.6*crashZ()+(k-1)*0.9; }
+function crashW(){ return 0.35+0.65*crashZ(); }
+function segTip(i){ const s=SEG[i], mt=MAPTYPES[maptype];
+  let body;
+  if(mt.share){ const r=shareOf(s);
+    body = r ? `<b>${Math.round(100*r.share)}%</b> of its ${r.n} fatal crashes were ${mt.metric}`
+             : `too few crashes to compare (under ${MINSHARE})`;
+  } else { const ny=y1-y0+1, n=selWin(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
+    body = `${s.l.toFixed(1)} miles with AADT ${s.a.toLocaleString()} · ${n} fatal crash${n===1?'':'es'}`
+      +(pc?` (${pc} ped/bike)`:'')+(rate!=null?` · ${rate.toFixed(1)} crashes per 100 million vehicle miles`:''); }
+  return `<div class="segpop"><b>${s.lab}</b>`
+    +`<br>${body}<br><button class="zbtn" onclick="toggleView()"></button></div>`; }
+const BIG_STATE=20000;   // above this many crashes, default the slider to recent years (lighter load)
+function drawCrashes(){
+  ptLayer.clearLayers(); ptMarkers=[];
+  const mt=MAPTYPES[maptype];
+  let nc=0,nk=0;
+  for(const c of CR){
+    if(c.y<y0||c.y>y1||!inCat(c.pc)) continue;
+    if(mt.share){ if(mt.since&&c.y<mt.since) continue; if(!c[mt.crkey]) continue; }
+    nc++; nk+=c.k;
+    if(ptsOff) continue;
+    const m=L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k),color:'#67000d',
+      weight:crashW(),fillColor:'#cb181d',fillOpacity:.85}).bindPopup(crashPopup(c)).addTo(ptLayer);
+    ptMarkers.push([m,c.k]);
+  }
+  document.getElementById('stat').innerHTML = ptsOff ? `Crash points hidden`
+    : mt.share ? `${nc.toLocaleString()} ${catWord()||''}fatal crashes ${mt.avg}`
+    : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
+}
+function drawMap(){
+  const zw=segWeight(), mt=MAPTYPES[maptype];
+  let maxShare=0;
+  if(mt.share) SEG.forEach(s=>{ const r=shareOf(s); if(r&&r.share>maxShare) maxShare=r.share; });
+  segLayer.clearLayers(); segPolys=[];
+  SEG.forEach((s,i)=>{
+    const has=segHasData(s);
+    const pl=L.polyline(s.c,{color:segColor(s,maxShare),weight:has?zw.hit:zw.miss,opacity:.85})
+      .bindPopup(segTip(i)).on('popupopen',()=>{ detail={t:'seg',i}; atState=(map.getZoom()<=8); highlightSeg(i); highlightSegCrashes(i); zbtnText(); });
+    pl.addTo(segLayer); segPolys[i]=pl;
+  });
+  document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
+  drawCrashes();
+  updateLegend(maxShare);
+}
+function riskLegendHtml(){
+  const c=RATE_CUTS;
+  return `<b class="lgttl">Fatal crashes per 100M vehicle-miles</b>`
+    +`<div class="lgscale"><span class="sw" style="background:#1a9850;margin-left:0"></span>&lt;${c[0]}`
+    +`<span class="sw" style="background:#a6d96a"></span>${c[0]}–${c[1]}`
+    +`<span class="sw" style="background:#fee08b"></span>${c[1]}–${c[2]}`
+    +`<span class="sw" style="background:#fdae61"></span>${c[2]}–${c[3]}`
+    +`<span class="sw" style="background:#d73027"></span>${c[3]}+`
+    +`<span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>`
+    +`<div class="muted lgfoot">Crash rate is calculated using 2017 AADT. Sources: crash data from `
+    +`<a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>; `
+    +`AADT from <a href="https://www.fhwa.dot.gov/policyinformation/hpms.cfm" target="_blank" rel="noopener">FHWA HPMS</a>. `
+    +`Address search <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</div>`;
+}
+// Statewide share for the current map type, over CR within the year window (and >=since).
+function statewideAvg(){ const mt=MAPTYPES[maptype]; if(!mt.share) return null;
+  const k=mt.crkey, since=mt.since||0; let num=0,den=0;
+  for(const c of CR){ if(c.y<y0||c.y>y1) continue; if(since&&c.y<since) continue; den++; if(c[k]) num++; }
+  return den? num/den : 0; }
+function updateLegend(maxShare){
+  const el=document.getElementById('legend'); if(!el) return;
+  const mt=MAPTYPES[maptype];
+  // The "what you're seeing" note (#risknote, above the legend) is relevant ONLY to
+  // Fatal crash risk — hidden in every other map type so the legend stays put.
+  const rn=document.getElementById('risknote'); if(rn) rn.style.display = (maptype==='risk') ? '' : 'none';
+  if(!mt.share){ el.innerHTML=riskLegendHtml(); return; }
+  const pct=Math.round(100*(maxShare||0))||100, avg=Math.round(100*statewideAvg());
+  el.innerHTML=`<b class="lgttl">Share of crashes ${mt.metric}</b>`
+    +`<div class="lgbar" style="background:linear-gradient(to right,${SHARE_RAMP.join(',')})"></div>`
+    +`<div class="lgbarlab"><span>0%</span><span>${pct}%</span></div>`
+    +`<div class="lgstat">Fatal crashes ${mt.avg} statewide: <b>${avg}%</b></div>`
+    +`<div class="lgna"><span class="sw" style="background:#dcdcdc;margin-left:0"></span>Insufficient crashes to assess</div>`
+    +(mt.note?`<div class="muted lgfoot">${mt.note}</div>`:'');
+}
+// zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
+map.on('zoomend',()=>{ const zw=segWeight(), cw=crashW();
+  segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:segHasData(SEG[i])?zw.hit:zw.miss}); });
+  ptMarkers.forEach(([m,k])=>{ m.setRadius(crashR(k)); m.setStyle({weight:cw}); });
+  hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); });
+  rhlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
+map.on('popupclose',()=>{ hlLayer.clearLayers(); markLayer.clearLayers(); });
+// Explicit view state so the toggle direction never depends on a zoom guess.
+let detail=null, atState=false, ready=false, hashLock=false;
+// Shareable URL: encodes the current tab and (on the map) center+zoom in the hash.
+function updateHash(){
+  if(!ready||hashLock) return;
+  let h=curTab;
+  if(curTab==='map'){ const c=map.getCenter(); h=`map=${c.lat.toFixed(4)},${c.lng.toFixed(4)},${map.getZoom()}`; }
+  history.replaceState(null,'','#'+h);
+}
+function applyHash(){
+  const h=decodeURIComponent((location.hash||'').replace(/^#/,'')); if(!h) return false;
+  const m=h.match(/^map=(-?\d+\.?\d*),(-?\d+\.?\d*),(\d+)/);
+  if(m){ hashLock=true; setTab('map'); map.setView([+m[1],+m[2]],+m[3]); hashLock=false; return true; }
+  if(h==='analysis'||h==='hotspots'||h==='map'){ setTab(h); return true; }
+  return false;
+}
+map.on('moveend',()=>{ if(curTab==='map') updateHash(); });
+function zbtnText(){ const b=document.querySelector('.leaflet-popup-content .zbtn');
+  if(b) b.textContent = atState ? '▴ Segment view' : '▾ Statewide view'; }
+map.on('popupopen',zbtnText);
+function toggleView(){
+  if(!atState){ atState=true; fitState(); }
+  else { atState=false;
+    if(detail&&detail.t==='seg') map.fitBounds(SEG[detail.i].c,{padding:[70,70],maxZoom:14});
+    else if(detail&&detail.t==='spot') map.fitBounds(detail.h.e,{padding:[80,80],maxZoom:14}); }
+  zbtnText();
+}
+function gotoSeg(i){
+  setTab('map');
+  map.fitBounds(SEG[i].c,{padding:[70,70],maxZoom:14});
+  setTimeout(()=>{ if(segPolys[i]) segPolys[i].openPopup(); }, 320);   // popupopen sets detail+highlight+label
+}
+function spotTip(h){
+  const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
+  return `<div class="segpop"><b>${h.road}</b> <span style="color:#555">— ${place}</span>`
+    +`<br><b>${h.n}</b> pedestrian / cyclist deaths over ${h.mi} mi · <b>${h.permi}/mile</b> (2001–2024)`
+    +`<br><button class="zbtn" onclick="toggleView()">▾ Statewide view</button></div>`;
+}
+function gotoSpot(h){
+  setTab('map');
+  if(h.seg!=null && SEG[h.seg]){ gotoSeg(h.seg); setTimeout(()=>drawMarks(h.marks),360); return; }
+  detail={t:'spot',h}; atState=false;
+  map.fitBounds(h.e,{padding:[80,80],maxZoom:14});
+  const mid=h.e[Math.floor(h.e.length/2)];
+  // open the popup FIRST (it fires popupclose on any prior popup, which clears
+  // the highlight layer), THEN draw the line + death markers so they survive.
+  setTimeout(()=>{ L.popup({maxWidth:260}).setLatLng(mid).setContent(spotTip(h)).openOn(map);
+                   highlightSpot(h); drawMarks(h.marks); }, 360);
+}
+let alcSpots=[], rateSpots=[], pedSpots=[];
+function renderHotspots(){
+  const NY=YMAX-YMIN+1;
+  let totCr=0,totVmt=0,totMi=0,totPed=0;
+  SEG.forEach(s=>{ totCr+=s.cr.length; totMi+=s.l; totVmt+=s.a*365*NY*s.l; for(const a of s.cr) if(a[1]) totPed++; });
+  let crAlc=0; for(const c of CR) if(c.d) crAlc++;
+  const avgRate=totVmt?totCr/totVmt*1e8:0, avgAlc=CR.length?crAlc/CR.length:0, avgPed=totMi?totPed/totMi:0;
+  const xLine=(v,avg)=> avg>0 ? `<b style="color:#c0392b">${(v/avg).toFixed(1)}×</b> statewide average` : '';
+  // Adaptive crash threshold: highest in [8,6,5,4] that still yields a usable pool
+  // (small states drop lower so the lists aren't near-empty).
+  const counts=SEG.map(s=>s.cr.length); let T=4;
+  for(const t of [8,6,5,4]){ if(counts.filter(n=>n>=t).length>=10){ T=t; break; } }
+  const rated = SEG.map((s,i)=>{ let alc=0,ped=0; for(const a of s.cr){ if(a[2])alc++; if(a[1])ped++; }
+      const vmt=s.a*365*NY*s.l, rate=vmt? s.cr.length/vmt*1e8 : 0;
+      return {road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length, ped, rate,
+              share:s.cr.length?alc/s.cr.length:0, len:s.l, aadt:s.a, segIndex:i}; }).filter(x=>x.n>=T);
+  // Only ABOVE-statewide-average areas — these tabs are the *worst*, top-down.
+  rateSpots = rated.filter(x=>x.rate>avgRate).sort((a,b)=>b.rate-a.rate);
+  alcSpots  = rated.filter(x=>x.share>avgAlc).sort((a,b)=>(b.share-a.share)||(b.n-a.n));
+  pedSpots  = (HOTSPOTS.ped||[]).filter(h=>h.permi>avgPed);
+  // Balance: equal count across shown categories (aim >=5); drop a too-thin one.
+  let cats=[{k:'rate',l:rateSpots},{k:'alc',l:alcSpots},{k:'ped',l:pedSpots}].filter(c=>c.l.length>=3);
+  let N=Math.min(12, ...cats.map(c=>c.l.length).concat([12]));
+  if(N<5 && cats.length>1){ cats=cats.slice().sort((a,b)=>a.l.length-b.l.length); cats.shift();
+    N=Math.min(12, ...cats.map(c=>c.l.length).concat([12])); }
+  const HEAD={
+    rate:['Highest death rate', `fatal crashes per 100M VMT, among segments with ≥${T} crashes · statewide average ${avgRate.toFixed(1)}`],
+    alc:['Most alcohol-involvement', `share of fatal crashes with alcohol involved (≥${T} crashes) · statewide average ${Math.round(100*avgAlc)}%`],
+    ped:['Pedestrian & cyclist death clusters', `most deaths on one road, regardless of traffic · statewide average ${avgPed.toFixed(2)}/mile`]};
+  const card=(h,k,i)=>{
+    const place=[h.loc, h.cty?`${h.cty} Co.`:''].filter(Boolean).join(' · ');
+    let lines;
+    if(k==='rate') lines=[`${h.len} mi · AADT ${h.aadt.toLocaleString()}`,
+        `${h.n} fatal crashes · <b>${h.rate.toFixed(1)}</b> per 100M VMT`, xLine(h.rate,avgRate)];
+    else if(k==='alc') lines=[`${h.n} fatal crashes`, `<b>${Math.round(100*h.share)}%</b> alcohol-involved`, xLine(h.share,avgAlc)];
+    else lines=[`${h.n} ped/cyclist deaths · ${h.mi} mi`, `<b>${h.permi}</b> per mile`, xLine(h.permi,avgPed)];
+    return `<div class="hscard" data-k="${k}" data-i="${i}"><div class="hsrank">${i+1}</div>`
+      +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${lines.filter(Boolean).join('<br>')}</div></div></div>`; };
+  document.getElementById('hslists').innerHTML = cats.map(c=>
+     `<div class="hsgrp"><h3 class="hsred">${HEAD[c.k][0]} <span class="muted">— ${HEAD[c.k][1]}</span></h3>`
+    +`<div class="hscards">`+c.l.slice(0,N).map((h,i)=>card(h,c.k,i)).join('')+`</div></div>`).join('')
+    || `<p class="sub">Not enough segments to rank for this state.</p>`;
+  document.querySelectorAll('.hscard').forEach(el=>el.onclick=()=>{
+    const k=el.dataset.k, i=+el.dataset.i;
+    if(k==='ped') gotoSpot(pedSpots[i]); else gotoSeg((k==='rate'?rateSpots:alcSpots)[i].segIndex); });
+}
+
+// ---------- analysis ----------
+// share of a segment's fatal crashes (in the year window) with a given flag (cr index)
+function shareWin(s,fi){ let num=0,den=0; for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; den++; if(a[fi]) num++; } return den? num/den : null; }
+function buildAnalysis(){
+  const ny=y1-y0+1;
+  document.getElementById('yrlabel2').textContent=y0===y1?y0:`${y0}–${y1}`;
+  const BK=curBuckets(), counts=BK.map(()=>0);
+  const rows=[]; let zero=0;
+  SEG.forEach((s,i)=>{
+    const c=sel(s), n=c.length;
+    if(n===0){ zero++;   // zero-crash segments are always listed (just sort to the bottom)
+      rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n:0,rate:rateOf(s,0,ny),ped:pedN(s),bkt:-1,trend:trendOf(s),
+        alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)}); return; }
+    const rate=rateOf(s,n,ny);
+    const bkt = histMode==='rate' ? rateBucket(rate) : countBucket(n);
+    counts[bkt]++;
+    rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n,rate,ped:pedN(s),bkt,trend:trendOf(s),
+      alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)});
+  });
+  renderHist(counts, BK);
+  let r = bucketFilter!=null ? rows.filter(x=>x.bkt===bucketFilter) : rows;
+  if(min3) r=r.filter(x=>x.n>=3);
+  if(search) r=r.filter(x=>((x.lab||'')+' '+(x.loc||'')).toLowerCase().includes(search));
+  const k=sort.key;
+  r.sort((A,B)=>{ if(k==='lab'||k==='loc') return sort.dir*String(A[k]||'').localeCompare(String(B[k]||''));
+    let va=A[k], vb=B[k]; va=(va==null?-1:va); vb=(vb==null?-1:vb); return sort.dir*(va-vb); });
+  renderTable(r);
+}
+function renderHist(counts, BK){
+  const max=Math.max(1,...counts), h=document.getElementById('hist');
+  h.innerHTML=BK.map((b,i)=>{
+    const cls='hbar'+(bucketFilter===i?' sel':'')+(bucketFilter!=null&&bucketFilter!==i?' dim':'');
+    return `<div class="${cls}" data-b="${i}"><div class="hn">${counts[i]}</div>`
+      +`<div class="bar" style="height:${Math.round(100*counts[i]/max)}%;background:${b.c}"></div>`
+      +`<div class="hl">${b.lab}</div></div>`; }).join('');
+  const axis = histMode==='rate'
+    ? 'crashes per 100 million vehicle miles traveled (VMT)'
+    : 'fatal crashes in the selected years';
+  const zn=document.getElementById('zeronote');
+  zn.innerHTML = `<span class="haxis">${axis}</span>`
+    + (bucketFilter!=null ? ` &nbsp;·&nbsp; <a href="#" id="hclear">show all segments</a>` : '');
+  const hc=document.getElementById('hclear');
+  if(hc) hc.onclick=(ev)=>{ ev.preventDefault(); bucketFilter=null; buildAnalysis(); };
+  h.querySelectorAll('.hbar').forEach(el=>el.onclick=()=>{
+    const b=+el.dataset.b; bucketFilter = (bucketFilter===b? null : b); buildAnalysis(); });
+}
+function renderCoverage(){
+  const off=STATS.crLocal+STATS.crUnmatched, pon=Math.round(100*STATS.crAssigned/STATS.crTotal);
+  const html=
+    `<b>What you're seeing — and what you're not:</b><br>`
+    +`Busy roads have more crashes on them in part because they have more traffic, so to assess `
+    +`<i>risk</i>, vehicle safety experts compare segments of road by the number of crashes per annual `
+    +`average daily traffic (AADT). FHWA HPMS publishes AADT for the highway network `
+    +`(${STATS.segTotal.toLocaleString()} segments) but not county and local roads.<br><br>`
+    +`Of ${STATS.crTotal.toLocaleString()} geocoded fatal crashes in Wisconsin ${STATS.yMin}–${STATS.yMax}, `
+    +`<b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> occurred on a rated segment, and can be compared below `
+    +`according to their crashes per 100 million vehicle miles traveled (VMT). `
+    +`<b>${off.toLocaleString()} (${100-pon}%)</b> occurred on local/county roads or could not be matched to a `
+    +`segment — they appear as points on the map but can not be compared according to risk.`;
+  ['risknote','aboutbody'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+}
+const COLS=[['lab','Road'],['loc','Location'],['l','Length (miles)'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
+const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['Insufficient data','#aaa']};
+function renderTable(rows){
+  const SHARE_COLS=[['alcSh','% alcohol','Share of the segment’s fatal crashes that were alcohol-involved (in the selected years)'],
+                    ['ntSh','% night','Share of the segment’s fatal crashes that happened in the dark'],
+                    ['wxSh','% weather','Share of the segment’s fatal crashes in adverse weather']];
+  const head='<thead><tr>'+COLS.map(([k,t])=>
+      `<th data-k="${k}" class="${sort.key===k?'sorted':''}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
+    +`<th title="Direction of risk in 5-year bands across 2001–2024 (independent of the year slider). ↑ rising · ↓ falling · → little change · ‘Insufficient data’ = too few crashes to tell.">Trend (2001–24)</th>`
+    +SHARE_COLS.map(([k,t,ti])=>`<th class="shcol ${sort.key===k?'sorted':''}" data-k="${k}" title="${ti}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
+    +`</tr></thead>`;
+  const pctc=v=>v!=null?Math.round(100*v)+'%':'—';
+  const body='<tbody>'+rows.map(r=>{
+    const col=rateColor(r.rate,r.n), tr=TREND[r.trend];
+    return `<tr data-i="${r.i}"><td>${r.lab}</td><td>${r.loc||''}</td><td>${r.l.toFixed(2)}</td><td>${r.a.toLocaleString()}</td>`
+      +`<td>${r.n}</td><td>${r.ped||''}</td>`
+      +`<td><span class="dot" style="background:${col}"></span>${r.rate!=null?r.rate.toFixed(1):'—'}</td>`
+      +`<td style="color:${tr[1]};font-weight:600">${tr[0]}</td>`
+      +`<td class="shcol">${pctc(r.alcSh)}</td><td class="shcol">${pctc(r.ntSh)}</td><td class="shcol">${pctc(r.wxSh)}</td></tr>`; }).join('')+'</tbody>';
+  const t=document.getElementById('segtable');
+  t.innerHTML=head+body;
+  t.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sort.key===k) sort.dir*=-1; else { sort.key=k; sort.dir=(k==='lab'?1:-1); }
+    buildAnalysis(); });
+  t.querySelectorAll('tr[data-i]').forEach(tr=>tr.onclick=()=>gotoSeg(+tr.dataset.i));
+  const parts=[]; if(min3) parts.push('3+ crashes'); if(search) parts.push(`“${search}”`);
+  const filtered = bucketFilter!=null || parts.length>0;
+  document.getElementById('rowhint').textContent=
+    `${filtered?'Filtered to':'Showing'} ${rows.length.toLocaleString()} segments`
+    +(bucketFilter!=null?` “${curBuckets()[bucketFilter].lab}${histMode==='rate'?' crashes/100M VMT':' crashes'}”`:'')
+    +(parts.length?' · '+parts.join(' · '):'');
+}
+
+// ---------- shared filter state ----------
+function apply(){ drawMap(); if(curTab==='analysis') buildAnalysis(); }
+function setYears(a,b,from){ y0=a; y1=b; syncing=true;
+  if(from!=='map'&&sMap&&sMap.noUiSlider) sMap.noUiSlider.set([a,b]);
+  if(from!=='ana'&&sAna&&sAna.noUiSlider) sAna.noUiSlider.set([a,b]);
+  syncing=false; apply(); }
+function setCat(c){ cat=c; ptsOff=false;
+  document.querySelectorAll('.catsel button').forEach(b=>b.classList.toggle('on',b.dataset.cat===c));
+  apply(); }
+// map-only: hide all crash points but keep the risk-shaded roads
+function setPts(off){ ptsOff=off;
+  const row=document.querySelector('.catsel[data-which="map"]');
+  if(row) row.querySelectorAll('button').forEach(b=>
+    b.classList.toggle('on', off ? b.dataset.pts==='off' : b.dataset.cat===cat));
+  drawMap(); }
+function setTab(t){ curTab=t;
+  const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');   // dismiss intro on navigation
+  document.getElementById('map-view').classList.remove('introup');                // reveal the map controls
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  document.getElementById('map-view').classList.toggle('active',t==='map');
+  document.getElementById('analysis').classList.toggle('active',t==='analysis');
+  document.getElementById('hotspots').classList.toggle('active',t==='hotspots');
+  document.getElementById('info').classList.toggle('active',t==='info');
+  if(t==='map') setTimeout(()=>map.invalidateSize(),0);
+  else if(t==='analysis') buildAnalysis();
+  else if(t==='hotspots') renderHotspots();
+  updateHash();
+}
+
+const sMap=document.getElementById('slider'), sAna=document.getElementById('slider2');
+[[sMap,'map'],[sAna,'ana']].forEach(([el,which])=>{
+  noUiSlider.create(el,{start:[YMIN,YMAX],connect:true,step:1,margin:0,
+    range:{min:YMIN,max:YMAX},format:{to:v=>Math.round(v),from:v=>Number(v)}});
+  el.noUiSlider.on('update',v=>{ if(syncing) return; setYears(+v[0],+v[1],which); });
+});
+document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>{
+  if(b.dataset.pts==='off') setPts(true); else setCat(b.dataset.cat); }));
+updateLegend(0);   // populate the (risk) legend immediately, before data loads
+document.getElementById('maptype').addEventListener('change',e=>{
+  maptype=e.target.value;
+  hlLayer.clearLayers(); markLayer.clearLayers(); map.closePopup(); detail=null;   // clear any illuminated segment
+  drawMap();
+});
+document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
+document.getElementById('search').addEventListener('change',e=>logSearch(e.target.value,'analysis'));
+document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
+document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ mapSearch(e.target.value); logSearch(e.target.value,'map'); } });
+
+// ---- anonymous search logging: the term + coarse location/session, no raw IP.
+//      Inert until LOG_ENDPOINT (a Google Apps Script web-app URL) is filled in. ----
+const LOG_ENDPOINT='https://script.google.com/macros/s/AKfycbx-g-FIWOpyeJxaenE2WCt_zAHpoSONIcqEtXfi6exeTTVslo8BboxsnmfjUvkygKPb/exec';
+let _sid=null,_geo=null;
+function _sessId(){ if(_sid) return _sid;
+  try{ _sid=localStorage.getItem('nmsid'); if(!_sid){ _sid=Math.random().toString(36).slice(2,10); localStorage.setItem('nmsid',_sid); } }
+  catch(e){ _sid='nostore'; } return _sid; }
+async function _coarseGeo(){ if(_geo!==null) return _geo;
+  try{ const j=await (await fetch('https://ipapi.co/json/')).json();
+       _geo={country:j.country_name||'',region:j.region||'',city:j.city||''}; }
+  catch(e){ _geo={}; } return _geo; }
+async function logSearch(term,where){
+  term=(term||'').trim(); if(!term||!LOG_ENDPOINT) return;
+  const g=await _coarseGeo();
+  const body=JSON.stringify({term,where,sid:_sessId(),country:g.country,region:g.region,
+    city:g.city,ref:document.referrer||'',lang:navigator.language||'',
+    screen:`${screen.width}x${screen.height}`,ua:navigator.userAgent});
+  try{ fetch(LOG_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body}); }catch(e){}
+}
+function dismissIntro(){
+  const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');
+  document.getElementById('map-view').classList.remove('introup');   // reveal controls
+  if(curTab==='map'){ map.invalidateSize(); fitState(); }            // re-center NM in the now-visible area
+}
+['aboutx','aboutgo'].forEach(id=>document.getElementById(id).addEventListener('click',dismissIntro));
+document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('click',()=>{
+  histMode=b.dataset.m; bucketFilter=null;
+  document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
+  buildAnalysis(); }));
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+document.getElementById('statesel').addEventListener('change',e=>{ location.assign("../"+e.target.value+"/"+location.hash); });
+// clicking the wordmark returns to this state's home with the intro blurb showing
+document.getElementById('brand').addEventListener('click',()=>{ if(location.hash) location.href=location.pathname; else location.reload(); });
+renderCoverage();   // fills the About tab
+// phones: fold the legend into the bottom control panel so the map gets more room
+if(window.matchMedia('(max-width:620px)').matches){
+  const ctrl=document.getElementById('ctrl'), lg=document.getElementById('legend');
+  if(ctrl&&lg) ctrl.appendChild(lg);
+}
+
+// crashes.json is positional arrays (smaller download) — rehydrate to objects so the
+// rest of the code keeps using c.la/c.lo/etc. Order must match the build's CR writer.
+const CR_FIELDS=['la','lo','y','m','dy','dw','hr','k','inj','si','ev','d','pc','nt','ix','wx','sg'];
+function rehydrate(rows){ return rows.map(r=>{ const o={}; for(let i=0;i<CR_FIELDS.length;i++) o[CR_FIELDS[i]]=r[i]; return o; }); }
+Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
+  .then(([s,c])=>{ SEG=s; CR=rehydrate(c);
+    if(CR.length>BIG_STATE){            // big state: start on the last 5 years so it loads light; expandable
+      y0=Math.max(YMIN,YMAX-4);
+      if(sMap&&sMap.noUiSlider) sMap.noUiSlider.set([y0,y1]);
+      if(sAna&&sAna.noUiSlider) sAna.noUiSlider.set([y0,y1]);
+    }
+    drawMap();
+    ready=true; setTimeout(()=>{ map.invalidateSize(); fitState(); },0); });
+</script>
+</body></html>

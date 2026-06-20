@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Deadliest Mile — fatal crash risk on Kansas roads</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{display:flex;flex-direction:column;font:13px/1.45 -apple-system,Helvetica,Arial;color:#222}
+  /* tab bar */
+  #tabbar{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:2px;background:#1f2d3d;padding:0 10px}
+  #brand{font:800 16px/1 -apple-system,Helvetica,Arial;letter-spacing:.5px;color:#fff;
+    white-space:nowrap;padding:12px 18px 12px 6px;margin-right:4px}
+  #brand{cursor:pointer}
+  #brand b{color:#e3120b}
+  #statesel{margin-left:auto;align-self:center;background:#2a3a4d;color:#fff;border:1px solid #3a4d63;
+    border-radius:5px;font:600 12.5px inherit;padding:6px 8px;cursor:pointer}
+  #tabbar .tab{appearance:none;border:none;background:transparent;color:#5fc9bb;
+    font:600 14.5px/1 -apple-system,Helvetica,Arial;padding:13px 18px;cursor:pointer;border-bottom:3px solid transparent}
+  #tabbar .tab:hover{color:#9fe5da}
+  #tabbar .tab.active{color:#fff;border-bottom-color:#2ec4b6}
+  #content{flex:1 1 auto;position:relative;min-height:0}
+  .view{display:none;position:absolute;inset:0}
+  .view.active{display:block}
+  #map{height:100%}
+  #analysis,#info{overflow:auto;background:#f4f6f8}
+  /* floating panels on the map */
+  .panel{position:absolute;z-index:1000;background:rgba(255,255,255,.96);border:1px solid #ccc;
+    border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.2);font:13.5px/1.5 -apple-system,Helvetica,Arial}
+  #ctrl{bottom:18px;right:14px;padding:12px 15px;width:270px}
+  #ctrl .mslab{font-weight:600;margin-bottom:4px}
+  #mapsearch{width:100%;font:13.5px inherit;padding:6px 9px;border:1px solid #c3c3c3;border-radius:5px}
+  #msmsg{color:#b00;font-size:12.5px;line-height:1.35;margin-top:3px;min-height:0}
+  #maptype{width:100%;font:13px inherit;padding:6px 8px;border:1px solid #c3c3c3;border-radius:5px;background:#fff;margin-top:3px}
+  #legend .lgbar{height:11px;border-radius:2px;margin:4px 0 2px}
+  #legend .lgbarlab{display:flex;justify-content:space-between;font-size:11px;color:#555}
+  #legend .lgstat{margin-top:5px;font-size:12px;color:#333;white-space:nowrap}
+  #legend .lgna{margin-top:4px;font-size:11.5px;color:#555;white-space:nowrap}
+  #legend .lgna .sw{width:13px;height:8px}
+  #ctrl .yr{font-weight:600;margin-bottom:9px}
+  #slider,#slider2{margin:2px 7px 4px}
+  #stat{margin-top:8px;color:#444}
+  #legend{bottom:18px;left:14px;padding:8px 11px;color:#333}
+  /* fixed min-height so the legend never resizes when switching map types; width
+     comes from #leftstack so it always matches the "what you're seeing" note (desktop) */
+  @media(min-width:621px){ #legend{min-height:152px} }
+  #legend .lgttl{display:block;margin-bottom:4px;font-weight:700;white-space:nowrap}
+  #legend .lgscale{white-space:nowrap;font-size:11.5px}
+  #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
+  #legend .lgfoot a{color:#1559a3;text-decoration:underline}
+  #legend .sw{display:inline-block;width:13px;height:9px;margin:0 2px 0 5px;vertical-align:1px}
+  #legend .lgshort{display:none}
+  /* desktop: the methodology note sits in a stack beneath the legend */
+  #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
+    flex-direction:column;gap:10px;width:506px}   /* fixed width → legend matches the note; wide enough for the rate scale on one line */
+  #leftstack .panel{position:static;max-width:none}
+  #risknote{padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
+  #risknote b{color:#1a2433}
+  /* the 'About' tab is mobile-only; desktop keeps the note under the legend */
+  @media(min-width:621px){ .tab[data-tab="info"]{display:none} }
+  @media(max-width:620px){
+    #leftstack{display:none}                       /* the note lives in the About tab on mobile */
+    #map-view.introup #ctrl{display:none}          /* intro card shows alone on phones */
+    /* one compact panel at the bottom: search + toggles + legend */
+    #ctrl{left:8px;right:8px;width:auto;bottom:10px;padding:11px 13px;max-height:52vh;overflow:auto}
+    #ctrl .yr,#slider,#stat{display:none}           /* drop the year slider and the crash/killed count */
+    #ctrl #legend{position:static;background:none;border:none;box-shadow:none;
+      padding:9px 0 0;margin-top:9px;border-top:1px solid #e6e9ec;color:#333}
+    #legend .lgttl{font-size:12.5px;margin-bottom:3px}
+    #legend .lgscale{white-space:nowrap;font-size:11.5px}
+    #legend .sw{margin:0 2px 0 5px;width:13px;height:8px}
+    #legend .lgfoot{display:none}                    /* drop the note under the legend */
+    #legend .lgfull{display:none} #legend .lgshort{display:inline}
+    .leaflet-control-zoom{display:none}
+  }
+  .muted{color:#888;font-size:12px}
+  #about{top:50%;left:50%;transform:translate(-50%,-50%);width:420px;max-width:calc(100vw - 32px);
+    padding:30px 32px;z-index:1200;text-align:center}
+  #about .atitle{font:800 34px/1.05 -apple-system,Helvetica,Arial;letter-spacing:.5px;margin:0 0 4px;color:#1a2433}
+  #about .atitle b{color:#e3120b}
+  #about .asub{font-size:16px;font-weight:600;color:#555;margin:0 0 14px}
+  #about .adesc{font-size:15.5px;line-height:1.55;color:#333}
+  #about #aboutx{position:absolute;top:7px;right:11px;border:none;background:none;font-size:21px;
+    color:#999;cursor:pointer;line-height:1;padding:0}
+  #about #aboutx:hover{color:#444}
+  #about #aboutgo{margin-top:15px;font:13px/1 inherit;background:#2171b5;color:#fff;border:none;
+    border-radius:5px;padding:8px 14px;cursor:pointer}
+  #about #aboutgo:hover{background:#1559a3}
+  #about.hidden{display:none}
+  @media(max-width:620px){ #about{left:12px;right:12px;width:auto;top:54px;transform:none;max-height:84vh;overflow:auto}
+    #about .atitle{font-size:27px} }
+  #aboutbody{background:#fff;border:1px solid #e2e6ea;border-radius:8px;padding:16px 18px;
+    font-size:14.5px;line-height:1.6;color:#333;max-width:680px}
+  #aboutbody b{color:#1a2433}
+  /* category segmented control */
+  .catsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden}
+  .catsel button{appearance:none;border:none;background:#fff;color:#444;font:12.5px/1 inherit;padding:7px 11px;cursor:pointer}
+  .histsel{display:inline-flex;border:1px solid #bdbdbd;border-radius:5px;overflow:hidden;vertical-align:middle;margin:0 3px}
+  .histsel button{appearance:none;border:none;background:#fff;color:#444;font:12px/1 inherit;padding:5px 9px;cursor:pointer}
+  .histsel button+button{border-left:1px solid #d5d5d5}
+  .histsel button.on{background:#2171b5;color:#fff}
+  .catsel button+button{border-left:1px solid #d5d5d5}
+  .catsel button.on{background:#2171b5;color:#fff}
+  /* thin slider with small vertical-line handles */
+  .noUi-target{height:3px;border:none;background:#dcdcdc;box-shadow:none}
+  .noUi-connect{background:#2171b5}
+  .noUi-horizontal .noUi-handle{width:4px;height:17px;right:-2px;top:-7px;border:none;
+    border-radius:1px;background:#1f5fa8;box-shadow:none;cursor:ew-resize}
+  .noUi-handle:after,.noUi-handle:before{display:none}
+  /* analysis tab */
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 20px 70px}
+  .wrap h2{font-size:16px;margin:0 0 2px}
+  .sub{color:#666;margin:0 0 12px}
+  .coverage{background:#fff;border:1px solid #e2e6ea;border-left:4px solid #f0ad4e;border-radius:6px;
+    padding:11px 14px;margin:0 0 18px;color:#444;font-size:12.5px;line-height:1.55}
+  .coverage b{color:#1a1a1a}
+  .actl{display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin:0 0 18px;
+    background:#fff;border:1px solid #e2e6ea;border-radius:6px;padding:12px 14px}
+  .actl .yr{font-weight:600;margin-bottom:5px}
+  #slider2{width:240px;margin:0}
+  .actl label.zc{font-size:12px;color:#555}
+  .card{background:#fff;border:1px solid #e2e6ea;border-radius:6px;padding:12px 14px;margin:0 0 18px}
+  .card .ttl{font-weight:600;margin-bottom:9px;font-size:12.5px}
+  .hist{display:flex;align-items:flex-end;gap:12px;height:158px}
+  .hbar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;cursor:pointer}
+  .hbar .hn{font-size:11px;color:#333;margin-bottom:3px;font-variant-numeric:tabular-nums}
+  .hbar .bar{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:opacity .12s}
+  .hbar:hover .bar{opacity:.8}
+  .hbar .hl{font-size:11px;color:#666;margin-top:5px}
+  .hbar.sel .hl{font-weight:700;color:#111}
+  .hbar.dim .bar{opacity:.28}
+  .zeronote{color:#777;font-size:11.5px;margin-top:9px;text-align:center}
+  .zeronote .haxis{font-weight:600;color:#555;font-size:12.5px}
+  .zeronote #hclear{color:#1559a3;font-weight:600;text-decoration:none}
+  .zeronote #hclear:hover{text-decoration:underline}
+  table.seg{width:100%;border-collapse:collapse;background:#fff;font-size:12.5px;
+    border:1px solid #e2e6ea;border-radius:6px;overflow:hidden}
+  table.seg th,table.seg td{padding:6px 10px;text-align:right;border-bottom:1px solid #eee;
+    white-space:nowrap;font-variant-numeric:tabular-nums}
+  table.seg th{position:sticky;top:0;background:#eaeef2;cursor:pointer;font-weight:600;color:#333;
+    border-bottom:2px solid #d3dae0;z-index:1}
+  table.seg th:first-child,table.seg td:first-child{text-align:left}
+  table.seg th.sorted{color:#1559a3}
+  table.seg tbody tr{cursor:pointer}
+  table.seg tbody tr:hover{background:#eaf3fb}
+  /* mobile: keep Road · Location · Crashes · Rate, fit to screen (no side-scroll) */
+  @media(max-width:620px){
+    .wrap{padding:14px 10px 70px}
+    table.seg{table-layout:fixed;width:100%}
+    table.seg th,table.seg td{padding:7px 6px;white-space:normal;font-size:12px}
+    table.seg td{word-break:break-word}
+    table.seg th{font-size:11px;vertical-align:bottom;line-height:1.2}
+    table.seg th:nth-child(3),table.seg td:nth-child(3),
+    table.seg th:nth-child(4),table.seg td:nth-child(4),
+    table.seg th:nth-child(6),table.seg td:nth-child(6),
+    table.seg th:nth-child(8),table.seg td:nth-child(8),
+    table.seg th:nth-child(9),table.seg td:nth-child(9),
+    table.seg th:nth-child(10),table.seg td:nth-child(10),
+    table.seg th:nth-child(11),table.seg td:nth-child(11){display:none}
+    table.seg th:nth-child(1),table.seg td:nth-child(1){width:22%}
+    table.seg th:nth-child(2),table.seg td:nth-child(2){width:46%}
+    table.seg th:nth-child(5),table.seg td:nth-child(5){width:15%}
+    table.seg th:nth-child(7),table.seg td:nth-child(7){width:17%}
+    /* controls: search across the top, slider full width, toggles + 3+ on one line */
+    .actl{gap:12px 14px}
+    .actl #search{order:1;width:100%}
+    .actl > div:first-child{order:2;width:100%}
+    .actl #slider2{width:100%}
+    .actl .catsel[data-which="ana"]{order:3}
+    .actl label.zc{order:4}
+  }
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
+  .rec{display:inline-flex;height:9px;width:46px;border-radius:2px;overflow:hidden;
+    vertical-align:-1px;margin-left:7px;border:1px solid #dcdcdc}
+  .rec i{display:block;height:100%}
+  .tablohint{color:#888;font-size:11.5px;margin:7px 2px 0}
+  #search{font:12px inherit;padding:5px 9px;border:1px solid #c3c3c3;border-radius:5px;width:190px}
+  .zbtn{margin-top:6px;font:11px/1 inherit;color:#1559a3;background:#eef4fb;border:1px solid #cfe0f2;
+    border-radius:4px;padding:4px 8px;cursor:pointer}
+  .zbtn:hover{background:#dceaf8}
+  .segpop{font:13.5px/1.55 -apple-system,Helvetica,Arial}
+  #hslists{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start}
+  @media(max-width:620px){ #hslists{grid-template-columns:1fr} }
+  .hsgrp{margin:0}
+  .hsgrp h3{font-size:13.5px;margin:0 0 10px;border-bottom:2px solid #e2e6ea;padding-bottom:5px}
+  .hsred{color:#c0392b}
+  .hsred .muted{color:#888;font-weight:400}
+  .hscards{display:flex;flex-direction:column;gap:7px}
+  .hscard{display:flex;gap:11px;align-items:flex-start;background:#fff;border:1px solid #e2e6ea;
+    border-radius:6px;padding:9px 12px;cursor:pointer}
+  .hscard:hover{background:#eaf3fb;border-color:#bcd6ef}
+  .hsrank{flex:0 0 24px;height:24px;border-radius:50%;background:#1f2d3d;color:#fff;font-weight:700;
+    font-size:12px;display:flex;align-items:center;justify-content:center}
+  .hsttl{font-weight:600;font-size:13px}
+  .hsstat{color:#555;font-size:12px;margin-top:3px;line-height:1.5}
+</style></head>
+<body>
+<div id="tabbar">
+  <span id="brand" title="Back to the intro">THE <b>DEADLIEST</b> MILE</span>
+  <button class="tab active" data-tab="map">Map</button>
+  <button class="tab" data-tab="analysis">Risk analysis</button>
+  <button class="tab" data-tab="hotspots">Most dangerous areas</button>
+  <button class="tab" data-tab="info">About</button>
+  <select id="statesel" aria-label="Change state" title="Change state"><option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS" selected>Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option><option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option></select>
+</div>
+<div id="content">
+  <!-- MAP -->
+  <div id="map-view" class="view active introup">
+    <div id="map"></div>
+    <div id="ctrl" class="panel">
+      <div class="mslab">Search roads or communities:</div>
+      <input id="mapsearch" placeholder="Search communities, roads, or an address" autocomplete="off">
+      <div id="msmsg"></div>
+      <div class="yr" style="margin-top:9px">Years: <span id="yrlabel"></span></div>
+      <div id="slider"></div>
+      <div class="mslab" style="margin-top:9px">Map type:</div>
+      <select id="maptype">
+        <option value="risk">Fatal crash risk</option>
+        <option value="alc">Alcohol involvement</option>
+        <option value="nt">Nighttime crashes</option>
+        <option value="ix">Deadly intersections</option>
+        <option value="wx">Adverse weather</option>
+      </select>
+      <div class="mslab" style="margin-top:9px">Crashes shown:</div>
+      <div class="catsel" data-which="map" style="margin-top:3px">
+        <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button><button data-pts="off">None</button>
+      </div>
+      <div id="stat"></div>
+    </div>
+    <div id="leftstack">
+    <div id="risknote" class="panel"></div>
+    <div id="legend" class="panel"></div>
+    </div>
+    <div id="about" class="panel">
+      <button id="aboutx" aria-label="Close">×</button>
+      <div class="atitle">THE <b>DEADLIEST</b> MILE</div>
+      <div class="asub">Fatal crash risk on Kansas roads</div>
+      <div class="adesc">The federal government documents every fatal vehicle crash. This map plots
+        more than two decades of that data — by road segment, adjusted for traffic — to show where
+        driving in Kansas is most dangerous.</div>
+      <button id="aboutgo">Explore the map →</button>
+    </div>
+  </div>
+  <!-- ANALYSIS -->
+  <div id="analysis" class="view">
+    <div class="wrap">
+      <h2>Risk by road segment</h2>
+      <div class="actl">
+        <div><div class="yr">Years: <span id="yrlabel2"></span></div><div id="slider2"></div></div>
+        <div class="catsel" data-which="ana">
+          <button data-cat="all" class="on">All</button><button data-cat="auto">Vehicle</button><button data-cat="ped">Ped/bike</button>
+        </div>
+        <label class="zc"><input type="checkbox" id="min3" checked> show only segments with 3+ crashes</label>
+        <input id="search" placeholder="search road or place…" autocomplete="off">
+      </div>
+      <div class="card">
+        <div class="ttl">Distribution of segments by
+          <span class="histsel">
+            <button data-m="rate" class="on">rate /100M</button><button data-m="count">crash count</button>
+          </span></div>
+        <div id="hist" class="hist"></div>
+        <div id="zeronote" class="zeronote"></div>
+      </div>
+      <table class="seg" id="segtable"></table>
+      <div class="tablohint" id="rowhint"></div>
+      <div class="tablohint">Trend is computed on 5-year bands across 2001–2024, where sufficient data exists to show a pattern.</div>
+    </div>
+  </div>
+  <!-- HOT SPOTS -->
+  <div id="hotspots" class="view">
+    <div class="wrap">
+      <h2>Most dangerous areas</h2>
+      <div id="hslists"></div>
+    </div>
+  </div>
+  <!-- ABOUT -->
+  <div id="info" class="view">
+    <div class="wrap">
+      <h2>About this map</h2>
+      <div id="aboutbody"></div>
+    </div>
+  </div>
+</div>
+<script>
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 5390, "crTotal": 8961, "crAssigned": 4427, "crLocal": 4185, "crUnmatched": 349, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 4579, "road": "KS-32", "loc": "11 mi E of Lawrence", "cty": "Leavenworth", "lat": 39.0038, "lon": -95.0894, "n": 8, "ped": 1, "aadt": 2268, "len": 5.1, "rate": 7.9, "marks": [[39.00388, -95.09347], [39.00396, -95.13097], [39.00384, -95.09379], [39.00404, -95.0774], [39.0013, -95.14206], [39.00383, -95.09361], [39.00187, -95.14019], [39.00384, -95.09369]]}, {"kind": "rate", "seg": 1576, "road": "US-24", "loc": "10 mi NE of Lawrence", "cty": "Leavenworth", "lat": 39.0455, "lon": -95.1307, "n": 8, "ped": 0, "aadt": 3873, "len": 5.1, "rate": 4.6, "marks": [[39.05058, -95.12161], [39.05968, -95.11211], [39.04372, -95.14263], [39.05856, -95.11155], [39.05882, -95.11187], [39.02316, -95.16069], [39.05969, -95.11209], [39.03433, -95.15117]]}, {"kind": "rate", "seg": 1506, "road": "US-24", "loc": "Perry", "cty": "Jefferson", "lat": 39.0715, "lon": -95.3577, "n": 10, "ped": 0, "aadt": 5154, "len": 5.1, "rate": 4.4, "marks": [[39.06571, -95.32279], [39.08073, -95.39385], [39.06999, -95.35382], [39.06698, -95.33558], [39.07193, -95.35858], [39.06956, -95.35109], [39.08075, -95.3968], [39.06644, -95.33362], [39.06569, -95.31886], [39.06568, -95.31158]]}, {"kind": "rate", "seg": 3294, "road": "US-50", "loc": "10 mi E of Hutchinson", "cty": "Reno", "lat": 38.0285, "lon": -97.7688, "n": 9, "ped": 0, "aadt": 4670, "len": 5.0, "rate": 4.4, "marks": [[38.02839, -97.77576], [38.02839, -97.73683], [38.03155, -97.77539], [38.02726, -97.77224], [38.0284, -97.81127], [38.02785, -97.77632], [38.02916, -97.78381], [38.02847, -97.77533], [38.02849, -97.76612]]}, {"kind": "rate", "seg": 3048, "road": "US-169", "loc": "20 mi N of Coffeyville", "cty": "Montgomery", "lat": 37.3379, "lon": -95.5322, "n": 10, "ped": 0, "aadt": 5217, "len": 5.0, "rate": 4.3, "marks": [[37.3409, -95.53105], [37.32145, -95.53528], [37.32849, -95.53226], [37.35822, -95.5205], [37.33905, -95.53436], [37.34843, -95.52943], [37.34545, -95.53137], [37.34834, -95.52939], [37.3275, -95.53288], [37.29849, -95.54674]]}, {"kind": "rate", "seg": 3352, "road": "US-50", "loc": "15 mi NE of Newton", "cty": "Marion", "lat": 38.1749, "lon": -97.1179, "n": 8, "ped": 0, "aadt": 4368, "len": 5.0, "rate": 4.2, "marks": [[38.17489, -97.097], [38.17647, -97.1115], [38.17473, -97.12292], [38.17536, -97.11616], [38.17559, -97.10129], [38.17426, -97.09024], [38.17497, -97.09728], [38.17445, -97.12068]]}, {"kind": "rate", "seg": 3469, "road": "US-83", "loc": "Garden City (10 mi S)", "cty": "Finney", "lat": 37.8208, "lon": -100.8706, "n": 8, "ped": 1, "aadt": 4574, "len": 5.1, "rate": 3.9, "marks": [[37.80342, -100.87054], [37.80978, -100.8706], [37.80972, -100.87063], [37.84666, -100.87646], [37.82063, -100.87029], [37.83315, -100.87055], [37.80961, -100.87061], [37.84759, -100.87051]]}, {"kind": "rate", "seg": 3387, "road": "US-50", "loc": "Ingalls", "cty": "Finney", "lat": 37.8829, "lon": -100.6747, "n": 8, "ped": 0, "aadt": 4908, "len": 5.1, "rate": 3.7, "marks": [[37.88504, -100.68513], [37.88292, -100.67368], [37.87621, -100.63854], [37.8819, -100.67199], [37.88103, -100.66856], [37.88437, -100.67864], [37.89756, -100.69519], [37.87483, -100.63542]]}, {"kind": "rate", "seg": 3825, "road": "US-81", "loc": "Belleville", "cty": "Republic", "lat": 39.821, "lon": -97.6401, "n": 8, "ped": 0, "aadt": 5004, "len": 5.1, "rate": 3.6, "marks": [[39.84737, -97.6305], [39.82014, -97.64099], [39.84087, -97.63374], [39.84095, -97.63324], [39.84111, -97.63423], [39.85589, -97.62148], [39.81348, -97.64547], [39.8411, -97.63424]]}, {"kind": "rate", "seg": 3282, "road": "US-50", "loc": "Strong City", "cty": "Chase", "lat": 38.4055, "lon": -96.4256, "n": 8, "ped": 0, "aadt": 5820, "len": 5.0, "rate": 3.1, "marks": [[38.40577, -96.48035], [38.40625, -96.39542], [38.40531, -96.38932], [38.40518, -96.38992], [38.40475, -96.40416], [38.40542, -96.45504], [38.40532, -96.46189], [38.40547, -96.47034]]}, {"kind": "rate", "seg": 1809, "road": "US-75", "loc": "Holton", "cty": "Jackson", "lat": 39.5555, "lon": -95.7464, "n": 8, "ped": 0, "aadt": 6360, "len": 5.1, "rate": 2.8, "marks": [[39.55175, -95.7483], [39.57354, -95.73255], [39.56591, -95.7338], [39.52199, -95.74808], [39.52678, -95.74818], [39.56593, -95.73381], [39.54307, -95.74827], [39.56594, -95.73379]]}, {"kind": "rate", "seg": 3308, "road": "US-50", "loc": "Garden City (3 mi NW)", "cty": "Finney", "lat": 38.0034, "lon": -100.8918, "n": 12, "ped": 1, "aadt": 9798, "len": 5.0, "rate": 2.8, "marks": [[38.00399, -100.86639], [38.00745, -100.88334], [38.00408, -100.8756], [38.00394, -100.90512], [38.00372, -100.86579], [38.00401, -100.86651], [38.0033, -100.92519], [38.0036, -100.92761], [38.00321, -100.90189], [38.0033, -100.86579], [38.00324, -100.90912], [38.00369, -100.92217]]}], "ped": [{"kind": "ped", "road": "Broadway Ave", "loc": "Wichita", "cty": "Sedgwick", "lat": 37.6744, "lon": -97.3351, "n": 10, "e": [[37.7101, -97.3356], [37.7084, -97.3356], [37.7062, -97.3355], [37.7048, -97.3355], [37.7046, -97.3355], [37.6881, -97.3355], [37.6632, -97.3351], [37.6325, -97.3346], [37.6166, -97.3341], [37.61, -97.334]], "mi": 6.9, "permi": 1.4, "marks": [[37.71166, -97.33558], [37.65523, -97.33554], [37.60776, -97.33396], [37.70447, -97.33556], [37.70504, -97.33556], [37.70491, -97.33551], [37.62994, -97.33428], [37.70452, -97.33552], [37.61218, -97.3341], [37.70862, -97.33556]]}, {"kind": "ped", "road": "I-35", "loc": "Kansas City", "cty": "Wyandotte", "lat": 39.0061, "lon": -94.6808, "n": 8, "e": [[38.9031, -94.7771], [38.9296, -94.7541], [38.9661, -94.7226], [39.0094, -94.6811], [39.0379, -94.6517], [39.0635, -94.6255], [39.0713, -94.6164], [39.073, -94.6146]], "mi": 17.7, "permi": 0.5, "marks": [[38.98261, -94.70806], [38.99416, -94.69672], [39.06806, -94.61998], [39.0515, -94.63842], [38.92165, -94.76287], [39.07081, -94.61818], [39.07516, -94.61111], [38.88448, -94.79126]], "geom": [[[38.8809, -94.792], [38.8812, -94.7919], [38.8823, -94.7916], [38.8836, -94.7912], [38.8837, -94.7911], [38.8852, -94.7907], [38.8855, -94.7905], [38.8866, -94.7902], [38.888, -94.7898]], [[38.888, -94.7898], [38.8892, -94.7894], [38.8894, -94.7893], [38.8908, -94.7889], [38.8922, -94.7885], [38.8934, -94.7881], [38.8936, -94.788], [38.895, -94.7873], [38.8956, -94.787], [38.8963, -94.7865], [38.8975, -94.7856], [38.8988, -94.7847], [38.9001, -94.7838], [38.9002, -94.7838], [38.9013, -94.7828], [38.9025, -94.7819], [38.9028, -94.7817], [38.9037, -94.7808], [38.9046, -94.78], [38.9049, -94.7797], [38.9061, -94.7786], [38.9068, -94.7779], [38.9072, -94.7775], [38.9083, -94.7763], [38.9086, -94.776], [38.9086, -94.7759], [38.909, -94.7755], [38.9094, -94.775], [38.9105, -94.7738], [38.9115, -94.7725], [38.9126, -94.7712], [38.9127, -94.7712], [38.9137, -94.77], [38.9137, -94.7699], [38.9148, -94.7688], [38.9157, -94.7679], [38.916, -94.7677], [38.9165, -94.7671], [38.9171, -94.7665], [38.9177, -94.7659], [38.9183, -94.7654], [38.9195, -94.7643], [38.92, -94.7639], [38.9207, -94.7633], [38.9219, -94.7623], [38.9231, -94.7612], [38.9243, -94.7602], [38.9255, -94.7592], [38.9267, -94.7581], [38.9279, -94.7571], [38.9291, -94.7561], [38.9303, -94.755], [38.9316, -94.754], [38.9323, -94.7534], [38.9327, -94.7529], [38.934, -94.7519], [38.9349, -94.7511], [38.9351, -94.7509], [38.9352, -94.7509], [38.9364, -94.7498], [38.9376, -94.7488], [38.9388, -94.7478], [38.939, -94.7476], [38.9391, -94.7475], [38.9393, -94.7473], [38.94, -94.7467], [38.9412, -94.7457], [38.9424, -94.7446], [38.9437, -94.7436], [38.9449, -94.7425], [38.945, -94.7425], [38.9451, -94.7423], [38.9452, -94.7422], [38.9454, -94.7421], [38.9461, -94.7415], [38.9464, -94.7412], [38.9473, -94.7404], [38.9486, -94.7394], [38.9498, -94.7383]], [[38.9498, -94.7383], [38.951, -94.7373], [38.9522, -94.7362], [38.9535, -94.7352], [38.9547, -94.7341], [38.9559, -94.7331], [38.9567, -94.7324], [38.9568, -94.7323], [38.9571, -94.732], [38.9583, -94.7309], [38.9595, -94.7297], [38.9607, -94.7286], [38.9619, -94.7275], [38.9627, -94.7267], [38.9631, -94.7263], [38.9642, -94.7252], [38.9654, -94.7241], [38.9665, -94.723], [38.9666, -94.7229], [38.9678, -94.7218], [38.969, -94.7207], [38.9701, -94.7195], [38.9713, -94.7184], [38.9716, -94.7182], [38.9725, -94.7173], [38.9737, -94.7162], [38.9749, -94.715], [38.9761, -94.7139], [38.977, -94.713], [38.9772, -94.7128], [38.9778, -94.7122], [38.9784, -94.7117], [38.9795, -94.7106], [38.9807, -94.7095], [38.9808, -94.7094], [38.9818, -94.7084], [38.9829, -94.7074], [38.9841, -94.7063], [38.9852, -94.7052], [38.986, -94.7045], [38.9863, -94.7041], [38.9875, -94.703], [38.9886, -94.7019], [38.9898, -94.7008], [38.9908, -94.6998], [38.9909, -94.6997], [38.992, -94.6987], [38.9926, -94.6982], [38.9932, -94.6976], [38.9933, -94.6975], [38.9943, -94.6966], [38.9944, -94.6966], [38.9957, -94.6958], [38.9964, -94.6954], [38.9971, -94.6952], [38.9978, -94.695], [38.9985, -94.6948], [38.9986, -94.6948], [38.9999, -94.6947], [39.0013, -94.6945], [39.0027, -94.6943], [39.0041, -94.6942], [39.0055, -94.694], [39.007, -94.6939], [39.0074, -94.6938], [39.0078, -94.6938], [39.0079, -94.6938], [39.0084, -94.6937], [39.0098, -94.6935], [39.0112, -94.6934], [39.0126, -94.6932]], [[39.0126, -94.6932], [39.0141, -94.6931], [39.0149, -94.693], [39.0155, -94.6929], [39.0168, -94.6927], [39.0182, -94.6926], [39.0186, -94.6925], [39.0196, -94.6923], [39.021, -94.6919], [39.0219, -94.6916], [39.0219, -94.6916], [39.0224, -94.6915], [39.0224, -94.6915], [39.0226, -94.6915], [39.0237, -94.6912], [39.0251, -94.6909], [39.0259, -94.6907], [39.0264, -94.6906], [39.0265, -94.6905], [39.0278, -94.69], [39.0291, -94.6895], [39.0305, -94.689], [39.0306, -94.689], [39.0317, -94.6882], [39.0318, -94.6882], [39.0329, -94.6872], [39.0335, -94.6867], [39.0337, -94.6865], [39.034, -94.6862], [39.0341, -94.6862], [39.0352, -94.6852], [39.0353, -94.6852], [39.036, -94.6842], [39.0361, -94.684], [39.0369, -94.6827], [39.037, -94.6826], [39.0376, -94.6816], [39.0378, -94.681], [39.0381, -94.6804], [39.0384, -94.6793], [39.0384, -94.6791], [39.0386, -94.678], [39.0386, -94.6774], [39.0386, -94.6756], [39.0387, -94.675], [39.039, -94.6738], [39.0391, -94.673], [39.0395, -94.6721], [39.0396, -94.6721], [39.0399, -94.6713], [39.0403, -94.6704], [39.0407, -94.6695], [39.0411, -94.6686], [39.0415, -94.6676], [39.0417, -94.6668], [39.0422, -94.665], [39.0427, -94.6632], [39.0427, -94.6631], [39.0432, -94.6612], [39.0437, -94.6594], [39.0439, -94.6585], [39.0445, -94.6568], [39.0448, -94.6561], [39.0451, -94.6551], [39.0457, -94.6534], [39.0459, -94.6531], [39.0462, -94.6517], [39.0467, -94.6499], [39.0469, -94.6492], [39.0471, -94.6484], [39.0471, -94.6481], [39.0476, -94.6464], [39.0476, -94.6463], [39.048, -94.6446], [39.0485, -94.6428], [39.0487, -94.6421], [39.049, -94.6412], [39.0491, -94.6411], [39.0491, -94.641], [39.0492, -94.6407], [39.0493, -94.6405], [39.0498, -94.6398], [39.05, -94.6397], [39.0511, -94.6385], [39.0512, -94.6384], [39.052, -94.6373], [39.0521, -94.6372], [39.0529, -94.6356], [39.0537, -94.6341], [39.0545, -94.6325], [39.0553, -94.6311], [39.0553, -94.631], [39.0557, -94.6304], [39.0559, -94.63]], [[39.0559, -94.63], [39.0562, -94.6295], [39.0566, -94.6291], [39.0572, -94.6287], [39.0574, -94.6285], [39.0577, -94.6283], [39.0586, -94.6281], [39.0588, -94.628], [39.0588, -94.628], [39.0598, -94.6277], [39.0602, -94.6275], [39.0607, -94.6271], [39.0614, -94.6265], [39.062, -94.6259], [39.0622, -94.6257], [39.0624, -94.6256], [39.0626, -94.6254], [39.0636, -94.6244], [39.0637, -94.6242], [39.0648, -94.6229], [39.0658, -94.6216], [39.0659, -94.6215], [39.0669, -94.6206], [39.067, -94.6205], [39.0683, -94.6198], [39.0683, -94.6198], [39.0697, -94.6194], [39.0708, -94.6191], [39.071, -94.619], [39.0711, -94.619], [39.0713, -94.6188], [39.072, -94.6184], [39.0722, -94.6181], [39.0724, -94.6179], [39.0726, -94.6178], [39.0727, -94.6176], [39.0731, -94.617], [39.0732, -94.6169], [39.0734, -94.6165], [39.0738, -94.6156], [39.0739, -94.6154], [39.0739, -94.6153], [39.0742, -94.6141], [39.0746, -94.6125], [39.0749, -94.611], [39.0752, -94.6099], [39.0753, -94.6094], [39.0754, -94.6088], [39.0755, -94.6086]]]}, {"kind": "ped", "road": "I-70", "loc": "Kansas City", "cty": "Wyandotte", "lat": 39.1005, "lon": -94.6867, "n": 5, "e": [[39.1061, -94.7349], [39.1033, -94.7105], [39.1002, -94.6826], [39.0968, -94.6546], [39.0964, -94.6511]], "mi": 5.3, "permi": 0.9, "marks": [[39.10622, -94.73728], [39.10596, -94.73247], [39.09688, -94.65348], [39.09761, -94.66177], [39.09582, -94.6487]], "geom": [[[39.1041, -94.6791], [39.1041, -94.679], [39.1041, -94.6789], [39.1039, -94.6781], [39.1038, -94.6779], [39.1038, -94.6778], [39.1035, -94.6765], [39.1034, -94.6762], [39.103, -94.6752], [39.1026, -94.6745], [39.1018, -94.6729], [39.1015, -94.6724], [39.101, -94.6714], [39.1002, -94.6699], [39.1001, -94.6698], [39.0999, -94.6694], [39.0994, -94.6681], [39.0991, -94.6676], [39.0988, -94.6664], [39.0986, -94.6658], [39.0983, -94.6647], [39.0979, -94.663], [39.0979, -94.6627], [39.0977, -94.6623], [39.0976, -94.6618], [39.0975, -94.6612], [39.0971, -94.6595], [39.0971, -94.6593], [39.097, -94.6591], [39.0968, -94.6577], [39.0968, -94.657], [39.0967, -94.6559], [39.0967, -94.6541], [39.0966, -94.6523], [39.0966, -94.6523], [39.0963, -94.6506], [39.0963, -94.6502], [39.0961, -94.6498], [39.0961, -94.6496], [39.096, -94.6494], [39.096, -94.6494], [39.0959, -94.649], [39.0959, -94.6488], [39.0958, -94.6485], [39.0958, -94.6485], [39.0958, -94.6485], [39.0953, -94.6473], [39.0951, -94.6468], [39.0947, -94.6459]], [[39.1061, -94.7408], [39.1061, -94.7393], [39.1061, -94.7392], [39.1061, -94.7389], [39.106, -94.7371], [39.106, -94.7352], [39.106, -94.7334], [39.1059, -94.7315], [39.1059, -94.7296], [39.1059, -94.7278], [39.1059, -94.7264], [39.1058, -94.7259], [39.1057, -94.7241], [39.1056, -94.7226], [39.1056, -94.7222], [39.1055, -94.7203], [39.1054, -94.7185], [39.1053, -94.7166], [39.1052, -94.7148], [39.105, -94.7129], [39.105, -94.7129], [39.1051, -94.7111], [39.1051, -94.7111], [39.1052, -94.7098], [39.1052, -94.7096], [39.1052, -94.7092], [39.1052, -94.7087], [39.1053, -94.7084], [39.1054, -94.7074], [39.1056, -94.7055], [39.1058, -94.7037], [39.1059, -94.7029], [39.1059, -94.7018], [39.1059, -94.7], [39.1059, -94.6995], [39.1059, -94.6981], [39.1058, -94.6975], [39.1057, -94.6963], [39.1055, -94.6944], [39.1054, -94.6926], [39.1052, -94.6913], [39.1052, -94.6907], [39.1052, -94.6889], [39.1052, -94.6883], [39.1052, -94.688], [39.1052, -94.6877], [39.1052, -94.6872], [39.1051, -94.687], [39.1051, -94.6851], [39.1051, -94.6838], [39.105, -94.6833], [39.1049, -94.6822], [39.1047, -94.6814], [39.1046, -94.681]], [[39.1046, -94.681], [39.1044, -94.6803], [39.1043, -94.6799], [39.1043, -94.6796], [39.1041, -94.6791]]]}, {"kind": "ped", "road": "US-54", "loc": "Wichita", "cty": "Sedgwick", "lat": 37.6763, "lon": -97.3373, "n": 4, "e": [[37.6732, -97.4071], [37.6752, -97.3633], [37.6776, -97.306], [37.6793, -97.2676]], "mi": 9.8, "permi": 0.4, "marks": [[37.67406, -97.38281], [37.67932, -97.27581], [37.67936, -97.2594], [37.67236, -97.43136]], "geom": [[[37.6723, -97.4345], [37.6723, -97.4344]], [[37.6794, -97.2929], [37.6794, -97.2924], [37.6793, -97.2918], [37.6793, -97.291], [37.6792, -97.2899], [37.6792, -97.2892], [37.6791, -97.2883], [37.6791, -97.2874], [37.6791, -97.2871], [37.6791, -97.2863], [37.6792, -97.2856], [37.6792, -97.2854], [37.6793, -97.2837], [37.6794, -97.2825], [37.6794, -97.2819], [37.6794, -97.2818], [37.6794, -97.2808], [37.6794, -97.2805], [37.6794, -97.2801], [37.6795, -97.2783], [37.6795, -97.278], [37.6795, -97.2767], [37.6795, -97.2766], [37.6795, -97.2765], [37.6795, -97.2748], [37.6795, -97.2746], [37.6795, -97.2728], [37.6795, -97.2719], [37.6794, -97.2713], [37.6794, -97.271], [37.6794, -97.2709], [37.6793, -97.2696], [37.6793, -97.2692], [37.6792, -97.2686], [37.6792, -97.2678], [37.6792, -97.2673], [37.6792, -97.2664], [37.6792, -97.2655], [37.6792, -97.2637], [37.6792, -97.2622], [37.6792, -97.2619], [37.6792, -97.26], [37.6792, -97.2582], [37.6792, -97.2564]], [[37.6794, -97.2943], [37.6794, -97.2942], [37.6794, -97.2932], [37.6794, -97.2929]], [[37.6794, -97.2965], [37.6794, -97.2961], [37.6794, -97.2947], [37.6794, -97.2943]], [[37.6757, -97.3654], [37.6759, -97.3636], [37.6761, -97.3618], [37.6761, -97.3613], [37.6763, -97.3599], [37.6764, -97.3581], [37.6766, -97.3563], [37.6768, -97.3545], [37.6769, -97.3533], [37.6769, -97.3529], [37.677, -97.3527], [37.677, -97.3526], [37.6772, -97.3509], [37.6773, -97.3499], [37.6773, -97.3492], [37.6774, -97.3491], [37.6775, -97.3487], [37.6778, -97.3474], [37.6779, -97.3471], [37.678, -97.3469], [37.6781, -97.3466], [37.6784, -97.3457], [37.6784, -97.3455], [37.6785, -97.3451], [37.6786, -97.3446], [37.6787, -97.3442], [37.6787, -97.344], [37.6787, -97.3439], [37.6787, -97.3436], [37.6788, -97.3421], [37.6789, -97.3408], [37.6789, -97.3403], [37.679, -97.3394], [37.679, -97.3384], [37.679, -97.3381], [37.679, -97.338], [37.6789, -97.3366], [37.6789, -97.3348], [37.6789, -97.3341], [37.6789, -97.334], [37.6788, -97.333], [37.6788, -97.3329], [37.6788, -97.3328], [37.6788, -97.3317], [37.6788, -97.3311], [37.6788, -97.3293], [37.6788, -97.3275], [37.6788, -97.3264], [37.6788, -97.3263], [37.6788, -97.3257], [37.6788, -97.325], [37.6788, -97.3238], [37.6788, -97.3238], [37.6787, -97.3223], [37.6787, -97.322], [37.6787, -97.3208], [37.6787, -97.3202], [37.6787, -97.3196], [37.6788, -97.3184], [37.6788, -97.3175], [37.6788, -97.3172], [37.6789, -97.317], [37.6789, -97.3166], [37.679, -97.3147], [37.679, -97.3145], [37.679, -97.3145], [37.679, -97.3138], [37.679, -97.3129], [37.679, -97.3126], [37.6791, -97.3115], [37.6791, -97.3111], [37.6791, -97.3109], [37.6792, -97.3093], [37.6792, -97.3085], [37.6792, -97.3082], [37.6792, -97.3079], [37.6793, -97.3075], [37.6793, -97.306], [37.6793, -97.3056], [37.6793, -97.3046], [37.6793, -97.3038], [37.6793, -97.3021], [37.6793, -97.302], [37.6794, -97.3002], [37.6794, -97.2992], [37.6794, -97.2988], [37.6794, -97.2985], [37.6794, -97.2983], [37.6794, -97.2965]], [[37.6731, -97.4053], [37.6731, -97.4045], [37.6732, -97.4041], [37.6732, -97.4035], [37.6732, -97.4026], [37.6732, -97.4017], [37.6732, -97.4014], [37.6733, -97.4003], [37.6733, -97.3999], [37.6733, -97.3993], [37.6733, -97.398], [37.6734, -97.3962], [37.6734, -97.3945], [37.6734, -97.3944], [37.6735, -97.3926], [37.6735, -97.3907], [37.6736, -97.3903], [37.6736, -97.3893], [37.6736, -97.3889], [37.6736, -97.3884], [37.6736, -97.3883], [37.6737, -97.3871], [37.6737, -97.387], [37.6737, -97.3857], [37.6738, -97.3853], [37.6738, -97.3846], [37.6739, -97.3842], [37.6739, -97.3841], [37.6739, -97.3835], [37.674, -97.3829], [37.6741, -97.3817], [37.6743, -97.3799], [37.6744, -97.3792], [37.6744, -97.3788], [37.6745, -97.378], [37.6746, -97.3762], [37.6748, -97.3744], [37.6749, -97.3741], [37.6749, -97.3737], [37.675, -97.3727], [37.675, -97.3726], [37.6751, -97.3717], [37.6752, -97.3711], [37.6752, -97.3708], [37.6754, -97.369], [37.6756, -97.3672], [37.6757, -97.3654]], [[37.6731, -97.4075], [37.6731, -97.4071], [37.6731, -97.4061], [37.6731, -97.4053]], [[37.673, -97.409], [37.6731, -97.4076], [37.6731, -97.4075]], [[37.673, -97.4108], [37.673, -97.4091], [37.673, -97.409]], [[37.6725, -97.4272], [37.6725, -97.4258], [37.6725, -97.4254], [37.6726, -97.4235], [37.6726, -97.4226], [37.6727, -97.4217], [37.6727, -97.421], [37.6727, -97.4207], [37.6727, -97.4205], [37.6727, -97.4204], [37.6727, -97.4201], [37.6727, -97.4199], [37.6728, -97.4184], [37.6728, -97.4181], [37.6728, -97.4175], [37.6728, -97.4163], [37.6729, -97.4144], [37.6729, -97.4126], [37.6729, -97.4126], [37.673, -97.4115], [37.673, -97.4108]], [[37.6725, -97.4282], [37.6725, -97.4272]], [[37.6724, -97.4308], [37.6724, -97.429], [37.6725, -97.4282]], [[37.6723, -97.4326], [37.6724, -97.4308]], [[37.6723, -97.4344], [37.6723, -97.4341], [37.6723, -97.4326]]]}, {"kind": "ped", "road": "I-435", "loc": "Overland Park", "cty": "Johnson", "lat": 38.9335, "lon": -94.6522, "n": 4, "e": [[38.9329, -94.678], [38.9329, -94.6651], [38.9332, -94.639], [38.9341, -94.6264]], "mi": 4.7, "permi": 0.9, "marks": [[38.93276, -94.63929], [38.93539, -94.61343], [38.9315, -94.66436], [38.93438, -94.69169]], "geom": [[[38.933, -94.6259], [38.9331, -94.6278], [38.9331, -94.6296], [38.9331, -94.6299], [38.9331, -94.6299], [38.9331, -94.6304], [38.9331, -94.6305], [38.9331, -94.6315], [38.9331, -94.6329], [38.9331, -94.6333], [38.9331, -94.6334], [38.9331, -94.6337], [38.9331, -94.6343], [38.9331, -94.6351], [38.933, -94.6366], [38.933, -94.637], [38.9328, -94.6388], [38.9327, -94.6397], [38.9326, -94.6406], [38.9325, -94.6425], [38.9323, -94.6443], [38.9321, -94.6461], [38.9319, -94.6479], [38.9318, -94.649], [38.9317, -94.6498], [38.9315, -94.6516], [38.9314, -94.6535], [38.9312, -94.6553], [38.9311, -94.6562], [38.9311, -94.6563], [38.9311, -94.6564], [38.931, -94.6571], [38.931, -94.659], [38.9309, -94.6594], [38.931, -94.6608], [38.9312, -94.6624], [38.9312, -94.6626], [38.9312, -94.6629], [38.9315, -94.6644], [38.9319, -94.6662], [38.9321, -94.6673], [38.9321, -94.6676], [38.9321, -94.6677]], [[38.933, -94.6241], [38.933, -94.6245], [38.933, -94.6259]], [[38.9332, -94.6222], [38.933, -94.6241]], [[38.9365, -94.6098], [38.936, -94.6116], [38.936, -94.6116], [38.9357, -94.6125], [38.9354, -94.6133], [38.935, -94.6145], [38.9349, -94.6151], [38.9343, -94.6169], [38.934, -94.618], [38.9338, -94.6186], [38.9335, -94.6198], [38.9334, -94.6204], [38.9332, -94.6218], [38.9332, -94.6222]], [[38.934, -94.6771], [38.934, -94.6772], [38.9342, -94.679], [38.9344, -94.6804], [38.9344, -94.6808], [38.9344, -94.6826], [38.9344, -94.6845], [38.9345, -94.6862], [38.9345, -94.6863], [38.9345, -94.6864], [38.9346, -94.6882], [38.9347, -94.69], [38.9348, -94.6919], [38.9348, -94.6929], [38.9349, -94.6937]], [[38.9326, -94.6699], [38.9329, -94.6717], [38.9333, -94.6735], [38.9336, -94.6753], [38.934, -94.6771]], [[38.9321, -94.6676], [38.9321, -94.6677], [38.9322, -94.668]], [[38.9322, -94.668], [38.9326, -94.6699]], [[38.9349, -94.6937], [38.935, -94.6956]]]}, {"kind": "ped", "road": "Topeka Blvd", "loc": "Topeka", "cty": "Shawnee", "lat": 38.9992, "lon": -95.6857, "n": 4, "e": [[38.9727, -95.6877], [38.9817, -95.6877], [39.0086, -95.685], [39.0257, -95.6837]], "mi": 3.7, "permi": 1.1, "marks": [[38.97421, -95.6878], [38.97113, -95.68753], [39.05168, -95.67958], [38.9998, -95.68774]]}, {"kind": "ped", "road": "13Th St", "loc": "Wichita", "cty": "Sedgwick", "lat": 37.7084, "lon": -97.3609, "n": 4, "e": [[37.7087, -97.3881], [37.7085, -97.3721], [37.7082, -97.34], [37.7081, -97.3336]], "mi": 3.0, "permi": 1.3, "marks": [[37.70851, -97.35262], [37.70802, -97.34014], [37.70814, -97.32714], [37.7089, -97.42364]]}]}, CITIES=[["Wichita", 37.6852, -97.3383, 12], ["Kansas City", 39.1065, -94.6945, 12], ["Topeka", 39.0443, -95.6875, 12], ["Overland Park", 38.9314, -94.6922, 12], ["Olathe", 38.8749, -94.8104, 12], ["Lenexa", 38.9577, -94.7858, 12], ["Salina", 38.8244, -97.6188, 12], ["Lawrence", 38.9594, -95.2789, 12], ["Shawnee", 39.0138, -94.7895, 12], ["Hutchinson", 38.0369, -97.9578, 12], ["Derby", 37.5643, -97.2348, 12], ["Manhattan", 39.1831, -96.5861, 12], ["Leavenworth", 39.2896, -94.9165, 12], ["Coffeyville", 37.0573, -95.632, 12], ["Merriam", 39.0127, -94.6919, 12], ["Garden City", 37.9701, -100.8658, 12], ["Liberal", 37.0475, -100.9109, 12], ["Dodge City", 37.7101, -100.0123, 12], ["Junction City", 39.0259, -96.8432, 12], ["Pittsburg", 37.4063, -94.6988, 12], ["Park City", 37.8077, -97.3253, 12], ["Newton", 38.0301, -97.3307, 12], ["Emporia", 38.4069, -96.182, 12], ["Edwardsville", 39.0754, -94.7901, 12], ["Bonner Springs", 39.0688, -94.8778, 12], ["Ulysses", 37.5287, -101.3444, 12], ["Leawood", 38.9233, -94.617, 12], ["Mission", 39.0375, -94.6686, 12], ["Arkansas City", 37.0535, -97.0357, 12], ["Gardner", 38.7992, -94.9188, 12]];
+const NM_BOUNDS=[[36.994, -102.051], [40.003, -94.607]];
+const map=L.map('map',{attributionControl:true});
+// Fit the whole state. On phones the bottom panel covers the lower screen, so pad
+// the bottom by its height — the state then centers in the VISIBLE area above it.
+function fitState(){
+  const isM=window.matchMedia('(max-width:620px)').matches;
+  const c=document.getElementById('ctrl');
+  const pb=(isM && c && c.offsetParent!==null) ? c.offsetHeight+24 : 12;
+  // desktop: reserve room on the left for the wider legend so the state sits
+  // slightly right of center (not behind it)
+  const padL=isM?12:150;
+  map.fitBounds(NM_BOUNDS,{paddingTopLeft:[padL,12],paddingBottomRight:[12,pb]});
+}
+fitState();   // padded fit up front so the orientation matches the post-load re-fit (no jump)
+map.attributionControl.setPrefix(false);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OSM, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+const canvas=L.canvas({padding:.5});
+const segLayer=L.layerGroup().addTo(map), rhlLayer=L.layerGroup().addTo(map),
+      hlLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map),
+      markLayer=L.layerGroup().addTo(map);
+// the individual deaths that make up a hot spot — yellow ring, red center
+function drawMarks(marks){ markLayer.clearLayers();
+  (marks||[]).forEach(m=>L.circleMarker(m,{radius:5,color:'#ffd11a',weight:2.5,
+    fillColor:'#cb181d',fillOpacity:1,interactive:false}).addTo(markLayer)); }
+function msMsg(t){ const e=document.getElementById('msmsg'); if(e) e.textContent=t||''; }
+function mapSearch(q){
+  q=(q||'').trim().toLowerCase(); if(!q){ msMsg(''); return; }
+  // exact municipality -> center on it (its zoom depends on the place's size)
+  const exact=CITIES.find(c=>c[0].toLowerCase()===q);
+  if(exact){ rhlLayer.clearLayers(); map.setView([exact[1],exact[2]],exact[3]||12); msMsg(''); return; }
+  // otherwise treat as a road/place: highlight the matching segments' real geometry
+  const segs=SEG.filter(s=>((s.lab||'')+' '+(s.loc||'')).toLowerCase().includes(q));
+  if(segs.length){
+    rhlLayer.clearLayers();
+    const bnds=L.latLngBounds([]);
+    segs.forEach(s=>{ L.polyline(s.c,{color:'#1d6fd8',weight:hlWeight(),opacity:.55,interactive:false}).addTo(rhlLayer);
+      s.c.forEach(p=>bnds.extend(p)); });
+    map.fitBounds(bnds,{padding:[45,45],maxZoom:14}); msMsg(''); return;
+  }
+  const city=CITIES.find(c=>c[0].toLowerCase().includes(q));
+  if(city){ rhlLayer.clearLayers(); map.setView([city[1],city[2]],city[3]||12); msMsg(''); return; }
+  geocodeAddr(q);   // not a known road/town — try a street address (centers the map, selects nothing)
+}
+function geocodeAddr(q){
+  msMsg('Searching…');
+  const b=NM_BOUNDS, vb=[b[0][1],b[1][0],b[1][1],b[0][0]].join(',');   // west,north,east,south (viewbox bias)
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&viewbox=${vb}&q=${encodeURIComponent(q)}`)
+    .then(r=>r.json()).then(j=>{
+      if(j&&j.length){ rhlLayer.clearLayers(); map.setView([+j[0].lat,+j[0].lon],14); msMsg(''); }
+      else msMsg(`No match for “${q}”. Try a community, a major road, or a full street address.`);
+    }).catch(()=>msMsg(`Couldn’t look up “${q}”. Try a community or major road.`));
+}
+function hlWeight(){ return segWeight().hit*2.0 + 5; }   // translucent highlight, fatter than the route
+// light up THIS segment's own fatal crashes (yellow ring); on a share layer, only
+// the crashes of that type (e.g. just the alcohol-involved deaths on the stretch)
+function highlightSegCrashes(i){ markLayer.clearLayers();
+  const mt=MAPTYPES[maptype];
+  for(const c of CR){ if(c.sg!==i) continue;
+    if(c.y<y0||c.y>y1||!inCat(c.pc)) continue;
+    if(mt.share){ if(mt.since&&c.y<mt.since) continue; if(!c[mt.crkey]) continue; }
+    L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k)+3.5,color:'#ffd11a',
+      weight:2.5,fillColor:'#cb181d',fillOpacity:1,interactive:false}).addTo(markLayer);
+  }
+}
+function highlightSeg(i){ hlLayer.clearLayers();
+  if(SEG[i]) L.polyline(SEG[i].c,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
+    lineCap:'round',interactive:false}).addTo(hlLayer); }
+function highlightSpot(h){ hlLayer.clearLayers();
+  const lines = (h.geom && h.geom.length) ? h.geom : [h.e];   // real road geometry, else smoothed line
+  lines.forEach(ln=>L.polyline(ln,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
+    lineCap:'round',interactive:false}).addTo(hlLayer)); }
+const RATE_CUTS=[2.0, 3.3, 5.4, 10.9];   // per-state rate color thresholds (scaled to this state's data)
+function rateColor(r,n){ if(!n||r==null) return '#d4d4d4'; const c=RATE_CUTS;
+  return r<c[0]?'#1a9850':r<c[1]?'#a6d96a':r<c[2]?'#fee08b':r<c[3]?'#fdae61':'#d73027'; }
+const DOW=['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function crashPopup(c){
+  let cas=`${c.k} killed`;
+  if(c.inj) cas+=` · ${c.inj} injured`+(c.si?` (${c.si} serious)`:'');
+  let date=[c.dw?DOW[c.dw]:'', `${MON[c.m]||''} ${c.dy||''}, ${c.y}`.trim()].filter(Boolean).join(', ');
+  if(c.hr!=null){ const h=c.hr%12||12; date+=` · ${h} ${c.hr<12?'AM':'PM'}`; }
+  const details=[c.ev, c.d?'alcohol involved':''].filter(Boolean).join(' · ');
+  let html=`<div style="font:13.5px/1.6 -apple-system,Helvetica,Arial"><b>${cas}</b>`
+    +`<br><span style="color:#555">${date}</span>`;
+  if(details) html+=`<br>${details}`;
+  return html+'</div>';
+}
+
+let SEG=[], CR=[], y0=YMIN, y1=YMAX, cat='all', ptsOff=false, maptype='risk';
+let segPolys=[], ptMarkers=[], curTab='map', syncing=false;
+let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
+
+const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
+const _rc=RATE_CUTS;
+const RATE_BUCKETS=[{lab:'<'+_rc[0],c:RAMP[0]},{lab:_rc[0]+'–'+_rc[1],c:RAMP[1]},{lab:_rc[1]+'–'+_rc[2],c:RAMP[2]},{lab:_rc[2]+'–'+_rc[3],c:RAMP[3]},{lab:_rc[3]+'+',c:RAMP[4]}];
+const COUNT_BUCKETS=[{lab:'1',c:RAMP[0]},{lab:'2–3',c:RAMP[1]},{lab:'4–6',c:RAMP[2]},{lab:'7–10',c:RAMP[3]},{lab:'11+',c:RAMP[4]}];
+function rateBucket(r){ const c=RATE_CUTS; return r<c[0]?0:r<c[1]?1:r<c[2]?2:r<c[3]?3:4; }
+function countBucket(n){ return n<=1?0:n<=3?1:n<=6?2:n<=10?3:4; }
+function curBuckets(){ return histMode==='rate'?RATE_BUCKETS:COUNT_BUCKETS; }
+// Trend of risk over the FULL period (2001–2024) in 5-year bands, category-filtered.
+// AADT is constant per segment, so rate-trend == crash-count-trend. Slope sign of
+// counts vs band index; needs >=4 crashes to call, else 'na'.
+function trendOf(s){
+  const b=[0,0,0,0,0];
+  s.cr.forEach(a=>{ if(!inCat(a[1])) return; const y=a[0];
+    b[y<=2005?0:y<=2010?1:y<=2015?2:y<=2020?3:4]++; });
+  if(b[0]+b[1]+b[2]+b[3]+b[4]<4) return 'na';
+  let slope=0; for(let x=0;x<5;x++) slope+=(x-2)*b[x]; slope/=10;
+  return slope>=0.25?'up':slope<=-0.25?'down':'flat';
+}
+function inCat(pc){ return cat==='all' ? true : (cat==='ped'? pc===1 : pc===0); }
+function sel(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&inCat(a[1])); }
+// Route COLORING uses all crashes in the window (overall risk) — independent of the
+// crash-type toggle, which only filters the dots. Routes never recolor on toggle.
+function selWin(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1); }
+function pedN(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&a[1]===1).length; }
+function rateOf(s,n,ny){ const vmt=s.a*365*ny*s.l; return vmt? n/vmt*1e8 : null; }
+function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehicle ':''; }
+
+// ---------- map types ----------
+// 'risk' = the fatal-crash rate (needs AADT). The others color each segment by the
+// SHARE of its crashes with a given trait (composition, AADT-independent).
+// cr per-crash array layout: [year, pc, alcohol, night, intersection, weather]
+const MAPTYPES={
+  risk:{lab:'Fatal crash risk'},
+  alc :{lab:'Alcohol involvement', share:1, fi:2, crkey:'d',  metric:'alcohol-involved', avg:'involving alcohol', dot:'alcohol-involved crashes',
+        note:'Recent-year alcohol involvement is under-counted.'},
+  nt  :{lab:'Nighttime crashes',   share:1, fi:3, crkey:'nt', metric:'at night', avg:'at night', dot:'nighttime crashes'},
+  ix  :{lab:'Deadly intersections',share:1, fi:4, crkey:'ix', since:2010, metric:'at an intersection', avg:'at intersections', dot:'intersection crashes',
+        note:'Based on 2010–2024 data only.'},
+  wx  :{lab:'Adverse weather',     share:1, fi:5, crkey:'wx', metric:'in adverse weather', avg:'in adverse weather', dot:'adverse-weather crashes'},
+};
+const SHARE_RAMP=['#f7fcfd','#bfd3e6','#8c96c6','#8856a7','#810f7c'];   // sequential (distinct from the rate ramp)
+const MINSHARE=4;   // need >=this many crashes in the window for a stable share
+function _hx(c){ return [parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)]; }
+function ramp(stops,t){ t=Math.max(0,Math.min(1,t||0)); const x=t*(stops.length-1),
+  i=Math.min(stops.length-2,Math.floor(x)), f=x-i, a=_hx(stops[i]), b=_hx(stops[i+1]);
+  return '#'+[0,1,2].map(j=>Math.round(a[j]+(b[j]-a[j])*f).toString(16).padStart(2,'0')).join(''); }
+function shareOf(s){ const mt=MAPTYPES[maptype], fi=mt.fi, since=mt.since||0; let num=0,den=0;
+  for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; if(since&&a[0]<since) continue; den++; if(a[fi]) num++; }
+  return den>=MINSHARE ? {share:num/den, n:den, k:num} : null; }
+function segHasData(s){ return MAPTYPES[maptype].share ? !!shareOf(s) : selWin(s).length>0; }
+function segColor(s,maxShare){
+  if(MAPTYPES[maptype].share){ const r=shareOf(s); return r? ramp(SHARE_RAMP, maxShare? r.share/maxShare:0) : '#dcdcdc'; }
+  const ny=y1-y0+1, n=selWin(s).length; return rateColor(rateOf(s,n,ny), n); }
+
+// ---------- map ----------
+function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
+  // Consistent regardless of the crash toggle — routes don't change when crashes hide.
+  return {hit:1.8+5.0*f, miss:0.6+1.0*f}; }   // higher floor so roads read at low (mobile) zoom
+// crash dots: tiny at statewide zoom (so they don't blob together), bigger as you zoom in
+function crashZ(){ return Math.max(0,Math.min(1,(map.getZoom()-6)/8)); }
+function crashR(k){ return 0.8+2.6*crashZ()+(k-1)*0.9; }
+function crashW(){ return 0.35+0.65*crashZ(); }
+function segTip(i){ const s=SEG[i], mt=MAPTYPES[maptype];
+  let body;
+  if(mt.share){ const r=shareOf(s);
+    body = r ? `<b>${Math.round(100*r.share)}%</b> of its ${r.n} fatal crashes were ${mt.metric}`
+             : `too few crashes to compare (under ${MINSHARE})`;
+  } else { const ny=y1-y0+1, n=selWin(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
+    body = `${s.l.toFixed(1)} miles with AADT ${s.a.toLocaleString()} · ${n} fatal crash${n===1?'':'es'}`
+      +(pc?` (${pc} ped/bike)`:'')+(rate!=null?` · ${rate.toFixed(1)} crashes per 100 million vehicle miles`:''); }
+  return `<div class="segpop"><b>${s.lab}</b>`
+    +`<br>${body}<br><button class="zbtn" onclick="toggleView()"></button></div>`; }
+const BIG_STATE=20000;   // above this many crashes, default the slider to recent years (lighter load)
+function drawCrashes(){
+  ptLayer.clearLayers(); ptMarkers=[];
+  const mt=MAPTYPES[maptype];
+  let nc=0,nk=0;
+  for(const c of CR){
+    if(c.y<y0||c.y>y1||!inCat(c.pc)) continue;
+    if(mt.share){ if(mt.since&&c.y<mt.since) continue; if(!c[mt.crkey]) continue; }
+    nc++; nk+=c.k;
+    if(ptsOff) continue;
+    const m=L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k),color:'#67000d',
+      weight:crashW(),fillColor:'#cb181d',fillOpacity:.85}).bindPopup(crashPopup(c)).addTo(ptLayer);
+    ptMarkers.push([m,c.k]);
+  }
+  document.getElementById('stat').innerHTML = ptsOff ? `Crash points hidden`
+    : mt.share ? `${nc.toLocaleString()} ${catWord()||''}fatal crashes ${mt.avg}`
+    : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
+}
+function drawMap(){
+  const zw=segWeight(), mt=MAPTYPES[maptype];
+  let maxShare=0;
+  if(mt.share) SEG.forEach(s=>{ const r=shareOf(s); if(r&&r.share>maxShare) maxShare=r.share; });
+  segLayer.clearLayers(); segPolys=[];
+  SEG.forEach((s,i)=>{
+    const has=segHasData(s);
+    const pl=L.polyline(s.c,{color:segColor(s,maxShare),weight:has?zw.hit:zw.miss,opacity:.85})
+      .bindPopup(segTip(i)).on('popupopen',()=>{ detail={t:'seg',i}; atState=(map.getZoom()<=8); highlightSeg(i); highlightSegCrashes(i); zbtnText(); });
+    pl.addTo(segLayer); segPolys[i]=pl;
+  });
+  document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
+  drawCrashes();
+  updateLegend(maxShare);
+}
+function riskLegendHtml(){
+  const c=RATE_CUTS;
+  return `<b class="lgttl">Fatal crashes per 100M vehicle-miles</b>`
+    +`<div class="lgscale"><span class="sw" style="background:#1a9850;margin-left:0"></span>&lt;${c[0]}`
+    +`<span class="sw" style="background:#a6d96a"></span>${c[0]}–${c[1]}`
+    +`<span class="sw" style="background:#fee08b"></span>${c[1]}–${c[2]}`
+    +`<span class="sw" style="background:#fdae61"></span>${c[2]}–${c[3]}`
+    +`<span class="sw" style="background:#d73027"></span>${c[3]}+`
+    +`<span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>`
+    +`<div class="muted lgfoot">Crash rate is calculated using 2017 AADT. Sources: crash data from `
+    +`<a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>; `
+    +`AADT from <a href="https://www.fhwa.dot.gov/policyinformation/hpms.cfm" target="_blank" rel="noopener">FHWA HPMS</a>. `
+    +`Address search <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</div>`;
+}
+// Statewide share for the current map type, over CR within the year window (and >=since).
+function statewideAvg(){ const mt=MAPTYPES[maptype]; if(!mt.share) return null;
+  const k=mt.crkey, since=mt.since||0; let num=0,den=0;
+  for(const c of CR){ if(c.y<y0||c.y>y1) continue; if(since&&c.y<since) continue; den++; if(c[k]) num++; }
+  return den? num/den : 0; }
+function updateLegend(maxShare){
+  const el=document.getElementById('legend'); if(!el) return;
+  const mt=MAPTYPES[maptype];
+  // The "what you're seeing" note (#risknote, above the legend) is relevant ONLY to
+  // Fatal crash risk — hidden in every other map type so the legend stays put.
+  const rn=document.getElementById('risknote'); if(rn) rn.style.display = (maptype==='risk') ? '' : 'none';
+  if(!mt.share){ el.innerHTML=riskLegendHtml(); return; }
+  const pct=Math.round(100*(maxShare||0))||100, avg=Math.round(100*statewideAvg());
+  el.innerHTML=`<b class="lgttl">Share of crashes ${mt.metric}</b>`
+    +`<div class="lgbar" style="background:linear-gradient(to right,${SHARE_RAMP.join(',')})"></div>`
+    +`<div class="lgbarlab"><span>0%</span><span>${pct}%</span></div>`
+    +`<div class="lgstat">Fatal crashes ${mt.avg} statewide: <b>${avg}%</b></div>`
+    +`<div class="lgna"><span class="sw" style="background:#dcdcdc;margin-left:0"></span>Insufficient crashes to assess</div>`
+    +(mt.note?`<div class="muted lgfoot">${mt.note}</div>`:'');
+}
+// zoom-only restyle keeps any open popup + highlight alive (don't rebuild the layer)
+map.on('zoomend',()=>{ const zw=segWeight(), cw=crashW();
+  segPolys.forEach((pl,i)=>{ if(pl) pl.setStyle({weight:segHasData(SEG[i])?zw.hit:zw.miss}); });
+  ptMarkers.forEach(([m,k])=>{ m.setRadius(crashR(k)); m.setStyle({weight:cw}); });
+  hlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); });
+  rhlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
+map.on('popupclose',()=>{ hlLayer.clearLayers(); markLayer.clearLayers(); });
+// Explicit view state so the toggle direction never depends on a zoom guess.
+let detail=null, atState=false, ready=false, hashLock=false;
+// Shareable URL: encodes the current tab and (on the map) center+zoom in the hash.
+function updateHash(){
+  if(!ready||hashLock) return;
+  let h=curTab;
+  if(curTab==='map'){ const c=map.getCenter(); h=`map=${c.lat.toFixed(4)},${c.lng.toFixed(4)},${map.getZoom()}`; }
+  history.replaceState(null,'','#'+h);
+}
+function applyHash(){
+  const h=decodeURIComponent((location.hash||'').replace(/^#/,'')); if(!h) return false;
+  const m=h.match(/^map=(-?\d+\.?\d*),(-?\d+\.?\d*),(\d+)/);
+  if(m){ hashLock=true; setTab('map'); map.setView([+m[1],+m[2]],+m[3]); hashLock=false; return true; }
+  if(h==='analysis'||h==='hotspots'||h==='map'){ setTab(h); return true; }
+  return false;
+}
+map.on('moveend',()=>{ if(curTab==='map') updateHash(); });
+function zbtnText(){ const b=document.querySelector('.leaflet-popup-content .zbtn');
+  if(b) b.textContent = atState ? '▴ Segment view' : '▾ Statewide view'; }
+map.on('popupopen',zbtnText);
+function toggleView(){
+  if(!atState){ atState=true; fitState(); }
+  else { atState=false;
+    if(detail&&detail.t==='seg') map.fitBounds(SEG[detail.i].c,{padding:[70,70],maxZoom:14});
+    else if(detail&&detail.t==='spot') map.fitBounds(detail.h.e,{padding:[80,80],maxZoom:14}); }
+  zbtnText();
+}
+function gotoSeg(i){
+  setTab('map');
+  map.fitBounds(SEG[i].c,{padding:[70,70],maxZoom:14});
+  setTimeout(()=>{ if(segPolys[i]) segPolys[i].openPopup(); }, 320);   // popupopen sets detail+highlight+label
+}
+function spotTip(h){
+  const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
+  return `<div class="segpop"><b>${h.road}</b> <span style="color:#555">— ${place}</span>`
+    +`<br><b>${h.n}</b> pedestrian / cyclist deaths over ${h.mi} mi · <b>${h.permi}/mile</b> (2001–2024)`
+    +`<br><button class="zbtn" onclick="toggleView()">▾ Statewide view</button></div>`;
+}
+function gotoSpot(h){
+  setTab('map');
+  if(h.seg!=null && SEG[h.seg]){ gotoSeg(h.seg); setTimeout(()=>drawMarks(h.marks),360); return; }
+  detail={t:'spot',h}; atState=false;
+  map.fitBounds(h.e,{padding:[80,80],maxZoom:14});
+  const mid=h.e[Math.floor(h.e.length/2)];
+  // open the popup FIRST (it fires popupclose on any prior popup, which clears
+  // the highlight layer), THEN draw the line + death markers so they survive.
+  setTimeout(()=>{ L.popup({maxWidth:260}).setLatLng(mid).setContent(spotTip(h)).openOn(map);
+                   highlightSpot(h); drawMarks(h.marks); }, 360);
+}
+let alcSpots=[], rateSpots=[], pedSpots=[];
+function renderHotspots(){
+  const NY=YMAX-YMIN+1;
+  let totCr=0,totVmt=0,totMi=0,totPed=0;
+  SEG.forEach(s=>{ totCr+=s.cr.length; totMi+=s.l; totVmt+=s.a*365*NY*s.l; for(const a of s.cr) if(a[1]) totPed++; });
+  let crAlc=0; for(const c of CR) if(c.d) crAlc++;
+  const avgRate=totVmt?totCr/totVmt*1e8:0, avgAlc=CR.length?crAlc/CR.length:0, avgPed=totMi?totPed/totMi:0;
+  const xLine=(v,avg)=> avg>0 ? `<b style="color:#c0392b">${(v/avg).toFixed(1)}×</b> statewide average` : '';
+  // Adaptive crash threshold: highest in [8,6,5,4] that still yields a usable pool
+  // (small states drop lower so the lists aren't near-empty).
+  const counts=SEG.map(s=>s.cr.length); let T=4;
+  for(const t of [8,6,5,4]){ if(counts.filter(n=>n>=t).length>=10){ T=t; break; } }
+  const rated = SEG.map((s,i)=>{ let alc=0,ped=0; for(const a of s.cr){ if(a[2])alc++; if(a[1])ped++; }
+      const vmt=s.a*365*NY*s.l, rate=vmt? s.cr.length/vmt*1e8 : 0;
+      return {road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length, ped, rate,
+              share:s.cr.length?alc/s.cr.length:0, len:s.l, aadt:s.a, segIndex:i}; }).filter(x=>x.n>=T);
+  // Only ABOVE-statewide-average areas — these tabs are the *worst*, top-down.
+  rateSpots = rated.filter(x=>x.rate>avgRate).sort((a,b)=>b.rate-a.rate);
+  alcSpots  = rated.filter(x=>x.share>avgAlc).sort((a,b)=>(b.share-a.share)||(b.n-a.n));
+  pedSpots  = (HOTSPOTS.ped||[]).filter(h=>h.permi>avgPed);
+  // Balance: equal count across shown categories (aim >=5); drop a too-thin one.
+  let cats=[{k:'rate',l:rateSpots},{k:'alc',l:alcSpots},{k:'ped',l:pedSpots}].filter(c=>c.l.length>=3);
+  let N=Math.min(12, ...cats.map(c=>c.l.length).concat([12]));
+  if(N<5 && cats.length>1){ cats=cats.slice().sort((a,b)=>a.l.length-b.l.length); cats.shift();
+    N=Math.min(12, ...cats.map(c=>c.l.length).concat([12])); }
+  const HEAD={
+    rate:['Highest death rate', `fatal crashes per 100M VMT, among segments with ≥${T} crashes · statewide average ${avgRate.toFixed(1)}`],
+    alc:['Most alcohol-involvement', `share of fatal crashes with alcohol involved (≥${T} crashes) · statewide average ${Math.round(100*avgAlc)}%`],
+    ped:['Pedestrian & cyclist death clusters', `most deaths on one road, regardless of traffic · statewide average ${avgPed.toFixed(2)}/mile`]};
+  const card=(h,k,i)=>{
+    const place=[h.loc, h.cty?`${h.cty} Co.`:''].filter(Boolean).join(' · ');
+    let lines;
+    if(k==='rate') lines=[`${h.len} mi · AADT ${h.aadt.toLocaleString()}`,
+        `${h.n} fatal crashes · <b>${h.rate.toFixed(1)}</b> per 100M VMT`, xLine(h.rate,avgRate)];
+    else if(k==='alc') lines=[`${h.n} fatal crashes`, `<b>${Math.round(100*h.share)}%</b> alcohol-involved`, xLine(h.share,avgAlc)];
+    else lines=[`${h.n} ped/cyclist deaths · ${h.mi} mi`, `<b>${h.permi}</b> per mile`, xLine(h.permi,avgPed)];
+    return `<div class="hscard" data-k="${k}" data-i="${i}"><div class="hsrank">${i+1}</div>`
+      +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${lines.filter(Boolean).join('<br>')}</div></div></div>`; };
+  document.getElementById('hslists').innerHTML = cats.map(c=>
+     `<div class="hsgrp"><h3 class="hsred">${HEAD[c.k][0]} <span class="muted">— ${HEAD[c.k][1]}</span></h3>`
+    +`<div class="hscards">`+c.l.slice(0,N).map((h,i)=>card(h,c.k,i)).join('')+`</div></div>`).join('')
+    || `<p class="sub">Not enough segments to rank for this state.</p>`;
+  document.querySelectorAll('.hscard').forEach(el=>el.onclick=()=>{
+    const k=el.dataset.k, i=+el.dataset.i;
+    if(k==='ped') gotoSpot(pedSpots[i]); else gotoSeg((k==='rate'?rateSpots:alcSpots)[i].segIndex); });
+}
+
+// ---------- analysis ----------
+// share of a segment's fatal crashes (in the year window) with a given flag (cr index)
+function shareWin(s,fi){ let num=0,den=0; for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; den++; if(a[fi]) num++; } return den? num/den : null; }
+function buildAnalysis(){
+  const ny=y1-y0+1;
+  document.getElementById('yrlabel2').textContent=y0===y1?y0:`${y0}–${y1}`;
+  const BK=curBuckets(), counts=BK.map(()=>0);
+  const rows=[]; let zero=0;
+  SEG.forEach((s,i)=>{
+    const c=sel(s), n=c.length;
+    if(n===0){ zero++;   // zero-crash segments are always listed (just sort to the bottom)
+      rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n:0,rate:rateOf(s,0,ny),ped:pedN(s),bkt:-1,trend:trendOf(s),
+        alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)}); return; }
+    const rate=rateOf(s,n,ny);
+    const bkt = histMode==='rate' ? rateBucket(rate) : countBucket(n);
+    counts[bkt]++;
+    rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n,rate,ped:pedN(s),bkt,trend:trendOf(s),
+      alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)});
+  });
+  renderHist(counts, BK);
+  let r = bucketFilter!=null ? rows.filter(x=>x.bkt===bucketFilter) : rows;
+  if(min3) r=r.filter(x=>x.n>=3);
+  if(search) r=r.filter(x=>((x.lab||'')+' '+(x.loc||'')).toLowerCase().includes(search));
+  const k=sort.key;
+  r.sort((A,B)=>{ if(k==='lab'||k==='loc') return sort.dir*String(A[k]||'').localeCompare(String(B[k]||''));
+    let va=A[k], vb=B[k]; va=(va==null?-1:va); vb=(vb==null?-1:vb); return sort.dir*(va-vb); });
+  renderTable(r);
+}
+function renderHist(counts, BK){
+  const max=Math.max(1,...counts), h=document.getElementById('hist');
+  h.innerHTML=BK.map((b,i)=>{
+    const cls='hbar'+(bucketFilter===i?' sel':'')+(bucketFilter!=null&&bucketFilter!==i?' dim':'');
+    return `<div class="${cls}" data-b="${i}"><div class="hn">${counts[i]}</div>`
+      +`<div class="bar" style="height:${Math.round(100*counts[i]/max)}%;background:${b.c}"></div>`
+      +`<div class="hl">${b.lab}</div></div>`; }).join('');
+  const axis = histMode==='rate'
+    ? 'crashes per 100 million vehicle miles traveled (VMT)'
+    : 'fatal crashes in the selected years';
+  const zn=document.getElementById('zeronote');
+  zn.innerHTML = `<span class="haxis">${axis}</span>`
+    + (bucketFilter!=null ? ` &nbsp;·&nbsp; <a href="#" id="hclear">show all segments</a>` : '');
+  const hc=document.getElementById('hclear');
+  if(hc) hc.onclick=(ev)=>{ ev.preventDefault(); bucketFilter=null; buildAnalysis(); };
+  h.querySelectorAll('.hbar').forEach(el=>el.onclick=()=>{
+    const b=+el.dataset.b; bucketFilter = (bucketFilter===b? null : b); buildAnalysis(); });
+}
+function renderCoverage(){
+  const off=STATS.crLocal+STATS.crUnmatched, pon=Math.round(100*STATS.crAssigned/STATS.crTotal);
+  const html=
+    `<b>What you're seeing — and what you're not:</b><br>`
+    +`Busy roads have more crashes on them in part because they have more traffic, so to assess `
+    +`<i>risk</i>, vehicle safety experts compare segments of road by the number of crashes per annual `
+    +`average daily traffic (AADT). FHWA HPMS publishes AADT for the highway network `
+    +`(${STATS.segTotal.toLocaleString()} segments) but not county and local roads.<br><br>`
+    +`Of ${STATS.crTotal.toLocaleString()} geocoded fatal crashes in Kansas ${STATS.yMin}–${STATS.yMax}, `
+    +`<b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> occurred on a rated segment, and can be compared below `
+    +`according to their crashes per 100 million vehicle miles traveled (VMT). `
+    +`<b>${off.toLocaleString()} (${100-pon}%)</b> occurred on local/county roads or could not be matched to a `
+    +`segment — they appear as points on the map but can not be compared according to risk.`;
+  ['risknote','aboutbody'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+}
+const COLS=[['lab','Road'],['loc','Location'],['l','Length (miles)'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
+const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['Insufficient data','#aaa']};
+function renderTable(rows){
+  const SHARE_COLS=[['alcSh','% alcohol','Share of the segment’s fatal crashes that were alcohol-involved (in the selected years)'],
+                    ['ntSh','% night','Share of the segment’s fatal crashes that happened in the dark'],
+                    ['wxSh','% weather','Share of the segment’s fatal crashes in adverse weather']];
+  const head='<thead><tr>'+COLS.map(([k,t])=>
+      `<th data-k="${k}" class="${sort.key===k?'sorted':''}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
+    +`<th title="Direction of risk in 5-year bands across 2001–2024 (independent of the year slider). ↑ rising · ↓ falling · → little change · ‘Insufficient data’ = too few crashes to tell.">Trend (2001–24)</th>`
+    +SHARE_COLS.map(([k,t,ti])=>`<th class="shcol ${sort.key===k?'sorted':''}" data-k="${k}" title="${ti}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
+    +`</tr></thead>`;
+  const pctc=v=>v!=null?Math.round(100*v)+'%':'—';
+  const body='<tbody>'+rows.map(r=>{
+    const col=rateColor(r.rate,r.n), tr=TREND[r.trend];
+    return `<tr data-i="${r.i}"><td>${r.lab}</td><td>${r.loc||''}</td><td>${r.l.toFixed(2)}</td><td>${r.a.toLocaleString()}</td>`
+      +`<td>${r.n}</td><td>${r.ped||''}</td>`
+      +`<td><span class="dot" style="background:${col}"></span>${r.rate!=null?r.rate.toFixed(1):'—'}</td>`
+      +`<td style="color:${tr[1]};font-weight:600">${tr[0]}</td>`
+      +`<td class="shcol">${pctc(r.alcSh)}</td><td class="shcol">${pctc(r.ntSh)}</td><td class="shcol">${pctc(r.wxSh)}</td></tr>`; }).join('')+'</tbody>';
+  const t=document.getElementById('segtable');
+  t.innerHTML=head+body;
+  t.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sort.key===k) sort.dir*=-1; else { sort.key=k; sort.dir=(k==='lab'?1:-1); }
+    buildAnalysis(); });
+  t.querySelectorAll('tr[data-i]').forEach(tr=>tr.onclick=()=>gotoSeg(+tr.dataset.i));
+  const parts=[]; if(min3) parts.push('3+ crashes'); if(search) parts.push(`“${search}”`);
+  const filtered = bucketFilter!=null || parts.length>0;
+  document.getElementById('rowhint').textContent=
+    `${filtered?'Filtered to':'Showing'} ${rows.length.toLocaleString()} segments`
+    +(bucketFilter!=null?` “${curBuckets()[bucketFilter].lab}${histMode==='rate'?' crashes/100M VMT':' crashes'}”`:'')
+    +(parts.length?' · '+parts.join(' · '):'');
+}
+
+// ---------- shared filter state ----------
+function apply(){ drawMap(); if(curTab==='analysis') buildAnalysis(); }
+function setYears(a,b,from){ y0=a; y1=b; syncing=true;
+  if(from!=='map'&&sMap&&sMap.noUiSlider) sMap.noUiSlider.set([a,b]);
+  if(from!=='ana'&&sAna&&sAna.noUiSlider) sAna.noUiSlider.set([a,b]);
+  syncing=false; apply(); }
+function setCat(c){ cat=c; ptsOff=false;
+  document.querySelectorAll('.catsel button').forEach(b=>b.classList.toggle('on',b.dataset.cat===c));
+  apply(); }
+// map-only: hide all crash points but keep the risk-shaded roads
+function setPts(off){ ptsOff=off;
+  const row=document.querySelector('.catsel[data-which="map"]');
+  if(row) row.querySelectorAll('button').forEach(b=>
+    b.classList.toggle('on', off ? b.dataset.pts==='off' : b.dataset.cat===cat));
+  drawMap(); }
+function setTab(t){ curTab=t;
+  const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');   // dismiss intro on navigation
+  document.getElementById('map-view').classList.remove('introup');                // reveal the map controls
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  document.getElementById('map-view').classList.toggle('active',t==='map');
+  document.getElementById('analysis').classList.toggle('active',t==='analysis');
+  document.getElementById('hotspots').classList.toggle('active',t==='hotspots');
+  document.getElementById('info').classList.toggle('active',t==='info');
+  if(t==='map') setTimeout(()=>map.invalidateSize(),0);
+  else if(t==='analysis') buildAnalysis();
+  else if(t==='hotspots') renderHotspots();
+  updateHash();
+}
+
+const sMap=document.getElementById('slider'), sAna=document.getElementById('slider2');
+[[sMap,'map'],[sAna,'ana']].forEach(([el,which])=>{
+  noUiSlider.create(el,{start:[YMIN,YMAX],connect:true,step:1,margin:0,
+    range:{min:YMIN,max:YMAX},format:{to:v=>Math.round(v),from:v=>Number(v)}});
+  el.noUiSlider.on('update',v=>{ if(syncing) return; setYears(+v[0],+v[1],which); });
+});
+document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>{
+  if(b.dataset.pts==='off') setPts(true); else setCat(b.dataset.cat); }));
+updateLegend(0);   // populate the (risk) legend immediately, before data loads
+document.getElementById('maptype').addEventListener('change',e=>{
+  maptype=e.target.value;
+  hlLayer.clearLayers(); markLayer.clearLayers(); map.closePopup(); detail=null;   // clear any illuminated segment
+  drawMap();
+});
+document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
+document.getElementById('search').addEventListener('change',e=>logSearch(e.target.value,'analysis'));
+document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
+document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ mapSearch(e.target.value); logSearch(e.target.value,'map'); } });
+
+// ---- anonymous search logging: the term + coarse location/session, no raw IP.
+//      Inert until LOG_ENDPOINT (a Google Apps Script web-app URL) is filled in. ----
+const LOG_ENDPOINT='https://script.google.com/macros/s/AKfycbx-g-FIWOpyeJxaenE2WCt_zAHpoSONIcqEtXfi6exeTTVslo8BboxsnmfjUvkygKPb/exec';
+let _sid=null,_geo=null;
+function _sessId(){ if(_sid) return _sid;
+  try{ _sid=localStorage.getItem('nmsid'); if(!_sid){ _sid=Math.random().toString(36).slice(2,10); localStorage.setItem('nmsid',_sid); } }
+  catch(e){ _sid='nostore'; } return _sid; }
+async function _coarseGeo(){ if(_geo!==null) return _geo;
+  try{ const j=await (await fetch('https://ipapi.co/json/')).json();
+       _geo={country:j.country_name||'',region:j.region||'',city:j.city||''}; }
+  catch(e){ _geo={}; } return _geo; }
+async function logSearch(term,where){
+  term=(term||'').trim(); if(!term||!LOG_ENDPOINT) return;
+  const g=await _coarseGeo();
+  const body=JSON.stringify({term,where,sid:_sessId(),country:g.country,region:g.region,
+    city:g.city,ref:document.referrer||'',lang:navigator.language||'',
+    screen:`${screen.width}x${screen.height}`,ua:navigator.userAgent});
+  try{ fetch(LOG_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body}); }catch(e){}
+}
+function dismissIntro(){
+  const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');
+  document.getElementById('map-view').classList.remove('introup');   // reveal controls
+  if(curTab==='map'){ map.invalidateSize(); fitState(); }            // re-center NM in the now-visible area
+}
+['aboutx','aboutgo'].forEach(id=>document.getElementById(id).addEventListener('click',dismissIntro));
+document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('click',()=>{
+  histMode=b.dataset.m; bucketFilter=null;
+  document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
+  buildAnalysis(); }));
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+document.getElementById('statesel').addEventListener('change',e=>{ location.assign("../"+e.target.value+"/"+location.hash); });
+// clicking the wordmark returns to this state's home with the intro blurb showing
+document.getElementById('brand').addEventListener('click',()=>{ if(location.hash) location.href=location.pathname; else location.reload(); });
+renderCoverage();   // fills the About tab
+// phones: fold the legend into the bottom control panel so the map gets more room
+if(window.matchMedia('(max-width:620px)').matches){
+  const ctrl=document.getElementById('ctrl'), lg=document.getElementById('legend');
+  if(ctrl&&lg) ctrl.appendChild(lg);
+}
+
+// crashes.json is positional arrays (smaller download) — rehydrate to objects so the
+// rest of the code keeps using c.la/c.lo/etc. Order must match the build's CR writer.
+const CR_FIELDS=['la','lo','y','m','dy','dw','hr','k','inj','si','ev','d','pc','nt','ix','wx','sg'];
+function rehydrate(rows){ return rows.map(r=>{ const o={}; for(let i=0;i<CR_FIELDS.length;i++) o[CR_FIELDS[i]]=r[i]; return o; }); }
+Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
+  .then(([s,c])=>{ SEG=s; CR=rehydrate(c);
+    if(CR.length>BIG_STATE){            // big state: start on the last 5 years so it loads light; expandable
+      y0=Math.max(YMIN,YMAX-4);
+      if(sMap&&sMap.noUiSlider) sMap.noUiSlider.set([y0,y1]);
+      if(sAna&&sAna.noUiSlider) sAna.noUiSlider.set([y0,y1]);
+    }
+    drawMap();
+    ready=true; setTimeout(()=>{ map.invalidateSize(); fitState(); },0); });
+</script>
+</body></html>
