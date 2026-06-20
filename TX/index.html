@@ -48,14 +48,14 @@
      comes from #leftstack so it always matches the "what you're seeing" note (desktop) */
   @media(min-width:621px){ #legend{min-height:152px} }
   #legend .lgttl{display:block;margin-bottom:4px;font-weight:700;white-space:nowrap}
-  #legend .lgscale{white-space:nowrap}
+  #legend .lgscale{white-space:nowrap;font-size:12px}
   #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
   #legend .lgfoot a{color:#1559a3;text-decoration:underline}
-  #legend .sw{display:inline-block;width:14px;height:9px;margin:0 2px 0 8px;vertical-align:1px}
+  #legend .sw{display:inline-block;width:13px;height:9px;margin:0 2px 0 5px;vertical-align:1px}
   #legend .lgshort{display:none}
   /* desktop: the methodology note sits in a stack beneath the legend */
   #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
-    flex-direction:column;gap:10px;width:420px}   /* fixed width → legend matches the note */
+    flex-direction:column;gap:10px;width:466px}   /* fixed width → legend matches the note; wide enough for the rate scale on one line */
   #leftstack .panel{position:static;max-width:none}
   #risknote{padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
   #risknote b{color:#1a2433}
@@ -291,10 +291,13 @@ const map=L.map('map',{attributionControl:true});
 // Fit the whole state. On phones the bottom panel covers the lower screen, so pad
 // the bottom by its height — the state then centers in the VISIBLE area above it.
 function fitState(){
+  const isM=window.matchMedia('(max-width:620px)').matches;
   const c=document.getElementById('ctrl');
-  const pb=(window.matchMedia('(max-width:620px)').matches && c && c.offsetParent!==null)
-    ? c.offsetHeight+24 : 12;
-  map.fitBounds(NM_BOUNDS,{paddingTopLeft:[12,12],paddingBottomRight:[12,pb]});
+  const pb=(isM && c && c.offsetParent!==null) ? c.offsetHeight+24 : 12;
+  // desktop: reserve room on the left for the wider legend so the state sits
+  // slightly right of center (not behind it)
+  const padL=isM?12:150;
+  map.fitBounds(NM_BOUNDS,{paddingTopLeft:[padL,12],paddingBottomRight:[12,pb]});
 }
 map.fitBounds(NM_BOUNDS);   // initial guess; re-fit precisely once the map is sized
 map.attributionControl.setPrefix(false);
@@ -570,7 +573,7 @@ function renderHotspots(){
     N=Math.min(12, ...cats.map(c=>c.l.length).concat([12])); }
   const HEAD={
     rate:['Highest death rate', `fatal crashes per 100M VMT, among segments with ≥${T} crashes · statewide average ${avgRate.toFixed(1)}`],
-    alc:['Most commonly alcohol-involved', `share of a road’s fatal crashes that were alcohol-involved (≥${T} crashes) · statewide average ${Math.round(100*avgAlc)}%`],
+    alc:['Most alcohol-involvement', `share of fatal crashes where alcohol was involved (≥${T} crashes) · statewide average ${Math.round(100*avgAlc)}%`],
     ped:['Pedestrian & cyclist death clusters', `most deaths on one road, regardless of traffic · statewide average ${avgPed.toFixed(2)}/mile`]};
   const card=(h,k,i)=>{
     const place=[h.loc, h.cty?`${h.cty} Co.`:''].filter(Boolean).join(' · ');
