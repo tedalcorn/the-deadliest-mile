@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NM Vehicle Crashes — risk by road segment</title>
+<title>Deadly Miles — fatal crash risk on New Mexico roads</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -593,7 +593,7 @@ document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key===
 
 // ---- anonymous search logging: the term + coarse location/session, no raw IP.
 //      Inert until LOG_ENDPOINT (a Google Apps Script web-app URL) is filled in. ----
-const LOG_ENDPOINT='';
+const LOG_ENDPOINT='https://script.google.com/macros/s/AKfycbx-g-FIWOpyeJxaenE2WCt_zAHpoSONIcqEtXfi6exeTTVslo8BboxsnmfjUvkygKPb/exec';
 let _sid=null,_geo=null;
 function _sessId(){ if(_sid) return _sid;
   try{ _sid=localStorage.getItem('nmsid'); if(!_sid){ _sid=Math.random().toString(36).slice(2,10); localStorage.setItem('nmsid',_sid); } }
