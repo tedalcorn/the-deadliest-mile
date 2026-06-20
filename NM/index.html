@@ -299,7 +299,7 @@ function fitState(){
   const padL=isM?12:150;
   map.fitBounds(NM_BOUNDS,{paddingTopLeft:[padL,12],paddingBottomRight:[12,pb]});
 }
-map.fitBounds(NM_BOUNDS);   // initial guess; re-fit precisely once the map is sized
+fitState();   // padded fit up front so the orientation matches the post-load re-fit (no jump)
 map.attributionControl.setPrefix(false);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
   {attribution:'© OSM, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
@@ -332,8 +332,8 @@ function mapSearch(q){
 }
 function geocodeAddr(q){
   msMsg('Searching…');
-  const b=NM_BOUNDS, vb=[b[0][1],b[1][0],b[1][1],b[0][0]].join(',');   // west,north,east,south
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&bounded=1&viewbox=${vb}&q=${encodeURIComponent(q)}`)
+  const b=NM_BOUNDS, vb=[b[0][1],b[1][0],b[1][1],b[0][0]].join(',');   // west,north,east,south (viewbox bias)
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&viewbox=${vb}&q=${encodeURIComponent(q)}`)
     .then(r=>r.json()).then(j=>{
       if(j&&j.length){ rhlLayer.clearLayers(); map.setView([+j[0].lat,+j[0].lon],14); msMsg(''); }
       else msMsg(`No match for “${q}”. Try a community, a major road, or a full street address.`);
@@ -451,25 +451,21 @@ function segTip(i){ const s=SEG[i], mt=MAPTYPES[maptype];
       +(pc?` (${pc} ped/bike)`:'')+(rate!=null?` · ${rate.toFixed(1)} crashes per 100 million vehicle miles`:''); }
   return `<div class="segpop"><b>${s.lab}</b>`
     +`<br>${body}<br><button class="zbtn" onclick="toggleView()"></button></div>`; }
-const DOT_CAP=12000;   // big states (TX) only plot crash dots once the visible count is manageable
+const BIG_STATE=20000;   // above this many crashes, default the slider to recent years (lighter load)
 function drawCrashes(){
   ptLayer.clearLayers(); ptMarkers=[];
-  const mt=MAPTYPES[maptype], big=CR.length>DOT_CAP, b=big?map.getBounds():null;
-  let nc=0,nk=0; const draw=[];
+  const mt=MAPTYPES[maptype];
+  let nc=0,nk=0;
   for(const c of CR){
     if(c.y<y0||c.y>y1||!inCat(c.pc)) continue;
     if(mt.share){ if(mt.since&&c.y<mt.since) continue; if(!c[mt.crkey]) continue; }
     nc++; nk+=c.k;
-    if(!big || b.contains([c.la,c.lo])) draw.push(c);
-  }
-  const suppressed = big && draw.length>DOT_CAP;   // too many in view (e.g. TX statewide) — show roads only
-  if(!ptsOff && !suppressed) for(const c of draw){
+    if(ptsOff) continue;
     const m=L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k),color:'#67000d',
       weight:crashW(),fillColor:'#cb181d',fillOpacity:.85}).bindPopup(crashPopup(c)).addTo(ptLayer);
     ptMarkers.push([m,c.k]);
   }
   document.getElementById('stat').innerHTML = ptsOff ? `Crash points hidden`
-    : suppressed ? `${nc.toLocaleString()} ${catWord()||''}fatal crashes — zoom in to plot them`
     : mt.share ? `${nc.toLocaleString()} ${catWord()||''}fatal crashes ${mt.avg}`
     : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
 }
@@ -605,7 +601,7 @@ function renderHotspots(){
     N=Math.min(12, ...cats.map(c=>c.l.length).concat([12])); }
   const HEAD={
     rate:['Highest death rate', `fatal crashes per 100M VMT, among segments with ≥${T} crashes · statewide average ${avgRate.toFixed(1)}`],
-    alc:['Most alcohol-involvement', `share of fatal crashes where alcohol was involved (≥${T} crashes) · statewide average ${Math.round(100*avgAlc)}%`],
+    alc:['Most alcohol-involvement', `share of fatal crashes with alcohol involved (≥${T} crashes) · statewide average ${Math.round(100*avgAlc)}%`],
     ped:['Pedestrian & cyclist death clusters', `most deaths on one road, regardless of traffic · statewide average ${avgPed.toFixed(2)}/mile`]};
   const card=(h,k,i)=>{
     const place=[h.loc, h.cty?`${h.cty} Co.`:''].filter(Boolean).join(' · ');
@@ -808,7 +804,13 @@ if(window.matchMedia('(max-width:620px)').matches){
 }
 
 Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.json').then(r=>r.json())])
-  .then(([s,c])=>{ SEG=s; CR=c; drawMap();
+  .then(([s,c])=>{ SEG=s; CR=c;
+    if(CR.length>BIG_STATE){            // big state: start on the last 5 years so it loads light; expandable
+      y0=Math.max(YMIN,YMAX-4);
+      if(sMap&&sMap.noUiSlider) sMap.noUiSlider.set([y0,y1]);
+      if(sAna&&sAna.noUiSlider) sAna.noUiSlider.set([y0,y1]);
+    }
+    drawMap();
     ready=true; setTimeout(()=>{ map.invalidateSize(); fitState(); },0); });
 </script>
 </body></html>
