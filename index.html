@@ -38,8 +38,9 @@
   #slider,#slider2{margin:2px 7px 4px}
   #stat{margin-top:8px;color:#444}
   #legend{bottom:18px;left:14px;padding:8px 11px;color:#333}
-  /* fixed size so the legend never resizes/jumps when switching map types (desktop) */
-  @media(min-width:621px){ #legend{width:352px;min-height:152px} }
+  /* fixed min-height so the legend never resizes when switching map types; width
+     comes from #leftstack so it always matches the "what you're seeing" note (desktop) */
+  @media(min-width:621px){ #legend{min-height:152px} }
   #legend .lgttl{display:block;margin-bottom:4px;font-weight:700;white-space:nowrap}
   #legend .lgscale{white-space:nowrap}
   #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
@@ -48,7 +49,7 @@
   #legend .lgshort{display:none}
   /* desktop: the methodology note sits in a stack beneath the legend */
   #leftstack{position:absolute;bottom:18px;left:14px;z-index:1000;display:flex;
-    flex-direction:column;gap:10px;max-width:520px}
+    flex-direction:column;gap:10px;width:420px}   /* fixed width → legend matches the note */
   #leftstack .panel{position:static;max-width:none}
   #risknote{padding:12px 15px;font:13.5px/1.55 -apple-system,Helvetica,Arial;color:#2b2b2b}
   #risknote b{color:#1a2433}
@@ -171,7 +172,8 @@
     border-radius:4px;padding:4px 8px;cursor:pointer}
   .zbtn:hover{background:#dceaf8}
   .segpop{font:13.5px/1.55 -apple-system,Helvetica,Arial}
-  #hslists{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  #hslists{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;align-items:start}
+  @media(max-width:1024px){ #hslists{grid-template-columns:1fr 1fr} }
   @media(max-width:760px){ #hslists{grid-template-columns:1fr} }
   .hsgrp{margin:0}
   .hsgrp h3{font-size:13.5px;margin:0 0 10px;border-bottom:2px solid #e2e6ea;padding-bottom:5px}
@@ -362,6 +364,9 @@ function trendOf(s){
 }
 function inCat(pc){ return cat==='all' ? true : (cat==='ped'? pc===1 : pc===0); }
 function sel(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&inCat(a[1])); }
+// Route COLORING uses all crashes in the window (overall risk) — independent of the
+// crash-type toggle, which only filters the dots. Routes never recolor on toggle.
+function selWin(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1); }
 function pedN(s){ return s.cr.filter(a=>a[0]>=y0&&a[0]<=y1&&a[1]===1).length; }
 function rateOf(s,n,ny){ const vmt=s.a*365*ny*s.l; return vmt? n/vmt*1e8 : null; }
 function catWord(){ return cat==='ped'?'pedestrian/cyclist ':cat==='auto'?'vehicle ':''; }
@@ -388,10 +393,10 @@ function ramp(stops,t){ t=Math.max(0,Math.min(1,t||0)); const x=t*(stops.length-
 function shareOf(s){ const mt=MAPTYPES[maptype], fi=mt.fi, since=mt.since||0; let num=0,den=0;
   for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; if(since&&a[0]<since) continue; den++; if(a[fi]) num++; }
   return den>=MINSHARE ? {share:num/den, n:den, k:num} : null; }
-function segHasData(s){ return MAPTYPES[maptype].share ? !!shareOf(s) : sel(s).length>0; }
+function segHasData(s){ return MAPTYPES[maptype].share ? !!shareOf(s) : selWin(s).length>0; }
 function segColor(s,maxShare){
   if(MAPTYPES[maptype].share){ const r=shareOf(s); return r? ramp(SHARE_RAMP, maxShare? r.share/maxShare:0) : '#dcdcdc'; }
-  const ny=y1-y0+1, n=sel(s).length; return rateColor(rateOf(s,n,ny), n); }
+  const ny=y1-y0+1, n=selWin(s).length; return rateColor(rateOf(s,n,ny), n); }
 
 // ---------- map ----------
 function segWeight(){ const f=Math.max(0,Math.min(1,(map.getZoom()-6)/7));
@@ -402,15 +407,14 @@ function crashZ(){ return Math.max(0,Math.min(1,(map.getZoom()-6)/8)); }
 function crashR(k){ return 0.8+2.6*crashZ()+(k-1)*0.9; }
 function crashW(){ return 0.35+0.65*crashZ(); }
 function segTip(i){ const s=SEG[i], mt=MAPTYPES[maptype];
-  const place=[s.loc, s.cty?`${s.cty} County`:''].filter(Boolean).join(' · ');
   let body;
   if(mt.share){ const r=shareOf(s);
     body = r ? `<b>${Math.round(100*r.share)}%</b> of its ${r.n} fatal crashes were ${mt.metric}`
              : `too few crashes to compare (under ${MINSHARE})`;
-  } else { const ny=y1-y0+1, n=sel(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
+  } else { const ny=y1-y0+1, n=selWin(s).length, rate=rateOf(s,n,ny), pc=pedN(s);
     body = `${s.l.toFixed(1)} miles with AADT ${s.a.toLocaleString()} · ${n} fatal crash${n===1?'':'es'}`
       +(pc?` (${pc} ped/bike)`:'')+(rate!=null?` · ${rate.toFixed(1)} crashes per 100 million vehicle miles`:''); }
-  return `<div class="segpop"><b>${s.lab}</b>${place?` <span style="color:#555">— ${place}</span>`:''}`
+  return `<div class="segpop"><b>${s.lab}</b>`
     +`<br>${body}<br><button class="zbtn" onclick="toggleView()"></button></div>`; }
 function drawMap(){
   const zw=segWeight(), mt=MAPTYPES[maptype];
@@ -425,9 +429,7 @@ function drawMap(){
   });
   ptLayer.clearLayers(); ptMarkers=[];
   let nc=0,nk=0;
-  CR.forEach(c=>{ if(ptsOff||c.y<y0||c.y>y1) return;
-    if(mt.share){ if(mt.since&&c.y<mt.since) return; if(!c[mt.crkey]) return; }
-    else if(!inCat(c.pc)) return;
+  CR.forEach(c=>{ if(ptsOff||c.y<y0||c.y>y1||!inCat(c.pc)) return;   // dots filtered by the crash-type toggle, every map type
     nc++; nk+=c.k;
     const m=L.circleMarker([c.la,c.lo],{renderer:canvas,radius:crashR(c.k),color:'#67000d',
       weight:crashW(),fillColor:'#cb181d',fillOpacity:.85}).bindPopup(crashPopup(c)).addTo(ptLayer);
@@ -435,8 +437,7 @@ function drawMap(){
   });
   document.getElementById('yrlabel').textContent=y0===y1?y0:`${y0}–${y1}`;
   document.getElementById('stat').innerHTML = ptsOff ? `Crash points hidden`
-    : (mt.share ? `${nc.toLocaleString()} fatal crashes ${mt.avg}`
-                : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`);
+    : `${nc.toLocaleString()} ${catWord()||''}fatal crashes · ${nk.toLocaleString()} killed`;
   updateLegend(maxShare);
 }
 function riskLegendHtml(){
@@ -534,7 +535,7 @@ function renderHotspots(){
   alcSpots = SEG.map((s,i)=>{ let num=0; for(const a of s.cr) if(a[2]) num++;
       return {kind:'alc', road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length,
               share:s.cr.length?num/s.cr.length:0, segIndex:i}; })
-    .filter(x=>x.n>=8).sort((a,b)=>(b.share-a.share)||(b.n-a.n)).slice(0,10);
+    .filter(x=>x.n>=8).sort((a,b)=>(b.share-a.share)||(b.n-a.n)).slice(0,12);
   const card=(h,k,i)=>{
     const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
     const stat = h.kind==='rate'
