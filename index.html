@@ -145,7 +145,10 @@
     table.seg th:nth-child(3),table.seg td:nth-child(3),
     table.seg th:nth-child(4),table.seg td:nth-child(4),
     table.seg th:nth-child(6),table.seg td:nth-child(6),
-    table.seg th:nth-child(8),table.seg td:nth-child(8){display:none}
+    table.seg th:nth-child(8),table.seg td:nth-child(8),
+    table.seg th:nth-child(9),table.seg td:nth-child(9),
+    table.seg th:nth-child(10),table.seg td:nth-child(10),
+    table.seg th:nth-child(11),table.seg td:nth-child(11){display:none}
     table.seg th:nth-child(1),table.seg td:nth-child(1){width:22%}
     table.seg th:nth-child(2),table.seg td:nth-child(2){width:46%}
     table.seg th:nth-child(5),table.seg td:nth-child(5){width:15%}
@@ -524,24 +527,39 @@ function gotoSpot(h){
   setTimeout(()=>{ L.popup({maxWidth:260}).setLatLng(mid).setContent(spotTip(h)).openOn(map);
                    highlightSpot(h); drawMarks(h.marks); }, 360);
 }
+let alcSpots=[];
 function renderHotspots(){
+  // Top segments by alcohol-involvement share (full period), among segments with
+  // enough crashes for a stable share. Derived client-side from the segment flags.
+  alcSpots = SEG.map((s,i)=>{ let num=0; for(const a of s.cr) if(a[2]) num++;
+      return {kind:'alc', road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length,
+              share:s.cr.length?num/s.cr.length:0, segIndex:i}; })
+    .filter(x=>x.n>=8).sort((a,b)=>(b.share-a.share)||(b.n-a.n)).slice(0,10);
   const card=(h,k,i)=>{
     const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
     const stat = h.kind==='rate'
       ? `${h.len} miles with AADT ${h.aadt.toLocaleString()} · ${h.n} fatal crashes (${h.ped} ped/bike)`
         +` · <b>${h.rate}</b> crashes per 100 million vehicle miles`
+      : h.kind==='alc'
+      ? `<b>${Math.round(100*h.share)}%</b> of ${h.n} fatal crashes were alcohol-involved`
       : `<b>${h.n}</b> pedestrian / cyclist deaths over ${h.mi} mi · <b>${h.permi}/mile</b>`;
     return `<div class="hscard" data-k="${k}" data-i="${i}"><div class="hsrank">${i+1}</div>`
       +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${stat}</div></div></div>`; };
   document.getElementById('hslists').innerHTML=
      `<div class="hsgrp"><h3 class="hsred">Highest death rate <span class="muted">— per 100M vehicle-miles, among segments with ≥8 fatal crashes (so one crash on an empty road can't top the list)</span></h3>`
     +`<div class="hscards">`+HOTSPOTS.rate.map((h,i)=>card(h,'rate',i)).join('')+`</div></div>`
+    +`<div class="hsgrp"><h3 class="hsred">Highest alcohol involvement <span class="muted">— share of a road’s fatal crashes that were alcohol-involved, among segments with ≥8 fatal crashes</span></h3>`
+    +`<div class="hscards">`+alcSpots.map((h,i)=>card(h,'alc',i)).join('')+`</div></div>`
     +`<div class="hsgrp"><h3 class="hsred">Pedestrian &amp; cyclist death clusters <span class="muted">— most deaths on one road, regardless of traffic volume</span></h3>`
     +`<div class="hscards">`+HOTSPOTS.ped.map((h,i)=>card(h,'ped',i)).join('')+`</div></div>`;
-  document.querySelectorAll('.hscard').forEach(el=>el.onclick=()=>gotoSpot(HOTSPOTS[el.dataset.k][+el.dataset.i]));
+  document.querySelectorAll('.hscard').forEach(el=>el.onclick=()=>{
+    if(el.dataset.k==='alc') gotoSeg(alcSpots[+el.dataset.i].segIndex);
+    else gotoSpot(HOTSPOTS[el.dataset.k][+el.dataset.i]); });
 }
 
 // ---------- analysis ----------
+// share of a segment's fatal crashes (in the year window) with a given flag (cr index)
+function shareWin(s,fi){ let num=0,den=0; for(const a of s.cr){ if(a[0]<y0||a[0]>y1) continue; den++; if(a[fi]) num++; } return den? num/den : null; }
 function buildAnalysis(){
   const ny=y1-y0+1;
   document.getElementById('yrlabel2').textContent=y0===y1?y0:`${y0}–${y1}`;
@@ -550,11 +568,13 @@ function buildAnalysis(){
   SEG.forEach((s,i)=>{
     const c=sel(s), n=c.length;
     if(n===0){ zero++;   // zero-crash segments are always listed (just sort to the bottom)
-      rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n:0,rate:rateOf(s,0,ny),ped:pedN(s),bkt:-1,trend:trendOf(s)}); return; }
+      rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n:0,rate:rateOf(s,0,ny),ped:pedN(s),bkt:-1,trend:trendOf(s),
+        alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)}); return; }
     const rate=rateOf(s,n,ny);
     const bkt = histMode==='rate' ? rateBucket(rate) : countBucket(n);
     counts[bkt]++;
-    rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n,rate,ped:pedN(s),bkt,trend:trendOf(s)});
+    rows.push({i,lab:s.lab,loc:s.loc,l:s.l,a:s.a,n,rate,ped:pedN(s),bkt,trend:trendOf(s),
+      alcSh:shareWin(s,2),ntSh:shareWin(s,3),wxSh:shareWin(s,5)});
   });
   renderHist(counts, BK);
   let r = bucketFilter!=null ? rows.filter(x=>x.bkt===bucketFilter) : rows;
@@ -601,15 +621,22 @@ function renderCoverage(){
 const COLS=[['lab','Road'],['loc','Location'],['l','Length (miles)'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
 const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['Insufficient data','#aaa']};
 function renderTable(rows){
+  const SHARE_COLS=[['alcSh','% alcohol','Share of the segment’s fatal crashes that were alcohol-involved (in the selected years)'],
+                    ['ntSh','% night','Share of the segment’s fatal crashes that happened in the dark'],
+                    ['wxSh','% weather','Share of the segment’s fatal crashes in adverse weather']];
   const head='<thead><tr>'+COLS.map(([k,t])=>
       `<th data-k="${k}" class="${sort.key===k?'sorted':''}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
-    +`<th title="Direction of risk in 5-year bands across 2001–2024 (independent of the year slider). ↑ rising · ↓ falling · → little change · ‘Insufficient data’ = too few crashes to tell.">Trend (2001–24)</th></tr></thead>`;
+    +`<th title="Direction of risk in 5-year bands across 2001–2024 (independent of the year slider). ↑ rising · ↓ falling · → little change · ‘Insufficient data’ = too few crashes to tell.">Trend (2001–24)</th>`
+    +SHARE_COLS.map(([k,t,ti])=>`<th class="shcol ${sort.key===k?'sorted':''}" data-k="${k}" title="${ti}">${t}${sort.key===k?(sort.dir<0?' ▾':' ▴'):''}</th>`).join('')
+    +`</tr></thead>`;
+  const pctc=v=>v!=null?Math.round(100*v)+'%':'—';
   const body='<tbody>'+rows.map(r=>{
     const col=rateColor(r.rate,r.n), tr=TREND[r.trend];
     return `<tr data-i="${r.i}"><td>${r.lab}</td><td>${r.loc||''}</td><td>${r.l.toFixed(2)}</td><td>${r.a.toLocaleString()}</td>`
       +`<td>${r.n}</td><td>${r.ped||''}</td>`
       +`<td><span class="dot" style="background:${col}"></span>${r.rate!=null?r.rate.toFixed(1):'—'}</td>`
-      +`<td style="color:${tr[1]};font-weight:600">${tr[0]}</td></tr>`; }).join('')+'</tbody>';
+      +`<td style="color:${tr[1]};font-weight:600">${tr[0]}</td>`
+      +`<td class="shcol">${pctc(r.alcSh)}</td><td class="shcol">${pctc(r.ntSh)}</td><td class="shcol">${pctc(r.wxSh)}</td></tr>`; }).join('')+'</tbody>';
   const t=document.getElementById('segtable');
   t.innerHTML=head+body;
   t.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
