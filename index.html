@@ -2,13 +2,13 @@
 <title>The Deadliest Mile</title><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>html,body{height:100%;margin:0}body{font:16px/1.5 -apple-system,system-ui,Helvetica,Arial;
 background:#1f2d3d;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center}
-.b{font-weight:800;letter-spacing:.5px;font-size:28px;margin-bottom:12px}.b b{color:#2ec4b6}
-a{color:#5fc9bb}</style></head><body><div style="padding:24px">
-<div class="b">THE DEADLIEST <b>MILE</b></div>
+.b{font-weight:800;letter-spacing:.5px;font-size:30px;margin-bottom:12px}.b b{color:#e3120b}
+a{color:#5fc9bb;white-space:nowrap}</style></head><body><div style="padding:24px;max-width:420px">
+<div class="b">THE <b>DEADLIEST</b> MILE</div>
 <div>Finding the map for your state…</div>
-<div style="margin-top:14px;font-size:14px">Or jump to: <a href="./NM/">New Mexico</a> · <a href="./VT/">Vermont</a></div>
+<div style="margin-top:14px;font-size:14px">Or jump to: <a href="./NM/">New Mexico</a> · <a href="./VT/">Vermont</a> · <a href="./TX/">Texas</a> · <a href="./NJ/">New Jersey</a></div>
 </div><script>
-var AVAIL=["NM","VT"];
+var AVAIL=["NM","VT","TX","NJ"];
 function go(s){location.replace("./"+s+"/"+location.hash);}
 try{fetch("https://ipapi.co/json/").then(function(r){return r.json();}).then(function(j){
 var c=(j.region_code||"").toUpperCase();go(AVAIL.indexOf(c)>=0?c:"NM");}).catch(function(){go("NM");});}
