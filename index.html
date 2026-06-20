@@ -587,8 +587,29 @@ const sMap=document.getElementById('slider'), sAna=document.getElementById('slid
 document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>{
   if(b.dataset.pts==='off') setPts(true); else setCat(b.dataset.cat); }));
 document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
+document.getElementById('search').addEventListener('change',e=>logSearch(e.target.value,'analysis'));
 document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
-document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key==='Enter') mapSearch(e.target.value); });
+document.getElementById('mapsearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ mapSearch(e.target.value); logSearch(e.target.value,'map'); } });
+
+// ---- anonymous search logging: the term + coarse location/session, no raw IP.
+//      Inert until LOG_ENDPOINT (a Google Apps Script web-app URL) is filled in. ----
+const LOG_ENDPOINT='';
+let _sid=null,_geo=null;
+function _sessId(){ if(_sid) return _sid;
+  try{ _sid=localStorage.getItem('nmsid'); if(!_sid){ _sid=Math.random().toString(36).slice(2,10); localStorage.setItem('nmsid',_sid); } }
+  catch(e){ _sid='nostore'; } return _sid; }
+async function _coarseGeo(){ if(_geo!==null) return _geo;
+  try{ const j=await (await fetch('https://ipapi.co/json/')).json();
+       _geo={country:j.country_name||'',region:j.region||'',city:j.city||''}; }
+  catch(e){ _geo={}; } return _geo; }
+async function logSearch(term,where){
+  term=(term||'').trim(); if(!term||!LOG_ENDPOINT) return;
+  const g=await _coarseGeo();
+  const body=JSON.stringify({term,where,sid:_sessId(),country:g.country,region:g.region,
+    city:g.city,ref:document.referrer||'',lang:navigator.language||'',
+    screen:`${screen.width}x${screen.height}`,ua:navigator.userAgent});
+  try{ fetch(LOG_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body}); }catch(e){}
+}
 function dismissIntro(){
   const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');
   document.getElementById('map-view').classList.remove('introup');   // reveal controls
