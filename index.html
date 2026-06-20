@@ -35,6 +35,7 @@
   #legend .lgttl{display:block;margin-bottom:4px;font-weight:700;white-space:nowrap}
   #legend .lgscale{white-space:nowrap}
   #legend .lgfoot{margin-top:6px;white-space:normal;max-width:360px;font-size:12px}
+  #legend .lgfoot a{color:#1559a3;text-decoration:underline}
   #legend .sw{display:inline-block;width:14px;height:9px;margin:0 2px 0 8px;vertical-align:1px}
   #legend .lgshort{display:none}
   /* desktop: the methodology note sits in a stack beneath the legend */
@@ -178,7 +179,7 @@
 <div id="tabbar">
   <button class="tab active" data-tab="map">Map</button>
   <button class="tab" data-tab="analysis">Risk analysis</button>
-  <button class="tab" data-tab="hotspots">Hot spots</button>
+  <button class="tab" data-tab="hotspots">Deadliest Spots</button>
   <button class="tab" data-tab="info">About</button>
 </div>
 <div id="content">
@@ -206,7 +207,8 @@
         <span class="sw" style="background:#d73027"></span>12+
         <span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>
       <div class="muted lgfoot">Crash rate is calculated using 2024 AADT.
-        Sources: Crash data from NHTSA FARS. AADT from NMDOT.</div>
+        Sources: crash data from <a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>;
+        AADT from <a href="https://www.dot.nm.gov/planning-research-multimodal-and-safety/planning-division/data-management-bureau/" target="_blank" rel="noopener">NMDOT</a>.</div>
     </div>
     <div id="risknote" class="panel"></div>
     </div>
@@ -247,7 +249,7 @@
   <!-- HOT SPOTS -->
   <div id="hotspots" class="view">
     <div class="wrap">
-      <h2>Hot spots</h2>
+      <h2>Deadliest Spots</h2>
       <p class="sub">A curated shortlist of New Mexico's most dangerous places — by death
         <b>rate</b> (adjusted for traffic) and by <b>pedestrian</b> deaths. Click any to see it on the map.</p>
       <div id="hslists"></div>
