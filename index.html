@@ -186,7 +186,7 @@
   .hsrank{flex:0 0 24px;height:24px;border-radius:50%;background:#1f2d3d;color:#fff;font-weight:700;
     font-size:12px;display:flex;align-items:center;justify-content:center}
   .hsttl{font-weight:600;font-size:13px}
-  .hsstat{color:#555;font-size:12px;margin-top:2px}
+  .hsstat{color:#555;font-size:12px;margin-top:3px;line-height:1.5}
 </style></head>
 <body>
 <div id="tabbar">
@@ -261,8 +261,6 @@
   <div id="hotspots" class="view">
     <div class="wrap">
       <h2>Deadliest Spots</h2>
-      <p class="sub">A curated shortlist of New Mexico's most dangerous places — by death
-        <b>rate</b> (adjusted for traffic) and by <b>pedestrian</b> deaths. Click any to see it on the map.</p>
       <div id="hslists"></div>
     </div>
   </div>
@@ -538,7 +536,8 @@ function renderHotspots(){
   SEG.forEach(s=>{ totCr+=s.cr.length; totMi+=s.l; totVmt+=s.a*365*NY*s.l; for(const a of s.cr) if(a[1]) totPed++; });
   let crAlc=0; for(const c of CR) if(c.d) crAlc++;
   const avgRate=totVmt?totCr/totVmt*1e8:0, avgAlc=CR.length?crAlc/CR.length:0, avgPed=totMi?totPed/totMi:0;
-  const xAvg=(v,avg)=> avg>0 ? ` · <b>${(v/avg).toFixed(1)}×</b> statewide average` : '';
+  // multiplier line — the number in bold red
+  const xLine=(v,avg)=> avg>0 ? `<b style="color:#c0392b">${(v/avg).toFixed(1)}×</b> statewide average` : '';
   // Top segments by alcohol-involvement share (full period), among segments with enough crashes.
   alcSpots = SEG.map((s,i)=>{ let num=0; for(const a of s.cr) if(a[2]) num++;
       return {kind:'alc', road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length,
@@ -546,13 +545,16 @@ function renderHotspots(){
     .filter(x=>x.n>=8).sort((a,b)=>(b.share-a.share)||(b.n-a.n)).slice(0,12);
   const card=(h,k,i)=>{
     const place=[h.loc, h.cty?`${h.cty} County`:''].filter(Boolean).join(' · ');
-    let stat;
-    if(h.kind==='rate') stat=`${h.len} miles with AADT ${h.aadt.toLocaleString()} · ${h.n} fatal crashes (${h.ped} ped/bike)`
-        +` · <b>${h.rate}</b> per 100M VMT`+xAvg(h.rate,avgRate);
-    else if(h.kind==='alc') stat=`<b>${Math.round(100*h.share)}%</b> of ${h.n} fatal crashes were alcohol-involved`+xAvg(h.share,avgAlc);
-    else stat=`<b>${h.n}</b> pedestrian / cyclist deaths over ${h.mi} mi · <b>${h.permi}</b>/mile`+xAvg(h.permi,avgPed);
+    let lines;
+    if(h.kind==='rate') lines=[`${h.len} miles · AADT ${h.aadt.toLocaleString()}`,
+        `${h.n} fatal crashes (${h.ped} ped/bike) · <b>${h.rate}</b> per 100M VMT`,
+        xLine(h.rate,avgRate)];
+    else if(h.kind==='alc') lines=[`${h.n} fatal crashes`, `<b>${Math.round(100*h.share)}%</b> alcohol-involved`,
+        xLine(h.share,avgAlc)];
+    else lines=[`${h.n} pedestrian / cyclist deaths over ${h.mi} mi`, `<b>${h.permi}</b> per mile`,
+        xLine(h.permi,avgPed)];
     return `<div class="hscard" data-k="${k}" data-i="${i}"><div class="hsrank">${i+1}</div>`
-      +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${stat}</div></div></div>`; };
+      +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${lines.filter(Boolean).join('<br>')}</div></div></div>`; };
   document.getElementById('hslists').innerHTML=
      `<div class="hsgrp"><h3 class="hsred">Highest death rate <span class="muted">— fatal crashes per 100M vehicle-miles, among segments with ≥8 fatal crashes. Statewide average: ${avgRate.toFixed(1)} per 100M VMT.</span></h3>`
     +`<div class="hscards">`+HOTSPOTS.rate.map((h,i)=>card(h,'rate',i)).join('')+`</div></div>`
