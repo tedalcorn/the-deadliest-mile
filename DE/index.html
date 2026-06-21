@@ -574,20 +574,41 @@ function gotoSpot(h){
   setTimeout(()=>{ L.popup({maxWidth:260}).setLatLng(mid).setContent(spotTip(h)).openOn(map);
                    highlightSpot(h); drawMarks(h.marks); }, 360);
 }
-let alcSpots=[], rateSpots=[], pedSpots=[];
+let alcSpots=[], rateSpots=[], pedSpots=[], ruralSpots=[];
 // ===== SWAPPABLE: the "most dangerous by rate" ranking =======================
 // `rated` = every segment with >=1 crash; each item keeps raw inputs (n = crash
-// count, rate = crashes/100M VMT, len, aadt, segIndex) so a different ranking can
-// be dropped in here without touching the rest of the tab. Current method: keep
-// segments meeting an adaptive crash floor, then sort by raw rate above the state
-// average. To switch to empirical-Bayes shrinkage, replace selectDangerousByRate
-// (and drop the floor) — counts + exposure are all present on each item.
-function crashFloor(rated){            // adaptive min crashes; small states drop lower
+// count, rate = crashes/100M VMT, len, aadt, segIndex).
+//
+// Ranking = reliability-adjusted (empirical-Bayes) rate, NOT raw rate. Raw
+// crashes/VMT is unstable wherever exposure is small: one death on a quiet rural
+// road (or a short low-volume segment) can spike to an extreme rate on thin
+// evidence — while the SAME metric is mathematically unable to flag genuinely
+// dangerous low-volume roads that can never accumulate many crashes. So we shrink
+// each segment's rate toward the statewide mean in proportion to how little
+// exposure (traffic x length x years) stands behind it: thin-data spikes regress
+// to average; a road with enough real deaths stays elevated even at low volume.
+// This replaces the old ">=8 crashes, sort by raw rate" floor (that floor was the
+// thing excluding rural roads). We only drop literal single-crash one-offs.
+// Displayed figures stay plain (deaths, raw rate, x average) — the adjusted rate
+// is ONLY the sort key. k0 = prior strength = how many "crashes' worth" of the
+// statewide-average rate each segment is credited with before its own record
+// counts. k0=2 (decided with Ted: tames short-segment flukes AND surfaces rural
+// roads, no arbitrary cutoff).
+const EB_K0 = 2;
+function ebRate(n, exposure100M, mu){      // Gamma-Poisson posterior-mean rate
+  const E0 = EB_K0/mu;                     // prior pseudo-exposure so prior mean == mu
+  return (EB_K0 + n) / (E0 + exposure100M);
+}
+function crashFloor(rated){            // adaptive min crashes; small states drop lower (alc/ped lists)
   for(const t of [8,6,5,4]) if(rated.filter(x=>x.n>=t).length>=10) return t;
   return 4;
 }
-function selectDangerousByRate(rated, avgRate, minCrashes){
-  return rated.filter(x=>x.n>=minCrashes && x.rate>avgRate).sort((a,b)=>b.rate-a.rate);
+function selectDangerousByRate(rated, avgRate){
+  return rated
+    .filter(x => x.n >= 2 && x.rate > 0)                       // drop single-crash one-offs
+    .map(x => ({...x, eb: ebRate(x.n, x.n/x.rate, avgRate)}))  // exposure E (100M VMT) = n/rate
+    .filter(x => x.eb > avgRate)                               // only worse-than-average places
+    .sort((a,b) => b.eb - a.eb);
 }
 // ============================================================================
 function renderHotspots(){
@@ -600,26 +621,36 @@ function renderHotspots(){
   // candidate pool: every segment with >=1 crash, raw inputs intact
   const rated = SEG.map((s,i)=>{ let alc=0,ped=0; for(const a of s.cr){ if(a[2])alc++; if(a[1])ped++; }
       const vmt=s.a*365*NY*s.l, rate=vmt? s.cr.length/vmt*1e8 : 0;
-      return {road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length, ped, rate,
+      return {road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length, ped, rate, ru:s.ru,
               share:s.cr.length?alc/s.cr.length:0, len:s.l, aadt:s.a, segIndex:i}; }).filter(x=>x.n>0);
   const T=crashFloor(rated);
   // Each tab = the ABOVE-statewide-average worst, top-down.
-  rateSpots = selectDangerousByRate(rated, avgRate, T);              // <- swap point (see above)
+  rateSpots = selectDangerousByRate(rated, avgRate);                // EB-ranked (see above)
   alcSpots  = rated.filter(x=>x.n>=T && x.share>avgAlc).sort((a,b)=>(b.share-a.share)||(b.n-a.n));
   pedSpots  = (HOTSPOTS.ped||[]).filter(h=>h.permi>avgPed);
+  ruralSpots= selectDangerousByRate(rated.filter(x=>x.ru), avgRate); // rural roads only, same EB ranking
   // Balance: equal count across shown categories (aim >=5); drop a too-thin one.
   let cats=[{k:'rate',l:rateSpots},{k:'alc',l:alcSpots},{k:'ped',l:pedSpots}].filter(c=>c.l.length>=3);
   let N=Math.min(12, ...cats.map(c=>c.l.length).concat([12]));
   if(N<5 && cats.length>1){ cats=cats.slice().sort((a,b)=>a.l.length-b.l.length); cats.shift();
     N=Math.min(12, ...cats.map(c=>c.l.length).concat([12])); }
+  // Rural panel, appended AFTER N is fixed so it never shrinks the core columns.
+  // Shown ONLY where it isn't redundant with the main list — i.e. where rural roads
+  // are a MINORITY (<50%) of the dangerous-rate pool. In rural-heavy states the main
+  // "Highest death rate" list is already almost all rural roads, so the panel would
+  // just duplicate it; in urban states (NJ, MA, CT, RI, FL, MD) it surfaces rural
+  // roads the busier roads otherwise bury.
+  if(ruralSpots.length>=5 && rateSpots.length && ruralSpots.length/rateSpots.length<0.5)
+    cats.push({k:'rural', l:ruralSpots});
   const HEAD={
-    rate:['Highest death rate', `fatal crashes per 100M VMT, among segments with ≥${T} crashes · statewide average ${avgRate.toFixed(1)}`],
+    rate:['Highest death rate', `fatal crashes per 100M VMT, adjusted for reliability · statewide average ${avgRate.toFixed(1)}`],
     alc:['Most alcohol-involvement', `share of fatal crashes with alcohol involved (≥${T} crashes) · statewide average ${Math.round(100*avgAlc)}%`],
-    ped:['Pedestrian & cyclist death clusters', `most deaths on one road, regardless of traffic · statewide average ${avgPed.toFixed(2)}/mile`]};
+    ped:['Pedestrian & cyclist death clusters', `most deaths on one road, regardless of traffic · statewide average ${avgPed.toFixed(2)}/mile`],
+    rural:['Most dangerous rural roads', `the same reliability-adjusted rate, among rural roads only · sparse rural traffic counts make these estimates less certain`]};
   const card=(h,k,i)=>{
     const place=[h.loc, h.cty?`${h.cty} Co.`:''].filter(Boolean).join(' · ');
     let lines;
-    if(k==='rate') lines=[`${h.len} mi · AADT ${h.aadt.toLocaleString()}`,
+    if(k==='rate'||k==='rural') lines=[`${h.len} mi · AADT ${h.aadt.toLocaleString()}`,
         `${h.n} fatal crashes · <b>${h.rate.toFixed(1)}</b> per 100M VMT`, xLine(h.rate,avgRate)];
     else if(k==='alc') lines=[`${h.n} fatal crashes`, `<b>${Math.round(100*h.share)}%</b> alcohol-involved`, xLine(h.share,avgAlc)];
     else lines=[`${h.n} ped/cyclist deaths · ${h.mi} mi`, `<b>${h.permi}</b> per mile`, xLine(h.permi,avgPed)];
@@ -631,7 +662,8 @@ function renderHotspots(){
     || `<p class="sub">Not enough segments to rank for this state.</p>`;
   document.querySelectorAll('.hscard').forEach(el=>el.onclick=()=>{
     const k=el.dataset.k, i=+el.dataset.i;
-    if(k==='ped') gotoSpot(pedSpots[i]); else gotoSeg((k==='rate'?rateSpots:alcSpots)[i].segIndex); });
+    if(k==='ped') gotoSpot(pedSpots[i]);
+    else { const L=k==='rate'?rateSpots:k==='alc'?alcSpots:ruralSpots; gotoSeg(L[i].segIndex); } });
 }
 
 // ---------- analysis ----------
@@ -682,18 +714,58 @@ function renderHist(counts, BK){
 }
 function renderCoverage(){
   const off=STATS.crLocal+STATS.crUnmatched, pon=Math.round(100*STATS.crAssigned/STATS.crTotal);
-  const html=
+  // Short note for the desktop legend stack.
+  const note=
     `<b>What you're seeing — and what you're not:</b><br>`
     +`Busy roads have more crashes on them in part because they have more traffic, so to assess `
     +`<i>risk</i>, vehicle safety experts compare segments of road by the number of crashes per annual `
     +`average daily traffic (AADT). FHWA HPMS publishes AADT for the highway network `
     +`(${STATS.segTotal.toLocaleString()} segments) but not county and local roads.<br><br>`
     +`Of ${STATS.crTotal.toLocaleString()} geocoded fatal crashes in Delaware ${STATS.yMin}–${STATS.yMax}, `
-    +`<b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> occurred on a rated segment, and can be compared below `
+    +`<b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> occurred on a rated segment, and can be compared `
     +`according to their crashes per 100 million vehicle miles traveled (VMT). `
     +`<b>${off.toLocaleString()} (${100-pon}%)</b> occurred on local/county roads or could not be matched to a `
     +`segment — they appear as points on the map but can not be compared according to risk.`;
-  ['risknote','aboutbody'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+  const rn=document.getElementById('risknote'); if(rn) rn.innerHTML=note;
+  // Fuller methodology for the About tab.
+  const about=
+    `<p><b>Data</b><br>`
+    +`The U.S. National Highway Traffic Safety Administration records every fatal vehicle crash in its `
+    +`Fatality Analysis Reporting System (FARS). This map uses those records for Delaware from `
+    +`${STATS.yMin} to ${STATS.yMax}, placed by the coordinates the federal record assigns each crash. `
+    +`Traffic volumes come from FHWA HPMS (2017), which publishes an annual average daily `
+    +`traffic figure for each segment of the signed highway network — the Interstate, U.S. and state `
+    +`routes — but not for county and local roads.</p>`
+    +`<p><b>Why traffic is the denominator</b><br>`
+    +`A busy road accumulates more crashes than a quiet one partly because more vehicles travel it. Counting `
+    +`crashes alone therefore measures exposure as much as danger. To weigh the risk of one stretch of road `
+    +`against another, traffic-safety researchers divide its crashes by the distance driven on it — its AADT `
+    +`multiplied by its length and the number of years — and express the result as fatal crashes per 100 `
+    +`million vehicle miles traveled. Of ${STATS.crTotal.toLocaleString()} fatal crashes in Delaware over `
+    +`this period, <b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> occurred on a segment with a known `
+    +`traffic volume and can be compared this way; the remaining <b>${off.toLocaleString()}</b>, on local and `
+    +`county roads, appear on the map but cannot.</p>`
+    +`<p><b>Why the length of a segment matters</b><br>`
+    +`A rate is only as steady as the exposure beneath it. On a short or lightly traveled segment, a single `
+    +`additional death can multiply the rate severalfold, so the highest raw rates tend to belong to the places `
+    +`where the evidence is thinnest. The same arithmetic runs in reverse: a low-volume rural road can be `
+    +`genuinely dangerous yet never record enough crashes to stand out, because so few vehicles pass through it. `
+    +`Ranking roads by raw rate alone would both elevate flukes and bury real hazards.</p>`
+    +`<p><b>How the most dangerous places are identified</b><br>`
+    +`To temper that, the “Most dangerous areas” lists rank roads by a rate adjusted for reliability: each `
+    +`segment's rate is drawn toward the statewide average in proportion to how little traffic and distance `
+    +`stand behind it, so a figure resting on thin evidence is pulled back toward the norm while one resting on `
+    +`many crashes and heavy traffic is left largely intact. Because no single measure is sufficient, the same `
+    +`places are shown several ways — by total deaths, by the share of crashes involving alcohol, by pedestrian `
+    +`and cyclist deaths per mile, and, where the data support it, by a ranking of rural roads judged on their `
+    +`own. Rural and urban roads are distinguished by the land-use classification recorded in FARS.</p>`
+    +`<p><b>Limitations</b><br>`
+    +`The data cover fatal crashes only, not injuries. Each segment's traffic volume is a single year applied `
+    +`across the full period, and for most states that count is roughly a decade old; where traffic has since `
+    +`grown, the rates shown here are correspondingly overstated. Crashes are placed by the coordinates in the `
+    +`federal record, which are at times imprecise. And because traffic counts exist only for the signed highway `
+    +`network, deaths on local and county roads are mapped but not rated.</p>`;
+  const ab=document.getElementById('aboutbody'); if(ab) ab.innerHTML=about;
 }
 const COLS=[['lab','Road'],['loc','Location'],['l','Length (miles)'],['a','AADT'],['n','Crashes'],['ped','Ped/bike'],['rate','Rate /100M']];
 const TREND={up:['↑ Upward','#d73027'],down:['↓ Downward','#1a9850'],flat:['→ Consistent','#777'],na:['Insufficient data','#aaa']};
