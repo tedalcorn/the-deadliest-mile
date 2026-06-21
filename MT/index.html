@@ -285,7 +285,7 @@
   </div>
 </div>
 <script>
-const YMIN=2001, YMAX=2024, STATS={"segTotal": 2369, "crTotal": 4760, "crAssigned": 2595, "crLocal": 1507, "crUnmatched": 658, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 373, "road": "US-2", "loc": "14 mi SW of Kalispell", "cty": "Flathead", "lat": 48.1079, "lon": -114.5906, "n": 11, "ped": 0, "aadt": 3161, "len": 5.0, "rate": 7.9, "marks": [[48.10034, -114.56359], [48.10173, -114.57058], [48.11442, -114.60268], [48.10734, -114.62779], [48.10079, -114.56673], [48.10066, -114.5662], [48.10971, -114.59349], [48.10499, -114.63136], [48.09669, -114.54977], [48.11141, -114.59651], [48.1145, -114.60147]]}, {"kind": "rate", "seg": 1734, "road": "US-212", "loc": "Busby", "cty": "Big Horn", "lat": 45.5284, "lon": -106.965, "n": 8, "ped": 0, "aadt": 2482, "len": 5.1, "rate": 7.2, "marks": [[45.52865, -106.97639], [45.52924, -107.00011], [45.53007, -106.95829], [45.52938, -107.00489], [45.52962, -106.95888], [45.52847, -106.96879], [45.52884, -106.98503], [45.52892, -106.99]]}, {"kind": "rate", "seg": 375, "road": "US-2", "loc": "6 mi SW of Kalispell", "cty": "Flathead", "lat": 48.1594, "lon": -114.4353, "n": 12, "ped": 2, "aadt": 5664, "len": 5.1, "rate": 4.8, "marks": [[48.18551, -114.40838], [48.17301, -114.42433], [48.17701, -114.42026], [48.18372, -114.40983], [48.14619, -114.4472], [48.16135, -114.43409], [48.15273, -114.43994], [48.15325, -114.43943], [48.14908, -114.4438], [48.13826, -114.4558], [48.1657, -114.43023], [48.14078, -114.45328]]}, {"kind": "rate", "seg": 1749, "road": "US-212", "loc": "39 mi SW of Billings", "cty": "Carbon", "lat": 45.3842, "lon": -109.139, "n": 9, "ped": 1, "aadt": 2873, "len": 8.0, "rate": 4.5, "marks": [[45.38239, -109.14634], [45.43155, -109.09834], [45.40718, -109.12293], [45.43961, -109.09196], [45.38343, -109.14085], [45.39193, -109.13269], [45.41845, -109.11078], [45.36749, -109.16123], [45.37041, -109.15815]]}, {"kind": "rate", "seg": 1535, "road": "MT-200", "loc": "38 mi SW of Polson", "cty": "Sanders", "lat": 47.4316, "lon": -114.8531, "n": 11, "ped": 1, "aadt": 3728, "len": 8.1, "rate": 4.2, "marks": [[47.43617, -114.85688], [47.42738, -114.84607], [47.44192, -114.85985], [47.44222, -114.86031], [47.39742, -114.81116], [47.41341, -114.83024], [47.40653, -114.82216], [47.41647, -114.83206], [47.41548, -114.83181], [47.41486, -114.83174], [47.47668, -114.89978]]}, {"kind": "rate", "seg": 61, "road": "US-93", "loc": "27 mi N of Missoula", "cty": "Lake", "lat": 47.2443, "lon": -114.1686, "n": 12, "ped": 0, "aadt": 7884, "len": 5.1, "rate": 3.4, "marks": [[47.23217, -114.15251], [47.22145, -114.13769], [47.21556, -114.12951], [47.22526, -114.14336], [47.24361, -114.16795], [47.23615, -114.15821], [47.24511, -114.16904], [47.22934, -114.14912], [47.26119, -114.16812], [47.25489, -114.17163], [47.25272, -114.17239], [47.21684, -114.13149]]}, {"kind": "rate", "seg": 62, "road": "US-93", "loc": "Ravalli", "cty": "Lake", "lat": 47.2932, "lon": -114.169, "n": 10, "ped": 0, "aadt": 7322, "len": 5.0, "rate": 3.1, "marks": [[47.31007, -114.12035], [47.27606, -114.18086], [47.29333, -114.16642], [47.29497, -114.15549], [47.27439, -114.17952], [47.27898, -114.18379], [47.29201, -114.17122], [47.31116, -114.11829], [47.2963, -114.14893], [47.27012, -114.17692]]}, {"kind": "rate", "seg": 59, "road": "US-93", "loc": "18 mi N of Missoula", "cty": "Lake", "lat": 47.1231, "lon": -114.0466, "n": 12, "ped": 0, "aadt": 8989, "len": 5.1, "rate": 3.0, "marks": [[47.08927, -114.04121], [47.12041, -114.04645], [47.11087, -114.04744], [47.12373, -114.04614], [47.11519, -114.04742], [47.1225, -114.04694], [47.10908, -114.04663], [47.13836, -114.04332], [47.11945, -114.0474], [47.13278, -114.04453], [47.1404, -114.04393], [47.14241, -114.04713]]}, {"kind": "rate", "seg": 54, "road": "US-93", "loc": "6 mi S of Polson", "cty": "Lake", "lat": 47.6124, "lon": -114.1132, "n": 14, "ped": 2, "aadt": 11533, "len": 5.0, "rate": 2.8, "marks": [[47.6324, -114.11317], [47.62367, -114.11313], [47.64599, -114.11344], [47.62933, -114.11311], [47.63125, -114.11312], [47.61453, -114.11328], [47.60373, -114.11328], [47.58022, -114.11289], [47.58779, -114.1132], [47.58029, -114.11356], [47.5803, -114.11352], [47.60905, -114.11294], [47.58575, -114.11328], [47.60222, -114.11301]]}, {"kind": "rate", "seg": 378, "road": "US-2", "loc": "7 mi NE of Kalispell", "cty": "Flathead", "lat": 48.304, "lon": -114.2489, "n": 18, "ped": 1, "aadt": 14606, "len": 5.0, "rate": 2.8, "marks": [[48.31728, -114.24284], [48.31324, -114.24436], [48.29109, -114.25531], [48.29139, -114.25554], [48.32142, -114.24084], [48.33427, -114.23395], [48.29031, -114.25571], [48.32725, -114.24091], [48.27591, -114.26286], [48.29989, -114.25073], [48.29734, -114.25218], [48.3332, -114.24094], [48.27307, -114.26434], [48.32643, -114.24099], [48.3059, -114.24811], [48.33257, -114.24131], [48.33211, -114.24092], [48.30518, -114.24852]]}, {"kind": "rate", "seg": 380, "road": "US-2", "loc": "14 mi NE of Kalispell", "cty": "Flathead", "lat": 48.3666, "lon": -114.1446, "n": 12, "ped": 0, "aadt": 9891, "len": 5.0, "rate": 2.8, "marks": [[48.3852, -114.1081], [48.38511, -114.10822], [48.37247, -114.13653], [48.3787, -114.12771], [48.37466, -114.1333], [48.36738, -114.17682], [48.38385, -114.11995], [48.38007, -114.12546], [48.36516, -114.16806], [48.38649, -114.10095], [48.38811, -114.0966], [48.38838, -114.09431]]}, {"kind": "rate", "seg": 52, "road": "US-93", "loc": "15 mi S of Polson", "cty": "Lake", "lat": 47.4725, "lon": -114.0969, "n": 11, "ped": 1, "aadt": 9146, "len": 5.1, "rate": 2.7, "marks": [[47.48484, -114.09719], [47.4425, -114.09694], [47.49301, -114.09717], [47.47688, -114.09703], [47.45704, -114.09689], [47.44519, -114.09697], [47.44305, -114.09699], [47.44962, -114.0969], [47.4984, -114.09696], [47.49879, -114.0969], [47.44551, -114.09696]]}], "ped": []}, CITIES=[["Billings", 45.7769, -108.5521, 12], ["Missoula", 46.8687, -114.0191, 12], ["Great Falls", 47.5066, -111.2866, 12], ["Helena", 46.5976, -112.0068, 12], ["Butte", 45.9902, -112.5241, 12], ["Bozeman", 45.686, -111.0497, 12], ["Kalispell", 48.21, -114.3216, 12], ["Polson", 47.6901, -114.1458, 12], ["Havre", 48.5505, -109.6748, 12], ["East Helena", 46.5874, -111.9164, 12], ["Cascade", 47.5636, -111.327, 12]];
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 2369, "crTotal": 4760, "crAssigned": 2595, "crLocal": 1507, "crUnmatched": 658, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": []}, CITIES=[["Billings", 45.7769, -108.5521, 12], ["Missoula", 46.8687, -114.0191, 12], ["Great Falls", 47.5066, -111.2866, 12], ["Helena", 46.5976, -112.0068, 12], ["Butte", 45.9902, -112.5241, 12], ["Bozeman", 45.686, -111.0497, 12], ["Kalispell", 48.21, -114.3216, 12], ["Polson", 47.6901, -114.1458, 12], ["Havre", 48.5505, -109.6748, 12], ["East Helena", 46.5874, -111.9164, 12], ["Cascade", 47.5636, -111.327, 12]];
 const NM_BOUNDS=[[44.555, -116.049], [49.0, -104.042]];
 const map=L.map('map',{attributionControl:true});
 // Fit the whole state. On phones the bottom panel covers the lower screen, so pad
@@ -575,6 +575,21 @@ function gotoSpot(h){
                    highlightSpot(h); drawMarks(h.marks); }, 360);
 }
 let alcSpots=[], rateSpots=[], pedSpots=[];
+// ===== SWAPPABLE: the "most dangerous by rate" ranking =======================
+// `rated` = every segment with >=1 crash; each item keeps raw inputs (n = crash
+// count, rate = crashes/100M VMT, len, aadt, segIndex) so a different ranking can
+// be dropped in here without touching the rest of the tab. Current method: keep
+// segments meeting an adaptive crash floor, then sort by raw rate above the state
+// average. To switch to empirical-Bayes shrinkage, replace selectDangerousByRate
+// (and drop the floor) — counts + exposure are all present on each item.
+function crashFloor(rated){            // adaptive min crashes; small states drop lower
+  for(const t of [8,6,5,4]) if(rated.filter(x=>x.n>=t).length>=10) return t;
+  return 4;
+}
+function selectDangerousByRate(rated, avgRate, minCrashes){
+  return rated.filter(x=>x.n>=minCrashes && x.rate>avgRate).sort((a,b)=>b.rate-a.rate);
+}
+// ============================================================================
 function renderHotspots(){
   const NY=YMAX-YMIN+1;
   let totCr=0,totVmt=0,totMi=0,totPed=0;
@@ -582,17 +597,15 @@ function renderHotspots(){
   let crAlc=0; for(const c of CR) if(c.d) crAlc++;
   const avgRate=totVmt?totCr/totVmt*1e8:0, avgAlc=CR.length?crAlc/CR.length:0, avgPed=totMi?totPed/totMi:0;
   const xLine=(v,avg)=> avg>0 ? `<b style="color:#c0392b">${(v/avg).toFixed(1)}×</b> statewide average` : '';
-  // Adaptive crash threshold: highest in [8,6,5,4] that still yields a usable pool
-  // (small states drop lower so the lists aren't near-empty).
-  const counts=SEG.map(s=>s.cr.length); let T=4;
-  for(const t of [8,6,5,4]){ if(counts.filter(n=>n>=t).length>=10){ T=t; break; } }
+  // candidate pool: every segment with >=1 crash, raw inputs intact
   const rated = SEG.map((s,i)=>{ let alc=0,ped=0; for(const a of s.cr){ if(a[2])alc++; if(a[1])ped++; }
       const vmt=s.a*365*NY*s.l, rate=vmt? s.cr.length/vmt*1e8 : 0;
       return {road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length, ped, rate,
-              share:s.cr.length?alc/s.cr.length:0, len:s.l, aadt:s.a, segIndex:i}; }).filter(x=>x.n>=T);
-  // Only ABOVE-statewide-average areas — these tabs are the *worst*, top-down.
-  rateSpots = rated.filter(x=>x.rate>avgRate).sort((a,b)=>b.rate-a.rate);
-  alcSpots  = rated.filter(x=>x.share>avgAlc).sort((a,b)=>(b.share-a.share)||(b.n-a.n));
+              share:s.cr.length?alc/s.cr.length:0, len:s.l, aadt:s.a, segIndex:i}; }).filter(x=>x.n>0);
+  const T=crashFloor(rated);
+  // Each tab = the ABOVE-statewide-average worst, top-down.
+  rateSpots = selectDangerousByRate(rated, avgRate, T);              // <- swap point (see above)
+  alcSpots  = rated.filter(x=>x.n>=T && x.share>avgAlc).sort((a,b)=>(b.share-a.share)||(b.n-a.n));
   pedSpots  = (HOTSPOTS.ped||[]).filter(h=>h.permi>avgPed);
   // Balance: equal count across shown categories (aim >=5); drop a too-thin one.
   let cats=[{k:'rate',l:rateSpots},{k:'alc',l:alcSpots},{k:'ped',l:pedSpots}].filter(c=>c.l.length>=3);

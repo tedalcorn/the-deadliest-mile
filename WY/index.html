@@ -285,7 +285,7 @@
   </div>
 </div>
 <script>
-const YMIN=2001, YMAX=2024, STATS={"segTotal": 1964, "crTotal": 2957, "crAssigned": 1960, "crLocal": 581, "crUnmatched": 416, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"rate": [{"kind": "rate", "seg": 896, "road": "WY-220", "loc": "10 mi SW of Casper", "cty": "", "lat": 42.7629, "lon": -106.5005, "n": 8, "ped": 0, "aadt": 4098, "len": 2.0, "rate": 11.2, "marks": [[42.75716, -106.51203], [42.76178, -106.50278], [42.75438, -106.51508], [42.76389, -106.48902], [42.75906, -106.50927], [42.764, -106.49099], [42.7642, -106.4939], [42.75529, -106.51466]]}, {"kind": "rate", "seg": 1441, "road": "WY-230", "loc": "29 mi SW of Laramie", "cty": "Albany", "lat": 41.0954, "lon": -106.0736, "n": 10, "ped": 0, "aadt": 828, "len": 15.0, "rate": 9.2, "marks": [[41.01985, -106.16049], [41.07749, -106.08726], [41.04834, -106.15447], [41.00674, -106.1767], [41.00679, -106.17444], [41.1124, -106.0285], [41.10746, -106.05017], [41.07664, -106.08845], [41.07668, -106.08837], [41.0074, -106.17271]]}, {"kind": "rate", "seg": 835, "road": "US-287", "loc": "22 mi SE of Laramie", "cty": "Albany", "lat": 41.0122, "lon": -105.4197, "n": 8, "ped": 0, "aadt": 4608, "len": 2.6, "rate": 7.7, "marks": [[41.02192, -105.42433], [41.01258, -105.42141], [41.00819, -105.41932], [41.02774, -105.43223], [41.01066, -105.42005], [41.0272, -105.4306], [41.01718, -105.42091], [41.00871, -105.41989]]}, {"kind": "rate", "seg": 833, "road": "US-287", "loc": "13 mi S of Laramie", "cty": "Albany", "lat": 41.1165, "lon": -105.5411, "n": 9, "ped": 0, "aadt": 3906, "len": 5.1, "rate": 5.2, "marks": [[41.07847, -105.50415], [41.07984, -105.50697], [41.13241, -105.55152], [41.13175, -105.55138], [41.081, -105.50823], [41.12914, -105.55133], [41.1316, -105.5515], [41.11434, -105.53926], [41.08054, -105.50736]]}, {"kind": "rate", "seg": 143, "road": "I-25", "loc": "Casper (2 mi NW)", "cty": "Natrona", "lat": 42.8692, "lon": -106.3454, "n": 9, "ped": 0, "aadt": 4514, "len": 5.1, "rate": 4.5, "marks": [[42.86753, -106.34693], [42.85686, -106.32938], [42.87135, -106.34467], [42.90031, -106.33995], [42.86434, -106.34386], [42.86367, -106.34231], [42.8934, -106.34103], [42.8664, -106.345], [42.8695, -106.34562]]}, {"kind": "rate", "seg": 1047, "road": "US-191", "loc": "31 mi SE of Green River", "cty": "Sweetwater", "lat": 41.121, "lon": -109.2106, "n": 9, "ped": 0, "aadt": 635, "len": 38.3, "rate": 4.2, "marks": [[41.04097, -109.37949], [41.3704, -109.27869], [41.06444, -109.31808], [41.27641, -109.2252], [41.34657, -109.26947], [41.2423, -109.1997], [41.22421, -109.19124], [41.34676, -109.26913], [41.23963, -109.19854]]}, {"kind": "rate", "seg": 1795, "road": "WY-210", "loc": "18 mi W of Cheyenne", "cty": "Laramie", "lat": 41.1736, "lon": -105.1268, "n": 10, "ped": 0, "aadt": 1916, "len": 14.1, "rate": 4.2, "marks": [[41.15541, -105.03855], [41.17419, -105.14443], [41.19024, -105.1888], [41.18948, -105.18748], [41.17749, -105.1053], [41.14604, -105.01007], [41.17215, -105.08738], [41.1557, -105.0566], [41.1943, -105.19185], [41.17358, -105.08839]]}, {"kind": "rate", "seg": 1915, "road": "WY-51", "loc": "5 mi E of Gillette", "cty": "Campbell", "lat": 44.2841, "lon": -105.3947, "n": 8, "ped": 0, "aadt": 2619, "len": 8.4, "rate": 4.1, "marks": [[44.28887, -105.31435], [44.28262, -105.42186], [44.2836, -105.39075], [44.28415, -105.37746], [44.29055, -105.30604], [44.284, -105.3937], [44.28272, -105.40768], [44.28409, -105.39581]]}, {"kind": "rate", "seg": 561, "road": "I-80", "loc": "7 mi E of Laramie", "cty": "Albany", "lat": 41.2635, "lon": -105.4643, "n": 11, "ped": 0, "aadt": 7301, "len": 5.0, "rate": 3.4, "marks": [[41.2683, -105.47672], [41.26432, -105.46523], [41.26685, -105.47508], [41.26225, -105.46124], [41.26233, -105.46154], [41.26018, -105.45571], [41.27218, -105.4833], [41.24623, -105.44147], [41.26571, -105.47073], [41.2723, -105.49973], [41.26398, -105.46499]]}, {"kind": "rate", "seg": 1259, "road": "US-30", "loc": "Cheyenne (2 mi NE)", "cty": "Laramie", "lat": 41.1503, "lon": -104.747, "n": 10, "ped": 1, "aadt": 7418, "len": 5.1, "rate": 3.0, "marks": [[41.14549, -104.75599], [41.14547, -104.756], [41.15966, -104.71362], [41.1595, -104.706], [41.1594, -104.6942], [41.1495, -104.74937], [41.1554, -104.73242], [41.15542, -104.73245], [41.15216, -104.74218], [41.14279, -104.7578]]}, {"kind": "rate", "seg": 686, "road": "I-80", "loc": "Evanston", "cty": "Uinta", "lat": 41.2669, "lon": -110.9495, "n": 9, "ped": 0, "aadt": 7918, "len": 5.0, "rate": 2.6, "marks": [[41.26727, -110.949], [41.25828, -110.96669], [41.26806, -110.94242], [41.26056, -110.97506], [41.26723, -110.94837], [41.26141, -110.95561], [41.26263, -110.97924], [41.2626, -110.8971], [41.26597, -110.91693]]}, {"kind": "rate", "seg": 563, "road": "I-80", "loc": "15 mi SE of Laramie", "cty": "Albany", "lat": 41.1441, "lon": -105.3702, "n": 8, "ped": 0, "aadt": 7105, "len": 5.1, "rate": 2.5, "marks": [[41.12808, -105.33373], [41.14087, -105.35797], [41.15472, -105.39818], [41.14457, -105.37422], [41.14469, -105.37479], [41.1384, -105.35218], [41.16266, -105.40756], [41.15616, -105.40055]]}], "ped": []}, CITIES=[["Cheyenne", 41.1358, -104.7909, 12], ["Casper", 42.8426, -106.329, 12], ["Rock Springs", 41.5812, -109.2519, 12], ["Gillette", 44.2741, -105.4858, 12], ["Laramie", 41.2981, -105.5842, 12], ["Riverton", 43.0394, -108.4174, 12], ["Rawlins", 41.7862, -107.2449, 12], ["Green River", 41.5255, -109.4581, 12], ["Douglas", 42.7672, -105.4023, 12], ["Cody", 44.525, -109.0434, 12], ["Powell", 44.7526, -108.7522, 12], ["Evanston", 41.261, -110.9787, 12], ["Sinclair", 41.7765, -107.1204, 12], ["Lander", 42.8436, -108.7357, 12], ["Sheridan", 44.7769, -106.9411, 12]];
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 1964, "crTotal": 2957, "crAssigned": 1960, "crLocal": 581, "crUnmatched": 416, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": []}, CITIES=[["Cheyenne", 41.1358, -104.7909, 12], ["Casper", 42.8426, -106.329, 12], ["Rock Springs", 41.5812, -109.2519, 12], ["Gillette", 44.2741, -105.4858, 12], ["Laramie", 41.2981, -105.5842, 12], ["Riverton", 43.0394, -108.4174, 12], ["Rawlins", 41.7862, -107.2449, 12], ["Green River", 41.5255, -109.4581, 12], ["Douglas", 42.7672, -105.4023, 12], ["Cody", 44.525, -109.0434, 12], ["Powell", 44.7526, -108.7522, 12], ["Evanston", 41.261, -110.9787, 12], ["Sinclair", 41.7765, -107.1204, 12], ["Lander", 42.8436, -108.7357, 12], ["Sheridan", 44.7769, -106.9411, 12]];
 const NM_BOUNDS=[[40.997, -111.056], [45.004, -104.053]];
 const map=L.map('map',{attributionControl:true});
 // Fit the whole state. On phones the bottom panel covers the lower screen, so pad
@@ -575,6 +575,21 @@ function gotoSpot(h){
                    highlightSpot(h); drawMarks(h.marks); }, 360);
 }
 let alcSpots=[], rateSpots=[], pedSpots=[];
+// ===== SWAPPABLE: the "most dangerous by rate" ranking =======================
+// `rated` = every segment with >=1 crash; each item keeps raw inputs (n = crash
+// count, rate = crashes/100M VMT, len, aadt, segIndex) so a different ranking can
+// be dropped in here without touching the rest of the tab. Current method: keep
+// segments meeting an adaptive crash floor, then sort by raw rate above the state
+// average. To switch to empirical-Bayes shrinkage, replace selectDangerousByRate
+// (and drop the floor) — counts + exposure are all present on each item.
+function crashFloor(rated){            // adaptive min crashes; small states drop lower
+  for(const t of [8,6,5,4]) if(rated.filter(x=>x.n>=t).length>=10) return t;
+  return 4;
+}
+function selectDangerousByRate(rated, avgRate, minCrashes){
+  return rated.filter(x=>x.n>=minCrashes && x.rate>avgRate).sort((a,b)=>b.rate-a.rate);
+}
+// ============================================================================
 function renderHotspots(){
   const NY=YMAX-YMIN+1;
   let totCr=0,totVmt=0,totMi=0,totPed=0;
@@ -582,17 +597,15 @@ function renderHotspots(){
   let crAlc=0; for(const c of CR) if(c.d) crAlc++;
   const avgRate=totVmt?totCr/totVmt*1e8:0, avgAlc=CR.length?crAlc/CR.length:0, avgPed=totMi?totPed/totMi:0;
   const xLine=(v,avg)=> avg>0 ? `<b style="color:#c0392b">${(v/avg).toFixed(1)}×</b> statewide average` : '';
-  // Adaptive crash threshold: highest in [8,6,5,4] that still yields a usable pool
-  // (small states drop lower so the lists aren't near-empty).
-  const counts=SEG.map(s=>s.cr.length); let T=4;
-  for(const t of [8,6,5,4]){ if(counts.filter(n=>n>=t).length>=10){ T=t; break; } }
+  // candidate pool: every segment with >=1 crash, raw inputs intact
   const rated = SEG.map((s,i)=>{ let alc=0,ped=0; for(const a of s.cr){ if(a[2])alc++; if(a[1])ped++; }
       const vmt=s.a*365*NY*s.l, rate=vmt? s.cr.length/vmt*1e8 : 0;
       return {road:s.lab, loc:s.loc, cty:s.cty, n:s.cr.length, ped, rate,
-              share:s.cr.length?alc/s.cr.length:0, len:s.l, aadt:s.a, segIndex:i}; }).filter(x=>x.n>=T);
-  // Only ABOVE-statewide-average areas — these tabs are the *worst*, top-down.
-  rateSpots = rated.filter(x=>x.rate>avgRate).sort((a,b)=>b.rate-a.rate);
-  alcSpots  = rated.filter(x=>x.share>avgAlc).sort((a,b)=>(b.share-a.share)||(b.n-a.n));
+              share:s.cr.length?alc/s.cr.length:0, len:s.l, aadt:s.a, segIndex:i}; }).filter(x=>x.n>0);
+  const T=crashFloor(rated);
+  // Each tab = the ABOVE-statewide-average worst, top-down.
+  rateSpots = selectDangerousByRate(rated, avgRate, T);              // <- swap point (see above)
+  alcSpots  = rated.filter(x=>x.n>=T && x.share>avgAlc).sort((a,b)=>(b.share-a.share)||(b.n-a.n));
   pedSpots  = (HOTSPOTS.ped||[]).filter(h=>h.permi>avgPed);
   // Balance: equal count across shown categories (aim >=5); drop a too-thin one.
   let cats=[{k:'rate',l:rateSpots},{k:'alc',l:alcSpots},{k:'ped',l:pedSpots}].filter(c=>c.l.length>=3);
