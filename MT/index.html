@@ -731,20 +731,18 @@ function renderCoverage(){
   const about=
     `<p><b>Data</b><br>`
     +`The U.S. National Highway Traffic Safety Administration records every fatal vehicle crash in its `
-    +`Fatality Analysis Reporting System (FARS). This map uses those records for Montana from `
-    +`${STATS.yMin} to ${STATS.yMax}, placed by the coordinates the federal record assigns each crash. `
-    +`Traffic volumes come from FHWA HPMS (2017), which publishes an annual average daily `
-    +`traffic figure for each segment of the signed highway network — the Interstate, U.S. and state `
-    +`routes — but not for county and local roads.</p>`
+    +`Fatality Analysis Reporting System (FARS). This map uses those records from ${STATS.yMin} to ${STATS.yMax}, `
+    +`placed by the coordinates the federal record assigns each crash. Traffic volumes come from state `
+    +`departments of transportation and the Federal Highway Administration's Highway Performance Monitoring `
+    +`System, which report an annual average daily traffic figure for each segment of the signed highway `
+    +`network — the Interstate, U.S. and state routes — but not for county and local roads.</p>`
     +`<p><b>Why traffic is the denominator</b><br>`
     +`A busy road accumulates more crashes than a quiet one partly because more vehicles travel it. Counting `
     +`crashes alone therefore measures exposure as much as danger. To weigh the risk of one stretch of road `
-    +`against another, traffic-safety researchers divide its crashes by the distance driven on it — its AADT `
-    +`multiplied by its length and the number of years — and express the result as fatal crashes per 100 `
-    +`million vehicle miles traveled. Of ${STATS.crTotal.toLocaleString()} fatal crashes in Montana over `
-    +`this period, <b>${STATS.crAssigned.toLocaleString()} (${pon}%)</b> occurred on a segment with a known `
-    +`traffic volume and can be compared this way; the remaining <b>${off.toLocaleString()}</b>, on local and `
-    +`county roads, appear on the map but cannot.</p>`
+    +`against another, traffic-safety researchers divide its crashes by the distance driven on it — its traffic `
+    +`volume multiplied by its length and the number of years — and express the result as fatal crashes per 100 `
+    +`million vehicle miles traveled. Only crashes on a segment with a known traffic volume can be compared this `
+    +`way; those on local and county roads appear on the map but cannot.</p>`
     +`<p><b>Why the length of a segment matters</b><br>`
     +`A rate is only as steady as the exposure beneath it. On a short or lightly traveled segment, a single `
     +`additional death can multiply the rate severalfold, so the highest raw rates tend to belong to the places `
@@ -761,8 +759,8 @@ function renderCoverage(){
     +`own. Rural and urban roads are distinguished by the land-use classification recorded in FARS.</p>`
     +`<p><b>Limitations</b><br>`
     +`The data cover fatal crashes only, not injuries. Each segment's traffic volume is a single year applied `
-    +`across the full period, and for most states that count is roughly a decade old; where traffic has since `
-    +`grown, the rates shown here are correspondingly overstated. Crashes are placed by the coordinates in the `
+    +`across the full period, and is often roughly a decade old; where traffic has since grown, the rates shown `
+    +`here are correspondingly overstated. Crashes are placed by the coordinates in the `
     +`federal record, which are at times imprecise. And because traffic counts exist only for the signed highway `
     +`network, deaths on local and county roads are mapped but not rated.</p>`;
   const ab=document.getElementById('aboutbody'); if(ab) ab.innerHTML=about;
