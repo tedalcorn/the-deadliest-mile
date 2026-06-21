@@ -182,7 +182,12 @@
     border-radius:4px;padding:4px 8px;cursor:pointer}
   .zbtn:hover{background:#dceaf8}
   .segpop{font:13.5px/1.55 -apple-system,Helvetica,Arial}
-  #hslists{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start}
+  /* Explicit columns by category count so 4 categories never land 3-up + a straggler:
+     4 -> 2x2, 3 -> 3 across, 2 -> 2; all collapse to 1 column on mobile. */
+  #hslists{display:grid;gap:24px;align-items:start;grid-template-columns:repeat(3,minmax(0,1fr))}
+  #hslists.n1{grid-template-columns:1fr}
+  #hslists.n2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #hslists.n4{grid-template-columns:repeat(2,minmax(0,1fr))}
   @media(max-width:620px){ #hslists{grid-template-columns:1fr} }
   .hsgrp{margin:0}
   .hsgrp h3{font-size:13.5px;margin:0 0 10px;border-bottom:2px solid #e2e6ea;padding-bottom:5px}
@@ -656,6 +661,7 @@ function renderHotspots(){
     else lines=[`${h.n} ped/cyclist deaths · ${h.mi} mi`, `<b>${h.permi}</b> per mile`, xLine(h.permi,avgPed)];
     return `<div class="hscard" data-k="${k}" data-i="${i}"><div class="hsrank">${i+1}</div>`
       +`<div><div class="hsttl">${h.road} — ${place}</div><div class="hsstat">${lines.filter(Boolean).join('<br>')}</div></div></div>`; };
+  document.getElementById('hslists').className = 'n'+cats.length;   // drives the column layout
   document.getElementById('hslists').innerHTML = cats.map(c=>
      `<div class="hsgrp"><h3 class="hsred">${HEAD[c.k][0]} <span class="muted">— ${HEAD[c.k][1]}</span></h3>`
     +`<div class="hscards">`+c.l.slice(0,N).map((h,i)=>card(h,c.k,i)).join('')+`</div></div>`).join('')
