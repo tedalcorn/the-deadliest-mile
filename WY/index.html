@@ -292,7 +292,9 @@
 <script>
 const YMIN=2001, YMAX=2024, STATS={"segTotal": 1964, "crTotal": 2957, "crAssigned": 1960, "crLocal": 581, "crUnmatched": 416, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": []}, CITIES=[["Cheyenne", 41.1358, -104.7909, 12], ["Casper", 42.8426, -106.329, 12], ["Rock Springs", 41.5812, -109.2519, 12], ["Gillette", 44.2741, -105.4858, 12], ["Laramie", 41.2981, -105.5842, 12], ["Riverton", 43.0394, -108.4174, 12], ["Rawlins", 41.7862, -107.2449, 12], ["Green River", 41.5255, -109.4581, 12], ["Douglas", 42.7672, -105.4023, 12], ["Cody", 44.525, -109.0434, 12], ["Powell", 44.7526, -108.7522, 12], ["Evanston", 41.261, -110.9787, 12], ["Sinclair", 41.7765, -107.1204, 12], ["Lander", 42.8436, -108.7357, 12], ["Sheridan", 44.7769, -106.9411, 12]];
 const NM_BOUNDS=[[40.997, -111.056], [45.004, -104.053]];
-const map=L.map('map',{attributionControl:true});
+// zoomSnap:0 lets fitBounds use a fractional zoom so the state fills the available
+// space exactly (default integer snapping rounds DOWN, leaving it looking zoomed out).
+const map=L.map('map',{attributionControl:true,zoomSnap:0});
 // Fit the whole state. On phones the bottom panel covers the lower screen, so pad
 // the bottom by its height — the state then centers in the VISIBLE area above it.
 function fitState(){

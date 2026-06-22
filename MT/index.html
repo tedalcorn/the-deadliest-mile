@@ -292,7 +292,9 @@
 <script>
 const YMIN=2001, YMAX=2024, STATS={"segTotal": 2369, "crTotal": 4760, "crAssigned": 2595, "crLocal": 1507, "crUnmatched": 658, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": []}, CITIES=[["Billings", 45.7769, -108.5521, 12], ["Missoula", 46.8687, -114.0191, 12], ["Great Falls", 47.5066, -111.2866, 12], ["Helena", 46.5976, -112.0068, 12], ["Butte", 45.9902, -112.5241, 12], ["Bozeman", 45.686, -111.0497, 12], ["Kalispell", 48.21, -114.3216, 12], ["Polson", 47.6901, -114.1458, 12], ["Havre", 48.5505, -109.6748, 12], ["East Helena", 46.5874, -111.9164, 12], ["Cascade", 47.5636, -111.327, 12]];
 const NM_BOUNDS=[[44.555, -116.049], [49.0, -104.042]];
-const map=L.map('map',{attributionControl:true});
+// zoomSnap:0 lets fitBounds use a fractional zoom so the state fills the available
+// space exactly (default integer snapping rounds DOWN, leaving it looking zoomed out).
+const map=L.map('map',{attributionControl:true,zoomSnap:0});
 // Fit the whole state. On phones the bottom panel covers the lower screen, so pad
 // the bottom by its height — the state then centers in the VISIBLE area above it.
 function fitState(){
