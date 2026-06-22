@@ -37,6 +37,10 @@
   #maptype{width:100%;font:13px inherit;padding:6px 8px;border:1px solid #c3c3c3;border-radius:5px;background:#fff;margin-top:3px}
   #legend .lgbar{height:11px;border-radius:2px;margin:4px 0 2px}
   #legend .lgbarlab{display:flex;justify-content:space-between;font-size:11px;color:#555}
+  #legend .lgbarwrap{position:relative;margin-top:4px}
+  #legend .lgbarwrap .lgbar{margin:15px 0 2px}
+  #legend .natlab{position:absolute;top:0;transform:translateX(-50%);font-size:10px;font-weight:600;color:#111;white-space:nowrap}
+  #legend .natline{position:absolute;top:15px;width:2px;height:11px;background:#111;pointer-events:none}
   #legend .lgstat{margin-top:5px;font-size:12px;color:#333;white-space:nowrap}
   #legend .lgna{margin-top:4px;font-size:11.5px;color:#555;white-space:nowrap}
   #legend .lgna .sw{width:13px;height:8px}
@@ -387,6 +391,7 @@ let segPolys=[], ptMarkers=[], curTab='map', syncing=false;
 let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
 
 const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
+const NAT_RATE=0.83;   // U.S. VMT-weighted fatal-crash rate per 100M VMT (rated network, all 50 states); recompute if data changes
 const _rc=RATE_CUTS;
 const RATE_BUCKETS=[{lab:'<'+_rc[0],c:RAMP[0]},{lab:_rc[0]+'–'+_rc[1],c:RAMP[1]},{lab:_rc[1]+'–'+_rc[2],c:RAMP[2]},{lab:_rc[2]+'–'+_rc[3],c:RAMP[3]},{lab:_rc[3]+'+',c:RAMP[4]}];
 const COUNT_BUCKETS=[{lab:'1',c:RAMP[0]},{lab:'2–3',c:RAMP[1]},{lab:'4–6',c:RAMP[2]},{lab:'7–10',c:RAMP[3]},{lab:'11+',c:RAMP[4]}];
@@ -492,15 +497,22 @@ function drawMap(){
   updateLegend(maxShare);
 }
 function riskLegendHtml(){
-  const c=RATE_CUTS;
+  // Continuous gradient scaled to THIS state's distribution (0 → ~95th-percentile rate),
+  // with the national average marked. The U.S. line sits far left in a high-risk state
+  // (most roads exceed the nation) and nearer the middle in a safe one (its worst roads
+  // barely top the national figure) — a built-in cross-state yardstick.
+  const c=RATE_CUTS, dmax=c[3]||1, pos=v=>Math.max(0,Math.min(100,100*v/dmax));
+  const stops=`#1a9850 0%,#a6d96a ${pos(c[0]).toFixed(0)}%,#fee08b ${pos(c[1]).toFixed(0)}%,#fdae61 ${pos(c[2]).toFixed(0)}%,#d73027 100%`;
+  const nx=pos(NAT_RATE).toFixed(1);
   return `<b class="lgttl">Fatal crashes per 100M vehicle-miles</b>`
-    +`<div class="lgscale"><span class="sw" style="background:#1a9850;margin-left:0"></span>&lt;${c[0]}`
-    +`<span class="sw" style="background:#a6d96a"></span>${c[0]}–${c[1]}`
-    +`<span class="sw" style="background:#fee08b"></span>${c[1]}–${c[2]}`
-    +`<span class="sw" style="background:#fdae61"></span>${c[2]}–${c[3]}`
-    +`<span class="sw" style="background:#d73027"></span>${c[3]}+`
-    +`<span class="sw" style="background:#d4d4d4"></span><span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>`
-    +`<div class="muted lgfoot">Crash rate is calculated using 2024 AADT. Sources: crash data from `
+    +`<div class="lgbarwrap">`
+    +`<div class="natlab" style="left:${nx}%">U.S. ${NAT_RATE}</div>`
+    +`<div class="lgbar" style="background:linear-gradient(to right,${stops})"></div>`
+    +`<div class="natline" style="left:${nx}%"></div></div>`
+    +`<div class="lgbarlab"><span>0</span><span>${dmax}+</span></div>`
+    +`<div class="lgna"><span class="sw" style="background:#d4d4d4;margin-left:0"></span>`
+    +`<span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div>`
+    +`<div class="muted lgfoot">Crash rate uses 2024 AADT; the U.S. line is the national average across all states. Sources: crash data from `
     +`<a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>; `
     +`AADT from <a href="https://www.dot.nm.gov/planning-research-multimodal-and-safety/planning-division/data-management-bureau/" target="_blank" rel="noopener">NMDOT</a>. `
     +`Address search <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</div>`;
@@ -534,20 +546,41 @@ map.on('zoomend',()=>{ const zw=segWeight(), cw=crashW();
 map.on('popupclose',()=>{ hlLayer.clearLayers(); markLayer.clearLayers(); });
 // Explicit view state so the toggle direction never depends on a zoom guess.
 let detail=null, atState=false, ready=false, hashLock=false;
-// Shareable URL: encodes the current tab and (on the map) center+zoom in the hash.
+// Shareable URL: #tab=<map|analysis|hotspots|info>[&type=<maptype>&c=<lat>,<lon>&z=<zoom>]
+// (the state itself lives in the path, e.g. /NM/). type/c/z apply only on the map tab.
 function updateHash(){
   if(!ready||hashLock) return;
-  let h=curTab;
-  if(curTab==='map'){ const c=map.getCenter(); h=`map=${c.lat.toFixed(4)},${c.lng.toFixed(4)},${map.getZoom()}`; }
-  history.replaceState(null,'','#'+h);
+  const p=['tab='+curTab];
+  if(curTab==='map'){
+    if(maptype!=='risk') p.push('type='+maptype);
+    const c=map.getCenter();
+    p.push('c='+c.lat.toFixed(4)+','+c.lng.toFixed(4));
+    p.push('z='+(+map.getZoom().toFixed(2)));
+  }
+  history.replaceState(null,'','#'+p.join('&'));
 }
 function applyHash(){
-  const h=decodeURIComponent((location.hash||'').replace(/^#/,'')); if(!h) return false;
-  const m=h.match(/^map=(-?\d+\.?\d*),(-?\d+\.?\d*),(\d+)/);
-  if(m){ hashLock=true; setTab('map'); map.setView([+m[1],+m[2]],+m[3]); hashLock=false; return true; }
-  if(h==='analysis'||h==='hotspots'||h==='map'){ setTab(h); return true; }
-  return false;
+  const raw=(location.hash||'').replace(/^#/,''); if(!raw) return false;
+  // back-compat with the older "#map=lat,lon,zoom" and bare-tab forms
+  const old=raw.match(/^map=(-?\d+\.?\d*),(-?\d+\.?\d*),(\d+\.?\d*)$/);
+  if(old){ hashLock=true; setTab('map'); map.setView([+old[1],+old[2]],+old[3]); hashLock=false; return true; }
+  if(['map','analysis','hotspots','info'].includes(raw)){ setTab(raw); return true; }
+  const q={}; raw.split('&').forEach(kv=>{ const i=kv.indexOf('='); if(i>0) q[kv.slice(0,i)]=decodeURIComponent(kv.slice(i+1)); });
+  if(!q.tab) return false;
+  hashLock=true;
+  setTab(q.tab);
+  if(q.tab==='map'){
+    if(q.type) setMaptype(q.type);
+    let placed=false;
+    if(q.c){ const a=q.c.split(',').map(Number), B=NM_BOUNDS;
+      if(a.length===2 && a.every(isFinite) && a[0]>=B[0][0] && a[0]<=B[1][0] && a[1]>=B[0][1] && a[1]<=B[1][1]){
+        map.setView([a[0],a[1]], q.z?+q.z:map.getZoom()); placed=true; } }
+    if(!placed) fitState();   // hash from another state (out-of-bounds) -> just fit this one
+  }
+  hashLock=false;
+  return true;
 }
+window.addEventListener('hashchange',applyHash);
 map.on('moveend',()=>{ if(curTab==='map') updateHash(); });
 function zbtnText(){ const b=document.querySelector('.leaflet-popup-content .zbtn');
   if(b) b.textContent = atState ? '▴ Segment view' : '▾ Statewide view'; }
@@ -844,11 +877,13 @@ const sMap=document.getElementById('slider'), sAna=document.getElementById('slid
 document.querySelectorAll('.catsel button').forEach(b=>b.addEventListener('click',()=>{
   if(b.dataset.pts==='off') setPts(true); else setCat(b.dataset.cat); }));
 updateLegend(0);   // populate the (risk) legend immediately, before data loads
-document.getElementById('maptype').addEventListener('change',e=>{
-  maptype=e.target.value;
+function setMaptype(t){
+  if(!MAPTYPES[t]) return;
+  maptype=t; document.getElementById('maptype').value=t;
   hlLayer.clearLayers(); markLayer.clearLayers(); map.closePopup(); detail=null;   // clear any illuminated segment
   drawMap();
-});
+}
+document.getElementById('maptype').addEventListener('change',e=>{ setMaptype(e.target.value); updateHash(); });
 document.getElementById('search').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); buildAnalysis(); });
 document.getElementById('search').addEventListener('change',e=>logSearch(e.target.value,'analysis'));
 document.getElementById('min3').addEventListener('change',e=>{ min3=e.target.checked; buildAnalysis(); });
@@ -906,6 +941,6 @@ Promise.all([fetch('data/segments.json').then(r=>r.json()),fetch('data/crashes.j
       if(sAna&&sAna.noUiSlider) sAna.noUiSlider.set([y0,y1]);
     }
     drawMap();
-    ready=true; setTimeout(()=>{ map.invalidateSize(); fitState(); },0); });
+    ready=true; setTimeout(()=>{ map.invalidateSize(); if(!applyHash()) fitState(); updateHash(); },0); });
 </script>
 </body></html>
