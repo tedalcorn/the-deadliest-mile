@@ -216,7 +216,7 @@
   <button class="tab" data-tab="analysis">Risk analysis</button>
   <button class="tab" data-tab="hotspots">Most dangerous areas</button>
   <button class="tab" data-tab="info">About</button>
-  <select id="statesel" aria-label="Change state" title="Change state"><option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option><option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY" selected>Wyoming</option></select>
+  <select id="statesel" aria-label="Change state" title="Change state"><option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="DC">District of Columbia</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option><option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY" selected>Wyoming</option></select>
 </div>
 <div id="content">
   <!-- MAP -->
@@ -297,8 +297,8 @@
   </div>
 </div>
 <script>
-const YMIN=2001, YMAX=2024, STATS={"segTotal": 1964, "crTotal": 2957, "crAssigned": 1960, "crLocal": 581, "crUnmatched": 416, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": []}, CITIES=[["Cheyenne", 41.1358, -104.7909, 12], ["Casper", 42.8426, -106.329, 12], ["Rock Springs", 41.5812, -109.2519, 12], ["Gillette", 44.2741, -105.4858, 12], ["Laramie", 41.2981, -105.5842, 12], ["Riverton", 43.0394, -108.4174, 12], ["Rawlins", 41.7862, -107.2449, 12], ["Green River", 41.5255, -109.4581, 12], ["Douglas", 42.7672, -105.4023, 12], ["Cody", 44.525, -109.0434, 12], ["Powell", 44.7526, -108.7522, 12], ["Evanston", 41.261, -110.9787, 12], ["Sinclair", 41.7765, -107.1204, 12], ["Lander", 42.8436, -108.7357, 12], ["Sheridan", 44.7769, -106.9411, 12]];
-const NM_BOUNDS=[[40.997, -111.056], [45.004, -104.053]];
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 1190, "crTotal": 2957, "crAssigned": 2156, "crLocal": 581, "crUnmatched": 220, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": []}, CITIES=[["Cheyenne", 41.1358, -104.7909, 12], ["Casper", 42.8426, -106.329, 12], ["Rock Springs", 41.5812, -109.2519, 12], ["Gillette", 44.2741, -105.4858, 12], ["Laramie", 41.2981, -105.5842, 12], ["Riverton", 43.0394, -108.4174, 12], ["Rawlins", 41.7862, -107.2449, 12], ["Green River", 41.5255, -109.4581, 12], ["Douglas", 42.7672, -105.4023, 12], ["Cody", 44.525, -109.0434, 12], ["Powell", 44.7526, -108.7522, 12], ["Evanston", 41.261, -110.9787, 12], ["Sinclair", 41.7765, -107.1204, 12], ["Lander", 42.8436, -108.7357, 12], ["Sheridan", 44.7769, -106.9411, 12]];
+const NM_BOUNDS=[[40.997, -111.055], [45.004, -104.053]];
 // zoomSnap:0 lets fitBounds use a fractional zoom so the state fills the available
 // space exactly (default integer snapping rounds DOWN, leaving it looking zoomed out).
 const map=L.map('map',{attributionControl:true,zoomSnap:0});
@@ -372,7 +372,7 @@ function highlightSpot(h){ hlLayer.clearLayers();
   const lines = (h.geom && h.geom.length) ? h.geom : [h.e];   // real road geometry, else smoothed line
   lines.forEach(ln=>L.polyline(ln,{color:'#1d6fd8',weight:hlWeight(),opacity:.4,
     lineCap:'round',interactive:false}).addTo(hlLayer)); }
-const RATE_CUTS=[1.7, 2.6, 4.2, 7.6];   // per-state rate color thresholds (scaled to this state's data)
+const RATE_CUTS=[1.8, 2.8, 4.6, 8.5];   // per-state rate color thresholds (scaled to this state's data)
 function rateColor(r,n){ if(!n||r==null) return '#d4d4d4'; const c=RATE_CUTS;
   return r<c[0]?'#1a9850':r<c[1]?'#a6d96a':r<c[2]?'#fee08b':r<c[3]?'#fdae61':'#d73027'; }
 const DOW=['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -516,7 +516,7 @@ function riskLegendHtml(){
     +`<div class="lgbarlab"><span>0</span><span>${dmax}+</span></div></div>`
     +`<div class="lgna"><span class="sw" style="background:#d4d4d4;margin-left:0"></span>`
     +`<span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div></div>`
-    +`<div class="muted lgfoot">Crash rate uses 2017 AADT; the nationwide-median line is the median of the 50 state rates. Sources: crash data from `
+    +`<div class="muted lgfoot">Crash rate uses 2024 AADT; the nationwide-median line is the median of the 50 state rates. Sources: crash data from `
     +`<a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>; `
     +`AADT from <a href="https://www.fhwa.dot.gov/policyinformation/hpms.cfm" target="_blank" rel="noopener">FHWA HPMS</a>. `
     +`Address search <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</div>`;
@@ -803,8 +803,8 @@ function renderCoverage(){
     +`and cyclist deaths per mile, and, where the data support it, by a ranking of rural roads judged on their `
     +`own. Rural and urban roads are distinguished by the land-use classification recorded in FARS.</p>`
     +`<p><b>Limitations</b><br>`
-    +`The data cover fatal crashes only, not injuries. Each segment's traffic volume is a single year applied `
-    +`across the full period, and is often roughly a decade old; where traffic has since grown, the rates shown `
+    +`The data cover fatal crashes only, not injuries. Each segment's traffic volume is a single year `
+    +`(2024) applied across the full period; where traffic has since grown, the rates shown `
     +`here are correspondingly overstated. Crashes are placed by the coordinates in the `
     +`federal record, which are at times imprecise. And because traffic counts exist only for the signed highway `
     +`network, deaths on local and county roads are mapped but not rated.</p>`;
