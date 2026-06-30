@@ -93,9 +93,6 @@
   #about .atitle b{color:#e3120b}
   #about .asub{font-size:16px;font-weight:600;color:#555;margin:0 0 14px}
   #about .adesc{font-size:15.5px;line-height:1.55;color:#333}
-  #about #aboutx{position:absolute;top:7px;right:11px;border:none;background:none;font-size:21px;
-    color:#999;cursor:pointer;line-height:1;padding:0}
-  #about #aboutx:hover{color:#444}
   #about #aboutgo{margin-top:15px;font:13px/1 inherit;background:#2171b5;color:#fff;border:none;
     border-radius:5px;padding:8px 14px;cursor:pointer}
   #about #aboutgo:hover{background:#1559a3}
@@ -250,7 +247,6 @@
     <div id="legend" class="panel"></div>
     </div>
     <div id="about" class="panel">
-      <button id="aboutx" aria-label="Close">×</button>
       <div class="atitle">THE <b>DEADLIEST</b> MILE</div>
       <div class="asub">Fatal crash risk on District of Columbia roads</div>
       <div class="adesc">The federal government documents every fatal vehicle crash. This map plots
@@ -558,7 +554,7 @@ map.on('zoomend',()=>{ const zw=segWeight(), cw=crashW();
   rhlLayer.eachLayer(l=>{ if(l.setLatLngs) l.setStyle({weight:hlWeight()}); }); });
 map.on('popupclose',()=>{ hlLayer.clearLayers(); markLayer.clearLayers(); });
 // Explicit view state so the toggle direction never depends on a zoom guess.
-let detail=null, atState=false, ready=false, hashLock=false, userMoved=false;
+let detail=null, atState=false, ready=false, hashLock=false, userMoved=false, introOpen=true;
 // Shareable URL: #tab=<map|analysis|hotspots|info>[&type=<maptype>&c=<lat>,<lon>&z=<zoom>]
 // (the state itself lives in the path, e.g. /NM/). type/c/z apply only on the map tab.
 // The location (c/z) is only pinned once the visitor has actually panned/zoomed, so a
@@ -606,7 +602,7 @@ map.on('moveend',()=>{ if(curTab==='map' && userMoved) updateHash(); });
 // the location only enters the URL after a real user gesture on the map (drag, scroll-
 // zoom, pinch, keyboard, or the zoom buttons) — programmatic fits on load don't count.
 ['mousedown','wheel','touchstart','keydown'].forEach(ev=>
-  map.getContainer().addEventListener(ev,()=>{ userMoved=true; },{passive:true}));
+  map.getContainer().addEventListener(ev,()=>{ if(!introOpen) userMoved=true; },{passive:true}));
 function zbtnText(){ const b=document.querySelector('.leaflet-popup-content .zbtn');
   if(b) b.textContent = atState ? '▴ Segment view' : '▾ Statewide view'; }
 map.on('popupopen',zbtnText);
@@ -881,6 +877,7 @@ function setPts(off){ ptsOff=off;
   drawMap(); }
 function setTab(t){ curTab=t;
   if(t!=='map'){   // leaving the map dismisses the intro card; restoring/selecting the map keeps it up until the user clicks it
+    introOpen=false;
     const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');
     document.getElementById('map-view').classList.remove('introup');              // reveal the map controls
   }
@@ -936,11 +933,15 @@ async function logSearch(term,where){
   try{ fetch(LOG_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body}); }catch(e){}
 }
 function dismissIntro(){
+  if(!introOpen) return;                                             // idempotent; also leaves userMoved alone
+  introOpen=false;
   const ab=document.getElementById('about'); if(ab) ab.classList.add('hidden');
   document.getElementById('map-view').classList.remove('introup');   // reveal controls
   if(curTab==='map'){ map.invalidateSize(); fitState(); }            // re-center NM in the now-visible area
 }
-['aboutx','aboutgo','about'].forEach(id=>document.getElementById(id).addEventListener('click',dismissIntro));
+// dismiss by clicking the card itself or anywhere on the map beside it
+['aboutgo','about'].forEach(id=>document.getElementById(id).addEventListener('click',dismissIntro));
+map.getContainer().addEventListener('click',()=>{ if(introOpen) dismissIntro(); });
 document.querySelectorAll('.histsel button').forEach(b=>b.addEventListener('click',()=>{
   histMode=b.dataset.m; bucketFilter=null;
   document.querySelectorAll('.histsel button').forEach(x=>x.classList.toggle('on',x.dataset.m===histMode));
