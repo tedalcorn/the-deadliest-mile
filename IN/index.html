@@ -399,7 +399,7 @@ let segPolys=[], ptMarkers=[], curTab='map', syncing=false;
 let sort={key:'rate',dir:-1}, bucketFilter=null, histMode='rate', search='', min3=true;
 
 const RAMP=['#1a9850','#a6d96a','#fee08b','#fdae61','#d73027'];
-const NAT_RATE=0.8;    // nationwide median of the 50 state fatal-crash rates per 100M VMT; recompute if data changes
+const NAT_RATE=0.78;   // U.S. average fatal-crash rate = total crashes / total VMT across all rated segments nationwide, per 100M VMT (0.7785, 2001-2024). Recompute when data changes: sum len(cr) / sum(a*365*24*l/1e8) over every state's segments.json.
 const _rc=RATE_CUTS;
 const RATE_BUCKETS=[{lab:'<'+_rc[0],c:RAMP[0]},{lab:_rc[0]+'–'+_rc[1],c:RAMP[1]},{lab:_rc[1]+'–'+_rc[2],c:RAMP[2]},{lab:_rc[2]+'–'+_rc[3],c:RAMP[3]},{lab:_rc[3]+'+',c:RAMP[4]}];
 const COUNT_BUCKETS=[{lab:'1',c:RAMP[0]},{lab:'2–3',c:RAMP[1]},{lab:'4–6',c:RAMP[2]},{lab:'7–10',c:RAMP[3]},{lab:'11+',c:RAMP[4]}];
@@ -517,11 +517,11 @@ function riskLegendHtml(){
     +`<div class="lgbarwrap">`
     +`<div class="lgbar" style="background:linear-gradient(to right,${stops})"></div>`
     +`<div class="natline" style="left:${nx}%"></div>`
-    +`<div class="natlab" style="left:${nx}%">Nationwide median ${NAT_RATE}</div>`
+    +`<div class="natlab" style="left:${nx}%">U.S. average ${NAT_RATE}</div>`
     +`<div class="lgbarlab"><span>0</span><span>${dmax}+</span></div></div>`
     +`<div class="lgna"><span class="sw" style="background:#d4d4d4;margin-left:0"></span>`
     +`<span class="lgfull">insufficient data</span><span class="lgshort">n/a</span></div></div>`
-    +`<div class="muted lgfoot">Crash rate uses 2024 AADT; the nationwide-median line is the median of the 50 state rates. Sources: crash data from `
+    +`<div class="muted lgfoot">Crash rate uses 2024 AADT; the U.S.-average line is total fatal crashes ÷ total miles driven across the rated network nationwide. Sources: crash data from `
     +`<a href="https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars" target="_blank" rel="noopener">NHTSA&nbsp;FARS</a>; `
     +`AADT from <a href="https://www.fhwa.dot.gov/policyinformation/hpms.cfm" target="_blank" rel="noopener">FHWA HPMS</a>. `
     +`Address search <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>.</div>`;
