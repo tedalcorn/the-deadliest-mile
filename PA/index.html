@@ -314,8 +314,10 @@ function fitState(){
 }
 fitState();   // padded fit up front so the orientation matches the post-load re-fit (no jump)
 map.attributionControl.setPrefix(false);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  {attribution:'© OSM, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+  {attribution:'Basemap © Esri, HERE, Garmin, © OpenStreetMap contributors',maxNativeZoom:16,maxZoom:19}).addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+  {maxNativeZoom:16,maxZoom:19}).addTo(map);
 const canvas=L.canvas({padding:.5});
 const segLayer=L.layerGroup().addTo(map), rhlLayer=L.layerGroup().addTo(map),
       hlLayer=L.layerGroup().addTo(map), ptLayer=L.layerGroup().addTo(map),
