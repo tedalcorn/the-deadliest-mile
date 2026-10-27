@@ -296,7 +296,7 @@
   </div>
 </div>
 <script>
-const YMIN=2001, YMAX=2024, STATS={"segTotal": 1190, "crTotal": 2957, "crAssigned": 2156, "crLocal": 581, "crUnmatched": 220, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": []}, CITIES=[["Cheyenne", 41.1358, -104.7909, 12], ["Casper", 42.8426, -106.329, 12], ["Rock Springs", 41.5812, -109.2519, 12], ["Gillette", 44.2741, -105.4858, 12], ["Laramie", 41.2981, -105.5842, 12], ["Riverton", 43.0394, -108.4174, 12], ["Rawlins", 41.7862, -107.2449, 12], ["Green River", 41.5255, -109.4581, 12], ["Douglas", 42.7672, -105.4023, 12], ["Cody", 44.525, -109.0434, 12], ["Powell", 44.7526, -108.7522, 12], ["Evanston", 41.261, -110.9787, 12], ["Sinclair", 41.7765, -107.1204, 12], ["Lander", 42.8436, -108.7357, 12], ["Sheridan", 44.7769, -106.9411, 12]];
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 1190, "crTotal": 2957, "crAssigned": 2164, "crLocal": 581, "crUnmatched": 212, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": []}, CITIES=[["Cheyenne", 41.1358, -104.7909, 12], ["Casper", 42.8426, -106.329, 12], ["Rock Springs", 41.5812, -109.2519, 12], ["Gillette", 44.2741, -105.4858, 12], ["Laramie", 41.2981, -105.5842, 12], ["Riverton", 43.0394, -108.4174, 12], ["Rawlins", 41.7862, -107.2449, 12], ["Green River", 41.5255, -109.4581, 12], ["Douglas", 42.7672, -105.4023, 12], ["Cody", 44.525, -109.0434, 12], ["Powell", 44.7526, -108.7522, 12], ["Evanston", 41.261, -110.9787, 12], ["Sinclair", 41.7765, -107.1204, 12], ["Lander", 42.8436, -108.7357, 12], ["Sheridan", 44.7769, -106.9411, 12]];
 const NM_BOUNDS=[[40.997, -111.055], [45.004, -104.053]];
 // zoomSnap:0 lets fitBounds use a fractional zoom so the state fills the available
 // space exactly (default integer snapping rounds DOWN, leaving it looking zoomed out).
@@ -796,7 +796,10 @@ function renderCoverage(){
     `<p><b>Data</b><br>`
     +`The U.S. National Highway Traffic Safety Administration records every fatal vehicle crash in its `
     +`Fatality Analysis Reporting System (FARS). This map uses those records from ${STATS.yMin} to ${STATS.yMax}, `
-    +`placed by the coordinates the federal record assigns each crash. Traffic volumes come from state `
+    +`placed by the coordinates the federal record assigns each crash. A crash counts toward a highway `
+    +`segment's rate only when the record names that route and the crash lies close to it. Being near a `
+    +`highway is not enough on its own, so a crash on a side road at a junction is not credited to the `
+    +`highway it meets. Traffic volumes come from state `
     +`departments of transportation and the Federal Highway Administration's Highway Performance Monitoring `
     +`System, which report an annual average daily traffic figure for each segment of the signed highway `
     +`network — the Interstate, U.S. and state routes — but not for county and local roads.</p>`
@@ -825,7 +828,9 @@ function renderCoverage(){
     +`The data cover fatal crashes only, not injuries. Each segment's traffic volume is a single year `
     +`(2024) applied across the full period; where traffic has since grown, the rates shown `
     +`here are correspondingly overstated. Crashes are placed by the coordinates in the `
-    +`federal record, which are at times imprecise. And because traffic counts exist only for the signed highway `
+    +`federal record, which are at times imprecise. Some highway crashes are recorded under a local street `
+    +`name rather than a route number. Those appear on the map but do not count toward the highway's rate, `
+    +`so the rates shown may understate the risk on some roads. And because traffic counts exist only for the signed highway `
     +`network, deaths on local and county roads are mapped but not rated.</p>`;
   const ab=document.getElementById('aboutbody'); if(ab) ab.innerHTML=about;
 }

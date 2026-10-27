@@ -296,7 +296,7 @@
   </div>
 </div>
 <script>
-const YMIN=2001, YMAX=2024, STATS={"segTotal": 31, "crTotal": 769, "crAssigned": 46, "crLocal": 701, "crUnmatched": 22, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": [{"kind": "ped", "road": "Southern Ave", "loc": "Washington", "cty": "District Of Columbia", "lat": 38.8394, "lon": -76.9779, "n": 5, "e": [[38.8302, -76.9897], [38.8308, -76.9889], [38.8323, -76.9871], [38.8456, -76.9701], [38.8523, -76.9614]], "mi": 2.2, "permi": 2.3, "marks": [[38.87071, -76.93781], [38.83391, -76.98504], [38.8296, -76.99053], [38.83088, -76.98889], [38.83204, -76.9874]]}, {"kind": "ped", "road": "Benning Rd", "loc": "Washington", "cty": "District Of Columbia", "lat": 38.893, "lon": -76.9552, "n": 5, "e": [[38.8981, -76.9718], [38.8972, -76.9654], [38.896, -76.9569], [38.8896, -76.9441], [38.8866, -76.9398]], "mi": 1.9, "permi": 2.6, "marks": [[38.89469, -76.94822], [38.87845, -76.93143], [38.89551, -76.95264], [38.89831, -76.9736], [38.89786, -76.96998]]}, {"kind": "ped", "road": "North Capitol St", "loc": "Washington", "cty": "District Of Columbia", "lat": 38.9237, "lon": -77.009, "n": 4, "e": [[38.91, -77.009], [38.9146, -77.0091], [38.9285, -77.009], [38.9374, -77.009]], "mi": 1.9, "permi": 2.1, "marks": [[38.91078, -77.00907], [38.95095, -77.00891], [38.92391, -77.00911], [38.9092, -77.009]]}]}, CITIES=[["Washington", 38.895, -76.9935, 12], ["Washington, Dc", 38.8937, -76.9966, 12]];
+const YMIN=2001, YMAX=2024, STATS={"segTotal": 31, "crTotal": 769, "crAssigned": 63, "crLocal": 701, "crUnmatched": 5, "yMin": 2001, "yMax": 2024}, HOTSPOTS={"ped": [{"kind": "ped", "road": "Southern Ave", "loc": "Washington", "cty": "District Of Columbia", "lat": 38.8394, "lon": -76.9779, "n": 5, "e": [[38.8302, -76.9897], [38.8308, -76.9889], [38.8323, -76.9871], [38.8456, -76.9701], [38.8523, -76.9614]], "mi": 2.2, "permi": 2.3, "marks": [[38.87071, -76.93781], [38.83391, -76.98504], [38.8296, -76.99053], [38.83088, -76.98889], [38.83204, -76.9874]]}, {"kind": "ped", "road": "Benning Rd", "loc": "Washington", "cty": "District Of Columbia", "lat": 38.893, "lon": -76.9552, "n": 5, "e": [[38.8981, -76.9718], [38.8972, -76.9654], [38.896, -76.9569], [38.8896, -76.9441], [38.8866, -76.9398]], "mi": 1.9, "permi": 2.6, "marks": [[38.89469, -76.94822], [38.87845, -76.93143], [38.89551, -76.95264], [38.89831, -76.9736], [38.89786, -76.96998]]}, {"kind": "ped", "road": "North Capitol St", "loc": "Washington", "cty": "District Of Columbia", "lat": 38.9237, "lon": -77.009, "n": 4, "e": [[38.91, -77.009], [38.9146, -77.0091], [38.9285, -77.009], [38.9374, -77.009]], "mi": 1.9, "permi": 2.1, "marks": [[38.91078, -77.00907], [38.95095, -77.00891], [38.92391, -77.00911], [38.9092, -77.009]]}]}, CITIES=[["Washington", 38.895, -76.9935, 12], ["Washington, Dc", 38.8937, -76.9966, 12]];
 const NM_BOUNDS=[[38.793, -77.071], [38.985, -76.934]];
 // zoomSnap:0 lets fitBounds use a fractional zoom so the state fills the available
 // space exactly (default integer snapping rounds DOWN, leaving it looking zoomed out).
@@ -796,7 +796,10 @@ function renderCoverage(){
     `<p><b>Data</b><br>`
     +`The U.S. National Highway Traffic Safety Administration records every fatal vehicle crash in its `
     +`Fatality Analysis Reporting System (FARS). This map uses those records from ${STATS.yMin} to ${STATS.yMax}, `
-    +`placed by the coordinates the federal record assigns each crash. Traffic volumes come from state `
+    +`placed by the coordinates the federal record assigns each crash. A crash counts toward a highway `
+    +`segment's rate only when the record names that route and the crash lies close to it. Being near a `
+    +`highway is not enough on its own, so a crash on a side road at a junction is not credited to the `
+    +`highway it meets. Traffic volumes come from state `
     +`departments of transportation and the Federal Highway Administration's Highway Performance Monitoring `
     +`System, which report an annual average daily traffic figure for each segment of the signed highway `
     +`network — the Interstate, U.S. and state routes — but not for county and local roads.</p>`
@@ -825,7 +828,9 @@ function renderCoverage(){
     +`The data cover fatal crashes only, not injuries. Each segment's traffic volume is a single year `
     +`(2024) applied across the full period; where traffic has since grown, the rates shown `
     +`here are correspondingly overstated. Crashes are placed by the coordinates in the `
-    +`federal record, which are at times imprecise. And because traffic counts exist only for the signed highway `
+    +`federal record, which are at times imprecise. Some highway crashes are recorded under a local street `
+    +`name rather than a route number. Those appear on the map but do not count toward the highway's rate, `
+    +`so the rates shown may understate the risk on some roads. And because traffic counts exist only for the signed highway `
     +`network, deaths on local and county roads are mapped but not rated.</p>`;
   const ab=document.getElementById('aboutbody'); if(ab) ab.innerHTML=about;
 }
